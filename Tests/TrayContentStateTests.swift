@@ -50,11 +50,13 @@ final class TrayContentStateTests: XCTestCase {
         XCTAssertLessThan(state.encodedByteCount, TrayContentState.maxEncodedBytes)
     }
 
-    func testConstructionPathsCannotExceedEncodedLimit() {
-        // After closing the memberwise-init bypass (Finding 1), `make(from:)`
-        // and `countOnly(count:)` are the only ways left to build a
-        // `TrayContentState`. Pin that neither can produce an oversized state,
-        // even fed pathological input.
+    func testExplicitFactoryPathsCannotExceedEncodedLimit() {
+        // `make(from:)` and `countOnly(count:)` are the type's two explicit
+        // factory functions. Pin that neither can produce an oversized state,
+        // even fed pathological input. This does not cover decoding — a
+        // `TrayContentState` can also be constructed via `Codable`, which
+        // `testDecodingOversizedJSONStaysWithinEncodedLimit` below covers
+        // separately, since decoding degrades rather than clamping in place.
         let manyWorstCaseItems = (0..<10_000).map { _ in
             item(name: "x", uti: "public.source-code")
         }
@@ -68,5 +70,20 @@ final class TrayContentStateTests: XCTestCase {
     func testEncodedByteCountIsNonZero() {
         let state = TrayContentState.make(from: [item(name: "a.jpeg")])
         XCTAssertGreaterThan(state.encodedByteCount, 0)
+    }
+
+    func testDecodingOversizedJSONStaysWithinEncodedLimit() throws {
+        // Reviewer's crafted repro (task-6-review-2.md, Finding 1): the
+        // synthesized Decodable initializer ignored `maxPreviews` and the
+        // bounded symbol vocabulary entirely, decoding a single 5000-byte
+        // `id` into a 5045-byte `TrayContentState` with no resistance.
+        // ActivityKit decodes this type in the widget process, so decoding
+        // must degrade to a value within the limit rather than throw or
+        // silently exceed it.
+        let hugeID = String(repeating: "x", count: 5000)
+        let json = #"{"count": 1, "recent": [{"id": "\#(hugeID)", "symbol": "y"}]}"#
+        let data = try XCTUnwrap(json.data(using: .utf8))
+        let decoded = try JSONDecoder().decode(TrayContentState.self, from: data)
+        XCTAssertLessThanOrEqual(decoded.encodedByteCount, TrayContentState.maxEncodedBytes)
     }
 }
