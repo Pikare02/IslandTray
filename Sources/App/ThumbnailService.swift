@@ -9,20 +9,22 @@ actor ThumbnailService {
     private static let pointSize = CGSize(width: 120, height: 120)
     private var inFlight: [UUID: Task<UIImage?, Never>] = [:]
 
-    func thumbnail(for item: TrayItem) async -> UIImage? {
-        if let cached = loadCached(item) { return cached }
+    /// - Parameter scale: the display scale to render at. `UITraitCollection.current`
+    ///   can't be trusted here — it's thread-local, and this actor never runs on the
+    ///   main thread, so it would always read as unset. Callers should pass the real
+    ///   scale of the context the thumbnail will be shown in, e.g. a SwiftUI view's
+    ///   `@Environment(\.displayScale)`. The default only covers callers with no
+    ///   display context (previews, tests); it matches the historical fallback here.
+    func thumbnail(for item: TrayItem, scale: CGFloat = 2) async -> UIImage? {
+        let scale = scale > 0 ? scale : 2
+        if let cached = loadCached(item, scale: scale) { return cached }
         if let running = inFlight[item.id] { return await running.value }
 
         let task = Task<UIImage?, Never> {
-            // UITraitCollection.current is documented as safe to read off the
-            // main thread (it's how UIGraphicsImageRenderer-style code picks up
-            // display scale in background rendering contexts), unlike the
-            // deprecated UIScreen.main, which would require a MainActor hop.
-            let scale = UITraitCollection.current.displayScale
             let request = QLThumbnailGenerator.Request(
                 fileAt: item.fileURL,
                 size: Self.pointSize,
-                scale: scale > 0 ? scale : 2,
+                scale: scale,
                 representationTypes: .all
             )
             guard let rep = try? await QLThumbnailGenerator.shared
@@ -46,9 +48,14 @@ actor ThumbnailService {
     // The cache lives in the container so the widget process can read it too,
     // which is what makes real thumbnails possible in the Dynamic Island.
 
-    private func loadCached(_ item: TrayItem) -> UIImage? {
+    // PNG carries no scale metadata, so the bytes alone don't say what scale
+    // they were rendered at. We tag them with the caller's requested scale
+    // rather than a hardcoded 1.0 — accurate as long as a given device's
+    // display scale doesn't change between the write and this read, which
+    // holds in practice (it's a fixed device/simulator characteristic).
+    private func loadCached(_ item: TrayItem, scale: CGFloat) -> UIImage? {
         guard let data = try? Data(contentsOf: item.thumbnailURL) else { return nil }
-        return UIImage(data: data)
+        return UIImage(data: data, scale: scale)
     }
 
     private func store(_ image: UIImage, for item: TrayItem) {
