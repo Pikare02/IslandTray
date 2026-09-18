@@ -123,10 +123,43 @@ xcuserdata/
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.pikare.islandtray</string>
-	</array>
+	<key>CFBundleDisplayName</key>
+	<string>IslandTray</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>NSExtensionActivationRule</key>
+			<dict>
+				<key>NSExtensionActivationSupportsFileWithMaxCount</key>
+				<integer>20</integer>
+				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+				<integer>20</integer>
+				<key>NSExtensionActivationSupportsMovieWithMaxCount</key>
+				<integer>20</integer>
+				<key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+	</dict>
 </dict>
 </plist>
 ```
@@ -229,6 +262,12 @@ targets:
     platform: iOS
     sources:
       - Tests
+    settings:
+      base:
+        # The base GENERATE_INFOPLIST_FILE: NO assumes a checked-in Info.plist,
+        # which a unit test bundle does not need. Without this override the test
+        # bundle fails to code sign.
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: IslandTray
 
@@ -250,6 +289,8 @@ schemes:
 テストターゲットに `Sources/Shared` を含めてはならない。共有ソースは `IslandTray` 側で既にコンパイルされており、`@testable import IslandTray` で参照できる。両方に含めるとシンボルが二重定義になる。
 
 - [ ] **Step 5: Info.plist を 3 つ作る**
+
+`GENERATE_INFOPLIST_FILE: NO` のもとでは、Xcode は `CFBundleIdentifier` / `CFBundleExecutable` / `CFBundleName` / `CFBundlePackageType` / `CFBundleInfoDictionaryVersion` を自動で埋めない。これらが欠けるとシミュレータがバンドルのインストールを拒否する（`missing or invalid CFBundleExecutable`）。下のとおり明示的に書くこと。
 
 `Resources/App/Info.plist`:
 
