@@ -79,6 +79,11 @@ targets:
     platform: iOS
     sources:
       - Tests
+    settings:
+      base:
+        # Base GENERATE_INFOPLIST_FILE: NO assumes a checked-in Info.plist (see other
+        # targets' INFOPLIST_FILE), but a unit test bundle doesn't need a custom one.
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: IslandTray
 
