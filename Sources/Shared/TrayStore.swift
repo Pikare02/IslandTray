@@ -36,16 +36,20 @@ final class TrayStore: Sendable {
 
     // MARK: - Reading
 
-    /// Newest first. Corrupt (but readable) metadata is rebuilt from disk.
+    /// Newest first. This is the only entry point that recovers: metadata that
+    /// is not tray metadata at all is rebuilt from disk here, explicitly.
     /// A metadata file that cannot be read throws: an unreadable tray is not an
     /// empty tray, and callers must not persist anything derived from it.
+    /// Metadata in an unrecognised schema throws too -- that is data from a
+    /// newer build, not damage, and rebuilding over it would destroy it.
     func load() throws -> [TrayItem] {
         try prepare()
         guard let data = try coordinatedRead(), !data.isEmpty else { return [] }
-        guard let items = try? JSONDecoder.tray.decode([TrayItem].self, from: data) else {
+        do {
+            return presentable(try decodeItems(from: data))
+        } catch TrayStoreError.unreadableMetadata {
             return try rebuildFromDisk()
         }
-        return presentable(items)
     }
 
     /// Recovers the list from the files actually present in Items/.
@@ -56,7 +60,10 @@ final class TrayStore: Sendable {
     @discardableResult
     func rebuildFromDisk() throws -> [TrayItem] {
         try prepare()
-        return try mutate { $0 = try self.itemsOnDisk() }
+        // The baseline is the thing being replaced, so it is not read back in:
+        // reading it would fail (it is corrupt) and, worse, the payload of an
+        // in-flight add would be picked up as a "recovered" item.
+        return try mutate(ignoringCurrentItems: true) { $0 = try self.itemsOnDisk() }
     }
 
     // MARK: - Writing
@@ -86,24 +93,59 @@ final class TrayStore: Sendable {
         return item
     }
 
-    func remove(id: UUID) throws {
-        try mutate { items in
-            guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-            // Unlink before dropping the entry: load() already filters an entry
-            // whose file is missing, while a file whose entry is missing gets
-            // resurrected by rebuildFromDisk(). A failed unlink aborts the whole
-            // mutation, so a deletion is never reported as done while the bytes
-            // are still there.
-            try self.deleteFiles(for: items[index])
-            items.remove(at: index)
-        }
+    @discardableResult
+    func remove(id: UUID) throws -> TrayRemovalResult {
+        try sweep { $0.id == id }
     }
 
-    func removeAll() throws {
-        try mutate { items in
-            for item in items { try self.deleteFiles(for: item) }
-            items.removeAll()
+    @discardableResult
+    func removeAll() throws -> TrayRemovalResult {
+        try sweep { _ in true }
+    }
+
+    /// Unlinks every matching payload, then persists metadata describing what
+    /// actually happened on disk.
+    ///
+    /// Unlink comes first because load() already filters an entry whose file is
+    /// missing, while a file whose entry is missing gets resurrected by
+    /// rebuildFromDisk(). But an unlink cannot be rolled back, so a mutation
+    /// that threw after unlinking some payloads would report a total failure
+    /// after a partial destruction. Instead the failures are collected, the
+    /// entries of the items that did go are dropped, and the caller is told
+    /// which ids went and which did not. Only a sweep that removed nothing at
+    /// all throws -- then nothing happened and nothing is written.
+    private func sweep(_ matches: (TrayItem) -> Bool) throws -> TrayRemovalResult {
+        var removed: [UUID] = []
+        var failed: [UUID] = []
+        var firstFailure: Error?
+        do {
+            try mutate { items in
+                for item in items where matches(item) {
+                    do {
+                        try self.deleteFiles(for: item)
+                        removed.append(item.id)
+                    } catch {
+                        failed.append(item.id)
+                        if firstFailure == nil { firstFailure = error }
+                    }
+                }
+                if removed.isEmpty, let firstFailure { throw firstFailure }
+                let gone = Set(removed)
+                items.removeAll { gone.contains($0.id) }
+            }
+        } catch {
+            // The read or the metadata write failed. If that happened before
+            // any unlink, nothing was destroyed and the plain error is honest.
+            // If it happened after, the bytes are already gone and a bare
+            // error would be the same lie the loop above avoids, so the
+            // partial result goes out with it.
+            if removed.isEmpty { throw error }
+            throw TrayStoreError.partialRemoval(
+                TrayRemovalResult(removed: removed, failed: failed),
+                reason: String(describing: error)
+            )
         }
+        return TrayRemovalResult(removed: removed, failed: failed)
     }
 
     // MARK: - Internals
@@ -136,7 +178,10 @@ final class TrayStore: Sendable {
     /// Reads, mutates and writes items.json inside one coordinated write.
     /// Returns the list that was written.
     @discardableResult
-    private func mutate(_ body: (inout [TrayItem]) throws -> Void) throws -> [TrayItem] {
+    private func mutate(
+        ignoringCurrentItems: Bool = false,
+        _ body: (inout [TrayItem]) throws -> Void
+    ) throws -> [TrayItem] {
         try prepare()
         var written: [TrayItem] = []
         var bodyError: Error?
@@ -145,12 +190,12 @@ final class TrayStore: Sendable {
             writingItemAt: metadataURL, options: .forMerging, error: &coordinatorError
         ) { url in
             do {
-                var items = try self.currentItems(at: url)
+                var items: [TrayItem] = ignoringCurrentItems ? [] : try self.currentItems(at: url)
                 try body(&items)
                 items = self.presentable(items)
                 // Atomic so a crash mid-write cannot leave truncated JSON. There
                 // are no file presenters here that would need an in-place write.
-                try JSONEncoder.tray.encode(items).write(to: url, options: .atomic)
+                try JSONEncoder.tray.encode(TrayMetadata(items: items)).write(to: url, options: .atomic)
                 written = items
             } catch {
                 bodyError = error
@@ -162,15 +207,44 @@ final class TrayStore: Sendable {
     }
 
     /// The baseline for a mutation, read from inside the coordinated accessor.
-    /// Never substitutes an empty list for a read it could not perform.
+    /// Never substitutes an empty list for a read it could not perform, and
+    /// never recovers: a mutation that rebuilt from disk here would pick up the
+    /// payload its own caller had just written and insert that id twice.
+    /// Recovery is rebuildFromDisk()'s job, invoked explicitly by load().
     private func currentItems(at url: URL) throws -> [TrayItem] {
         guard let data = try readIfPresent(at: url), !data.isEmpty else { return [] }
-        guard let items = try? JSONDecoder.tray.decode([TrayItem].self, from: data) else {
-            // Corrupt but readable: recover from the payloads rather than
-            // building this mutation on top of nothing.
-            return try itemsOnDisk()
+        return try decodeItems(from: data)
+    }
+
+    /// Decodes items.json, tolerating the unversioned layout earlier builds
+    /// wrote (a bare array, whose dates are ISO8601 strings).
+    ///
+    /// The two failure modes are kept apart on purpose: `unreadableMetadata`
+    /// means the bytes are not tray metadata and the destructive
+    /// rebuild-and-persist is the right answer, while
+    /// `unsupportedSchemaVersion` means a newer build owns this file and
+    /// rebuilding would throw its contents away.
+    private func decodeItems(from data: Data) throws -> [TrayItem] {
+        if let probe = try? JSONDecoder().decode(SchemaProbe.self, from: data) {
+            guard probe.version == TrayMetadata.currentVersion else {
+                throw TrayStoreError.unsupportedSchemaVersion(probe.version)
+            }
+            guard let metadata = try? JSONDecoder.tray.decode(TrayMetadata.self, from: data) else {
+                throw TrayStoreError.unreadableMetadata
+            }
+            return metadata.items
         }
-        return items
+        guard let legacy = try? JSONDecoder.tray.decode([TrayItem].self, from: data) else {
+            throw TrayStoreError.unreadableMetadata
+        }
+        return legacy
+    }
+
+    /// Reads the version without committing to the rest of the layout, so a
+    /// schema whose items this build cannot decode is still recognised as a
+    /// version rather than as garbage.
+    private struct SchemaProbe: Decodable {
+        let version: Int
     }
 
     /// nil only when the file genuinely does not exist. Every other failure
@@ -245,13 +319,20 @@ final class TrayStore: Sendable {
     }
 
     /// Newest first, with the id as a tiebreaker so the order is total even when
-    /// two items share a timestamp. Entries whose payload is gone are dropped.
+    /// two items share a timestamp. Entries whose payload is gone are dropped,
+    /// and an id survives at most once: TrayItem is Identifiable and this list
+    /// feeds a SwiftUI ForEach, where a repeated id is undefined behaviour --
+    /// and where deleting one twin unlinks the payload both of them share.
+    /// The dedupe is an invariant of everything this type hands out, not a
+    /// patch on one path that could produce a duplicate.
     private func presentable(_ items: [TrayItem]) -> [TrayItem] {
-        items
+        var seen = Set<UUID>()
+        return items
             .filter { FileManager.default.fileExists(atPath: $0.fileURL(in: itemsDirectory).path) }
             .sorted {
                 $0.addedAt == $1.addedAt ? $0.id.uuidString < $1.id.uuidString : $0.addedAt > $1.addedAt
             }
+            .filter { seen.insert($0.id).inserted }
     }
 
     private func utiIdentifier(forExtension ext: String) -> String {
@@ -259,6 +340,35 @@ final class TrayStore: Sendable {
               let type = UTType(filenameExtension: ext) else { return "public.data" }
         return type.identifier
     }
+}
+
+/// What a destructive sweep actually did. `failed` items keep both their bytes
+/// and their metadata entry, so the caller can report the partial result rather
+/// than claiming a delete that half happened either succeeded or did not.
+struct TrayRemovalResult: Sendable, Equatable {
+    let removed: [UUID]
+    let failed: [UUID]
+}
+
+enum TrayStoreError: Error, Equatable {
+    /// Present, readable, and not tray metadata. Safe to rebuild over.
+    case unreadableMetadata
+    /// Tray metadata written by a build that knows a schema this one does not.
+    /// Never rebuilt over: it is someone else's data, not damage.
+    case unsupportedSchemaVersion(Int)
+    /// Payloads were unlinked but the metadata describing that could not be
+    /// written. Carries what did go, so the caller can still be truthful.
+    case partialRemoval(TrayRemovalResult, reason: String)
+}
+
+/// The on-disk envelope. The version exists so that the next format change is a
+/// migration rather than a silent reclassification of every user's metadata as
+/// corrupt -- which is what an unversioned bare array made of the previous one.
+struct TrayMetadata: Codable {
+    static let currentVersion = 1
+
+    var version: Int = Self.currentVersion
+    var items: [TrayItem]
 }
 
 // Dates are persisted as a raw time interval rather than ISO8601, which has
@@ -279,8 +389,20 @@ extension JSONDecoder {
     static var tray: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
-            let interval = try decoder.singleValueContainer().decode(Double.self)
-            return Date(timeIntervalSinceReferenceDate: interval)
+            let container = try decoder.singleValueContainer()
+            if let interval = try? container.decode(Double.self) {
+                return Date(timeIntervalSinceReferenceDate: interval)
+            }
+            // Metadata from before the interval format. The second-resolution
+            // truncation is already baked into those bytes; accepting it keeps
+            // the display names, which a rebuild would destroy outright.
+            let text = try container.decode(String.self)
+            guard let date = ISO8601DateFormatter().date(from: text) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container, debugDescription: "unrecognised date encoding"
+                )
+            }
+            return date
         }
         return decoder
     }
