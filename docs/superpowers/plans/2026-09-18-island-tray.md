@@ -1730,7 +1730,9 @@ actor TrayActivityController {
         guard state.encodedByteCount < TrayContentState.maxEncodedBytes else {
             // Should be unreachable given the preview cap, but degrade instead
             // of letting ActivityKit reject the whole update.
-            await update(TrayContentState(count: items.count, recent: []))
+            // countOnly is the only construction path for a previewless state:
+            // the memberwise init is private so an oversized state cannot be built.
+            await update(TrayContentState.countOnly(count: items.count))
             return
         }
 
