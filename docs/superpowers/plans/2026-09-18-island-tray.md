@@ -2073,6 +2073,11 @@ struct TrayCardView: View {
     let item: TrayItem
     let onDelete: () -> Void
 
+    // The thumbnail generator takes the scale rather than discovering it: read
+    // off the main thread, UITraitCollection.current is unset and everything
+    // silently renders at 2x. This environment value is the authoritative scale
+    // for this view.
+    @Environment(\.displayScale) private var displayScale
     @State private var thumbnail: UIImage?
 
     private static let cardWidth: CGFloat = 104
@@ -2102,7 +2107,7 @@ struct TrayCardView: View {
                 .frame(width: Self.cardWidth)
         }
         .task(id: item.id) {
-            thumbnail = await ThumbnailService.shared.thumbnail(for: item)
+            thumbnail = await ThumbnailService.shared.thumbnail(for: item, scale: displayScale)
         }
         // onDrag rather than .draggable: this hands other apps the actual file
         // rather than a link to it.
