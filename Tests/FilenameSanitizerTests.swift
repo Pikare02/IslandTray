@@ -56,4 +56,58 @@ final class FilenameSanitizerTests: XCTestCase {
         XCTAssertLessThanOrEqual(r.name.utf8.count, 255)
         XCTAssertTrue(r.name.hasSuffix(".txt"))
     }
+
+    /// Pins the 255-byte guarantee generally, not just for the "long stem, short
+    /// extension" shape: every input here must come back at or under the cap,
+    /// regardless of where the bytes are concentrated.
+    func testByteCapHoldsRegardlessOfShape() {
+        let cases: [(raw: String?, fallback: String?)] = [
+            (String(repeating: "a", count: 500) + ".txt", nil),
+            ("photo." + String(repeating: "a", count: 400), nil),
+            (String(repeating: "a", count: 500), String(repeating: "b", count: 400)),
+            (String(repeating: "a", count: 500) + "." + String(repeating: "a", count: 400), nil),
+            (String(repeating: "é", count: 500) + ".txt", nil),
+        ]
+        for c in cases {
+            let r = FilenameSanitizer.sanitize(c.raw, fallbackExtension: c.fallback)
+            XCTAssertLessThanOrEqual(
+                r.name.utf8.count, 255,
+                "name exceeded 255 bytes for raw=\(String(describing: c.raw)), fallback=\(String(describing: c.fallback))"
+            )
+        }
+    }
+
+    /// Finding 1 repro: a filename whose "extension" segment is absurdly long
+    /// must not be able to defeat the 255-byte cap by driving the truncation
+    /// budget negative. The over-long segment is not a real extension, so it
+    /// is dropped entirely rather than truncated in place.
+    func testOverLongExtensionSegmentIsTreatedAsNoExtension() {
+        let r = FilenameSanitizer.sanitize("photo." + String(repeating: "a", count: 400), fallbackExtension: nil)
+        XCTAssertLessThanOrEqual(r.name.utf8.count, 255)
+        XCTAssertEqual(r.ext, "")
+        XCTAssertEqual(r.name, "photo")
+    }
+
+    /// Same defect, reachable through fallbackExtension instead of raw.
+    func testOverLongFallbackExtensionIsRejected() {
+        let r = FilenameSanitizer.sanitize("scan", fallbackExtension: String(repeating: "a", count: 400))
+        XCTAssertLessThanOrEqual(r.name.utf8.count, 255)
+        XCTAssertEqual(r.ext, "")
+        XCTAssertEqual(r.name, "scan")
+    }
+
+    /// Guards against overcorrecting: real-world long extensions (up to ~12
+    /// chars, e.g. Sketch's "sketchplugin" or Numbers' "numbers-tef") must
+    /// still be preserved, not swept up by the over-long-extension guard.
+    func testOrdinaryLongExtensionIsPreserved() {
+        let r = FilenameSanitizer.sanitize("archive.sketchplugin", fallbackExtension: nil)
+        XCTAssertEqual(r.ext, "sketchplugin")
+        XCTAssertEqual(r.name, "archive.sketchplugin")
+    }
+
+    func testStripsLineAndParagraphSeparators() {
+        let r = FilenameSanitizer.sanitize("a\u{2028}b\u{2029}c.txt", fallbackExtension: nil)
+        XCTAssertEqual(r.name, "abc.txt")
+        XCTAssertEqual(r.ext, "txt")
+    }
 }
