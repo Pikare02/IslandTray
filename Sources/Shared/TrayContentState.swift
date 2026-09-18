@@ -13,19 +13,40 @@ struct TrayContentState: Codable, Hashable {
 
     struct Preview: Codable, Hashable {
         /// TrayItem id. The widget derives the thumbnail path from this.
-        var id: String
+        let id: String
         /// SF Symbol name, used when the App Group container is unavailable.
-        var symbol: String
+        let symbol: String
+
+        /// Restricted to this file so every `Preview` is built through
+        /// `make(from:)`, which bounds both `id` (a UUID string) and `symbol`
+        /// (`TrayItem.symbolName`'s closed set) — never from arbitrary input.
+        fileprivate init(id: String, symbol: String) {
+            self.id = id
+            self.symbol = symbol
+        }
     }
 
-    var count: Int
-    var recent: [Preview]
+    let count: Int
+    let recent: [Preview]
+
+    /// Restricted so `maxPreviews` can never be bypassed by direct construction.
+    /// Build a `TrayContentState` via `make(from:)` or `countOnly(count:)`.
+    private init(count: Int, recent: [Preview]) {
+        self.count = count
+        self.recent = recent
+    }
 
     static func make(from items: [TrayItem]) -> TrayContentState {
         let previews = items.prefix(maxPreviews).map {
             Preview(id: $0.id.uuidString, symbol: $0.symbolName)
         }
         return TrayContentState(count: items.count, recent: Array(previews))
+    }
+
+    /// Degraded state carrying only the count, for when the full state (with
+    /// previews) would exceed `maxEncodedBytes`.
+    static func countOnly(count: Int) -> TrayContentState {
+        TrayContentState(count: count, recent: [])
     }
 
     var encodedByteCount: Int {
