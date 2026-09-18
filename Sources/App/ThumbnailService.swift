@@ -9,13 +9,14 @@ actor ThumbnailService {
     private static let pointSize = CGSize(width: 120, height: 120)
     private var inFlight: [UUID: Task<UIImage?, Never>] = [:]
 
-    /// - Parameter scale: the display scale to render at. `UITraitCollection.current`
-    ///   can't be trusted here — it's thread-local, and this actor never runs on the
-    ///   main thread, so it would always read as unset. Callers should pass the real
-    ///   scale of the context the thumbnail will be shown in, e.g. a SwiftUI view's
-    ///   `@Environment(\.displayScale)`. The default only covers callers with no
-    ///   display context (previews, tests); it matches the historical fallback here.
-    func thumbnail(for item: TrayItem, scale: CGFloat = 2) async -> UIImage? {
+    /// - Parameter scale: the display scale of the context the thumbnail will be
+    ///   shown in. Required, no default: `UITraitCollection.current` can't be
+    ///   trusted here — it's thread-local, and this actor never runs on the main
+    ///   thread, so it would always read as unset. The caller must supply the real
+    ///   scale, e.g. a SwiftUI view's `@Environment(\.displayScale)`.
+    func thumbnail(for item: TrayItem, scale: CGFloat) async -> UIImage? {
+        // Defensive clamp against a genuinely invalid value (0 or negative),
+        // not a substitute for the caller passing the real display scale.
         let scale = scale > 0 ? scale : 2
         if let cached = loadCached(item, scale: scale) { return cached }
         if let running = inFlight[item.id] { return await running.value }
