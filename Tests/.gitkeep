@@ -1,0 +1,2 @@
+# Keeps this directory in git so `xcodegen generate` works from a fresh clone.
+# Task 3 adds the first real test file here; this can go once tests exist.
