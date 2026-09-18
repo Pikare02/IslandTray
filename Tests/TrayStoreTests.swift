@@ -55,7 +55,7 @@ final class TrayStoreTests: XCTestCase {
 
     func testRemoveDeletesFileAndMetadata() throws {
         let item = try store.add(data: Data("x".utf8), suggestedName: "c.txt", uti: "public.plain-text")
-        try store.remove(id: item.id)
+        _ = try store.remove(id: item.id)
         XCTAssertTrue(try store.load().isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: item.fileURL(in: itemsDir).path))
     }
@@ -219,7 +219,7 @@ final class TrayStoreTests: XCTestCase {
     func testRemovedItemStaysRemovedAcrossRebuild() throws {
         let keep = try addText("keep.txt")
         let gone = try addText("gone.txt")
-        try store.remove(id: gone.id)
+        _ = try store.remove(id: gone.id)
         try corruptMetadata()
         XCTAssertEqual(try store.load().map(\.id), [keep.id], "rebuild resurrected a removed item")
     }
@@ -330,7 +330,7 @@ final class TrayStoreTests: XCTestCase {
     func testRemoveAllDeletesFilesAndMetadata() throws {
         _ = try addText("1.txt")
         _ = try addText("2.txt")
-        try store.removeAll()
+        _ = try store.removeAll()
         XCTAssertTrue(try store.load().isEmpty)
         XCTAssertEqual(try itemsDirEntries(), [])
         // And nothing comes back from a rebuild.
@@ -347,7 +347,7 @@ final class TrayStoreTests: XCTestCase {
 
     func testRemoveUnknownIDIsANoOp() throws {
         let item = try addText("1.txt")
-        try store.remove(id: UUID())
+        _ = try store.remove(id: UUID())
         XCTAssertEqual(try store.load().map(\.id), [item.id])
     }
 
@@ -394,9 +394,15 @@ final class TrayStoreTests: XCTestCase {
                 "precondition: the payload must be undeletable"
             )
 
-            let result = try store.removeAll()
-            XCTAssertEqual(Set(result.removed), Set(added.filter { $0.id != stuck.id }.map(\.id)))
-            XCTAssertEqual(result.failed, [stuck.id])
+            // A sweep that left a payload behind is not the "it worked" shape,
+            // but it still has to say exactly what went and what did not.
+            XCTAssertThrowsError(try store.removeAll()) { error in
+                guard case .incompleteRemoval(let result, _) = error as? TrayStoreError else {
+                    return XCTFail("a partial destruction must carry both lists: \(error)")
+                }
+                XCTAssertEqual(Set(result.removed), Set(added.filter { $0.id != stuck.id }.map(\.id)))
+                XCTAssertEqual(result.failed, [stuck.id])
+            }
 
             // Metadata agrees with disk: what went is gone from both, what
             // stayed is listed in both.
@@ -410,7 +416,7 @@ final class TrayStoreTests: XCTestCase {
         let stuck = try addText("stuck.txt")
 
         try withImmutable(stuck.fileURL(in: itemsDir)) {
-            _ = try store.removeAll()
+            _ = try? store.removeAll()
         }
 
         // Finding 4: the payloads that did go must not come back from a rebuild.
@@ -432,7 +438,7 @@ final class TrayStoreTests: XCTestCase {
         // atomic rename of items.json cannot land.
         try withPermissions(0o500, at: root) {
             XCTAssertThrowsError(try store.removeAll()) { error in
-                guard case .partialRemoval(let result, _) = error as? TrayStoreError else {
+                guard case .incompleteRemoval(let result, _) = error as? TrayStoreError else {
                     return XCTFail("a partial destruction must not surface as a plain failure: \(error)")
                 }
                 XCTAssertEqual(Set(result.removed), Set([a.id, b.id]))
@@ -481,6 +487,149 @@ final class TrayStoreTests: XCTestCase {
         try corruptMetadata()
         // The destructive path is still reachable -- for genuine garbage only.
         XCTAssertEqual(try store.load().map(\.id), [item.id])
+    }
+
+    // MARK: - Round 3, Finding 1: a recovery must not eat a concurrent add
+
+    /// The damage needs a real race: a recovery whose decision was taken before
+    /// another process's add() landed. One store retries add() while three
+    /// others call load() on the same corrupt tray, which is what the app, the
+    /// widget's timeline provider and the share extension do to one container.
+    /// Every trial is asserted, so one destroyed name out of ten fails the test.
+    func testRecoveryRacingAnAddKeepsTheRealNameAndTimestamp() throws {
+        let payload = Data("photo".utf8)
+
+        for trial in 0..<10 {
+            let trialRoot = root.appendingPathComponent("trial-\(trial)", isDirectory: true)
+            let trialItems = trialRoot.appendingPathComponent("Items", isDirectory: true)
+            let adder = TrayStore(root: trialRoot)
+            try adder.prepare()
+            try Data("}{ not json".utf8).write(to: trialRoot.appendingPathComponent("items.json"))
+            let readers = (0..<3).map { _ in TrayStore(root: trialRoot) }
+
+            DispatchQueue.concurrentPerform(iterations: readers.count + 1) { i in
+                guard i > 0 else {
+                    // add() throws while the metadata is still garbage, so it
+                    // retries: the item at risk is the one that commits next to
+                    // a recovery, not one that is refused outright.
+                    let deadline = Date().addingTimeInterval(5)
+                    while Date() < deadline {
+                        let added = try? adder.add(
+                            data: payload, suggestedName: "photo.txt", uti: "public.plain-text"
+                        )
+                        if added != nil { return }
+                    }
+                    return
+                }
+                for _ in 0..<5 { _ = try? readers[i - 1].load() }
+            }
+
+            let loaded = try adder.load()
+            XCTAssertEqual(loaded.count, 1, "trial \(trial): the concurrent add did not survive")
+            let item = try XCTUnwrap(loaded.first)
+            XCTAssertEqual(
+                item.name, "photo.txt",
+                "trial \(trial): a recovery replaced a concurrent add's display name"
+            )
+            // A recovered placeholder takes addedAt from the payload's creation
+            // date, which is always later than the real item's -- so a surviving
+            // timestamp is provably the one add() chose, not the file's.
+            let created = try XCTUnwrap(
+                FileManager.default
+                    .attributesOfItem(atPath: item.fileURL(in: trialItems).path)[.creationDate] as? Date
+            )
+            XCTAssertLessThan(
+                item.addedAt, created,
+                "trial \(trial): addedAt was replaced by the payload's creation time"
+            )
+        }
+    }
+
+    /// Which twin the dedupe keeps is not academic: the one case that produces
+    /// duplicates is a recovery racing an add, and a timestamp tiebreak always
+    /// picks the placeholder because its addedAt is the file's creation date.
+    func testDuplicateIDKeepsTheRealEntryNotTheRecoveredPlaceholder() throws {
+        let item = try addText("photo.txt")
+        let placeholder = TrayItem(
+            id: item.id,
+            name: "Recovered-\(item.id.uuidString.prefix(8)).txt",
+            uti: item.uti,
+            size: item.size,
+            addedAt: item.addedAt.addingTimeInterval(60),
+            ext: item.ext
+        )
+        try JSONEncoder.tray.encode(TrayMetadata(items: [item, placeholder])).write(to: metadataURL)
+
+        XCTAssertEqual(try store.load().map(\.name), ["photo.txt"])
+    }
+
+    /// The decision to rebuild and the rebuild itself must be one transaction.
+    /// Driven directly, because that is what a "Repair tray" affordance does --
+    /// and because load()'s decision is stale by the time the claim is taken.
+    func testRebuildLeavesMetadataThatIsValidAlone() throws {
+        let item = try addText("vacation.jpeg")
+
+        let rebuilt = try store.rebuildFromDisk()
+        XCTAssertEqual(rebuilt.map(\.name), ["vacation.jpeg"], "a rebuild destroyed valid metadata")
+        XCTAssertEqual(rebuilt.map(\.id), [item.id])
+        XCTAssertEqual(try store.load().map(\.name), ["vacation.jpeg"])
+        XCTAssertEqual(try store.load().first?.addedAt, item.addedAt)
+    }
+
+    // MARK: - Round 3, Finding 4: rebuild carries load()'s version guard too
+
+    func testRebuildRefusesANewerSchema() throws {
+        _ = try addText("keep.txt")
+        let future = Data(#"{"version":9999,"items":[]}"#.utf8)
+        try future.write(to: metadataURL)
+
+        XCTAssertThrowsError(try store.rebuildFromDisk(), "a newer schema is not damage") { error in
+            XCTAssertEqual(error as? TrayStoreError, .unsupportedSchemaVersion(9999))
+        }
+        XCTAssertEqual(try Data(contentsOf: metadataURL), future, "a newer schema must never be overwritten")
+    }
+
+    // MARK: - Round 3, Finding 2: one contract for what a sweep did
+
+    func testRemoveAllTellsTheCallerWhatSurvivedWhenEveryUnlinkFails() throws {
+        let a = try addText("a.txt")
+        let b = try addText("b.txt")
+
+        try withPermissions(0o500, at: itemsDir) {
+            XCTAssertThrowsError(try store.removeAll(), "a sweep that deleted nothing still failed") { error in
+                guard case .incompleteRemoval(let result, _) = error as? TrayStoreError else {
+                    return XCTFail("the failed list must not be discarded: \(error)")
+                }
+                XCTAssertTrue(result.removed.isEmpty)
+                XCTAssertEqual(Set(result.failed), Set([a.id, b.id]))
+            }
+        }
+
+        XCTAssertEqual(try store.load().count, 2, "nothing was destroyed, so nothing was dropped")
+        XCTAssertEqual(try itemsDirEntries().count, 2)
+    }
+
+    // MARK: - Round 3, Finding 3: an older schema is migrated, not refused
+
+    func testAFutureBuildStillReadsMetadataThisBuildWrote() throws {
+        let item = try addText("taxes.pdf")
+        let today = try Data(contentsOf: metadataURL)
+
+        // Simulate the next routine version bump: the same decoder, one
+        // currentVersion higher. Whoever bumps it finds out here, not from users.
+        let migrated = try TrayStore.decodeItems(
+            from: today, currentVersion: TrayMetadata.currentVersion + 1
+        )
+        XCTAssertEqual(migrated.map(\.id), [item.id])
+        XCTAssertEqual(migrated.map(\.name), ["taxes.pdf"], "a version bump must not orphan existing trays")
+
+        // The other direction is unchanged: metadata from a build that knows a
+        // newer schema is refused, never read as this build's shape.
+        XCTAssertThrowsError(
+            try TrayStore.decodeItems(from: today, currentVersion: TrayMetadata.currentVersion - 1)
+        ) { error in
+            XCTAssertEqual(error as? TrayStoreError, .unsupportedSchemaVersion(TrayMetadata.currentVersion))
+        }
     }
 }
 
