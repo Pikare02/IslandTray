@@ -1007,6 +1007,20 @@ EOF
 
 ## Task 5: 項目モデルとストア
 
+> **重要 — 以下のコードはそのまま使ってはならない。**
+>
+> この節の `TrayStore` 実装案には、レビューで再現された**データ消失の欠陥が 8 件**あった
+> （クロスプロセスの read-modify-write が調停されていない、読み取り失敗が空トレイと区別できない、
+> 復旧経路が復旧対象を破壊する、削除がリビルドで復活する、`add` が非トランザクショナル、
+> `.iso8601` が秒で切り捨てる、等）。修正の過程でさらに回帰が 3 件発生し、計 4 ラウンドのレビューを要した。
+>
+> 実際に動いている実装は `Sources/Shared/TrayStore.swift`（コミット `37c2fa6`→`6b6e121`）であり、
+> 下のコードとは大きく異なる。再実装する場合は下のコードではなく**そちらを読むこと**。
+> 各欠陥の再現手順と判断は `.superpowers/sdd/task-5-review{,-2,-3,-4}.md` に残っている。
+>
+> 下のコードは、当初の設計意図（UUID からのみパスを組む、コピーとして保存する、
+> `items.json` 1 ファイル）を読むための資料として残す。
+
 
 トレイの中身そのものを扱う。追加・削除・一覧と `items.json` の永続化。アプリと Share Extension の両方から書かれるため `NSFileCoordinator` で調停する。
 
@@ -2025,8 +2039,17 @@ final class TrayModel {
     }
 
     func remove(_ item: TrayItem) async {
+        // remove(id:) returns what actually happened on disk. A partial failure
+        // must not be reported to the user as a clean delete, nor as a no-op.
         do {
-            try TrayStore.shared.remove(id: item.id)
+            let result = try TrayStore.shared.remove(id: item.id)
+            banner = result.failed.isEmpty ? nil : "一部のファイルを削除できませんでした"
+        } catch let error as TrayStoreError {
+            if case .incompleteRemoval(let result, _) = error {
+                banner = "\(result.removed.count) 件を削除しましたが、\(result.failed.count) 件は削除できませんでした"
+            } else {
+                banner = "削除に失敗しました"
+            }
         } catch {
             banner = "削除に失敗しました"
         }
@@ -2479,7 +2502,12 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 
 - [ ] **Step 3: 移行を実装する**
 
-`Sources/Shared/TrayStore.swift` の `removeAll()` の直後に追加する:
+`Sources/Shared/TrayStore.swift` の `removeAll()` の直後に追加する。
+
+> **注意:** `TrayStore` の内部は Task 5 のレビューを経て大きく変わっている（`items.json` はバージョン付きの
+> エンベロープになり、書き込みは `mutate` 系に集約され、`write` は直接呼べない）。下のコードは当初の内部構造を
+> 前提に書かれているため、**現在の `TrayStore.swift` に合わせて書き直すこと**。守るべき性質は変わらない
+> ——冪等であること、同じルートに対しては何もしないこと、移行がコンテナの外に書き出さないこと。
 
 ```swift
     /// Moves items from a previous container into this one.
