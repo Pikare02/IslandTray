@@ -791,63 +791,59 @@ EOF
 `Tests/FilenameSanitizerTests.swift`:
 
 ```swift
-import XCTest
-@testable import IslandTray
+import Foundation
 
-final class FilenameSanitizerTests: XCTestCase {
-    func testKeepsOrdinaryName() {
-        let r = FilenameSanitizer.sanitize("photo.jpeg", fallbackExtension: nil)
-        XCTAssertEqual(r.name, "photo.jpeg")
-        XCTAssertEqual(r.ext, "jpeg")
+/// Normalizes filenames that arrive from drops and the share sheet.
+/// These are untrusted input: they may contain path separators, parent
+/// references, or control characters. Container paths are always built from a
+/// UUID, so this result is only used for display and for the file extension —
+/// but it must still never escape the container if it is ever joined to a path.
+enum FilenameSanitizer {
+    private static let maxBytes = 255
+
+    // Real-world extensions top out around 12 chars (e.g. "sketchplugin",
+    // "numbers-tef"). Anything longer isn't a genuine extension, and if left
+    // unbounded it can drive `truncate`'s byte budget negative, defeating the
+    // 255-byte guarantee (see task-3-review.md Finding 1). Cap with headroom.
+    private static let maxExtensionBytes = 20
+
+    static func sanitize(_ raw: String?, fallbackExtension: String?) -> (name: String, ext: String) {
+        // Take only the last path component, which drops "../" and any directories.
+        var base = (raw ?? "")
+            .components(separatedBy: CharacterSet(charactersIn: "/\\"))
+            .last ?? ""
+
+        base = base.components(separatedBy: .controlCharacters).joined()
+        base = base.components(separatedBy: CharacterSet(charactersIn: "\u{2028}\u{2029}")).joined()
+        base = base.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // A name made only of dots would still resolve to a directory reference.
+        if base.allSatisfy({ $0 == "." }) { base = "" }
+
+        var ext = (base as NSString).pathExtension.lowercased()
+        if ext.utf8.count > maxExtensionBytes {
+            // Not a real extension -- treat as absent so the fallback path below applies.
+            ext = ""
+        }
+        if ext.isEmpty, let fallback = fallbackExtension?.lowercased(), !fallback.isEmpty,
+           fallback.utf8.count <= maxExtensionBytes {
+            ext = fallback
+        }
+
+        var stem = (base as NSString).deletingPathExtension
+        if stem.isEmpty { stem = "Untitled" }
+
+        stem = truncate(stem, toBytes: maxBytes - (ext.isEmpty ? 0 : ext.utf8.count + 1))
+
+        let name = ext.isEmpty ? stem : "\(stem).\(ext)"
+        return (name, ext)
     }
 
-    func testStripsPathSeparators() {
-        let r = FilenameSanitizer.sanitize("../../etc/passwd", fallbackExtension: nil)
-        XCTAssertFalse(r.name.contains("/"))
-        XCTAssertFalse(r.name.contains(".."))
-        XCTAssertEqual(r.name, "passwd")
-    }
-
-    func testStripsNullAndControlCharacters() {
-        let r = FilenameSanitizer.sanitize("a\u{0}b\nc.txt", fallbackExtension: nil)
-        XCTAssertEqual(r.name, "abc.txt")
-        XCTAssertEqual(r.ext, "txt")
-    }
-
-    func testUsesFallbackWhenNameIsNil() {
-        let r = FilenameSanitizer.sanitize(nil, fallbackExtension: "png")
-        XCTAssertEqual(r.name, "Untitled.png")
-        XCTAssertEqual(r.ext, "png")
-    }
-
-    func testUsesFallbackWhenNameIsBlank() {
-        let r = FilenameSanitizer.sanitize("   ", fallbackExtension: "pdf")
-        XCTAssertEqual(r.name, "Untitled.pdf")
-        XCTAssertEqual(r.ext, "pdf")
-    }
-
-    func testAppendsFallbackExtensionWhenMissing() {
-        let r = FilenameSanitizer.sanitize("scan", fallbackExtension: "pdf")
-        XCTAssertEqual(r.name, "scan.pdf")
-        XCTAssertEqual(r.ext, "pdf")
-    }
-
-    func testNoExtensionAndNoFallback() {
-        let r = FilenameSanitizer.sanitize("README", fallbackExtension: nil)
-        XCTAssertEqual(r.name, "README")
-        XCTAssertEqual(r.ext, "")
-    }
-
-    func testLowercasesExtension() {
-        let r = FilenameSanitizer.sanitize("IMG_0001.JPEG", fallbackExtension: nil)
-        XCTAssertEqual(r.ext, "jpeg")
-    }
-
-    func testTruncatesVeryLongName() {
-        let long = String(repeating: "a", count: 500) + ".txt"
-        let r = FilenameSanitizer.sanitize(long, fallbackExtension: nil)
-        XCTAssertLessThanOrEqual(r.name.utf8.count, 255)
-        XCTAssertTrue(r.name.hasSuffix(".txt"))
+    private static func truncate(_ s: String, toBytes limit: Int) -> String {
+        guard s.utf8.count > limit, limit > 0 else { return s }
+        var out = s
+        while out.utf8.count > limit { out.removeLast() }
+        return out
     }
 }
 ```
@@ -916,7 +912,7 @@ enum FilenameSanitizer {
 xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
-期待: `** TEST SUCCEEDED **`
+期待: `** TEST SUCCEEDED **`、14 件すべて成功。
 
 - [ ] **Step 5: コミット**
 
