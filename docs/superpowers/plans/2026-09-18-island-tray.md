@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - デプロイメントターゲットは **iOS 17.0**。本実装で使う API はすべて iOS 17.0 で揃う（`@Observable`、`LiveActivityIntent`、`ContentUnavailableView`、`scrollClipDisabled`）。`.transient` のみ iOS 18.0 以降だが、Task 2 のスパイクで一度試すだけで本実装では使わないため、そこだけ `#available` で囲う。
-- テストとビルドの確認は **iPhone 15 Pro シミュレータ** で行う（OS は固定しない。インストール済みの最新ランタイムが使われる）。実機が必要なのは Task 2 のスパイクと Task 10 の実機確認だけ。
+- テストとビルドの確認は **iPhone 18 Pro シミュレータ**（Dynamic Island あり）で行う。`-destination` に OS は固定しない。実機が必要なのは Task 2 のスパイクと Task 10 の実機確認だけ。
 - ユニバーサルアプリ（iPhone / iPad 両対応）。`TARGETED_DEVICE_FAMILY = "1,2"`。
 - Swift の条件付きコンパイル（`#if`）による有料・無料の分岐は**禁止**。差分は entitlements ファイルのみ。
 - `ContentState` のエンコード後サイズは **4096 バイト未満**。画像データを載せてはならない。
@@ -151,6 +151,10 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
 
+# Note: targets deliberately have no `info:` block. An `info:` block makes
+# XcodeGen generate its own Info.plist and overwrite the hand-authored ones,
+# destroying NSSupportsLiveActivities, the URL scheme and the share rules.
+# INFOPLIST_FILE + GENERATE_INFOPLIST_FILE: NO is what wires them up.
 configs:
   Debug: debug
   Release: release
@@ -175,8 +179,6 @@ targets:
       - Sources/App
       - path: Resources/App/Assets.xcassets
         buildPhase: resources
-    info:
-      path: Resources/App/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray
@@ -196,8 +198,6 @@ targets:
     sources:
       - Sources/Shared
       - Sources/Widget
-    info:
-      path: Resources/Widget/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
@@ -214,8 +214,6 @@ targets:
     sources:
       - Sources/Shared
       - Sources/Share
-    info:
-      path: Resources/Share/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.share
@@ -816,7 +814,7 @@ final class FilenameSanitizerTests: XCTestCase {
 - [ ] **Step 2: テストが失敗することを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `cannot find 'FilenameSanitizer' in scope` でコンパイルエラーになる。
@@ -874,7 +872,7 @@ enum FilenameSanitizer {
 - [ ] **Step 4: テストが通ることを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `** TEST SUCCEEDED **`
@@ -1099,7 +1097,7 @@ final class TrayStoreTests: XCTestCase {
 - [ ] **Step 2: テストが失敗することを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `cannot find 'TrayStore' in scope` でコンパイルエラーになる。
@@ -1357,7 +1355,7 @@ extension JSONDecoder {
 - [ ] **Step 5: テストが通ることを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `** TEST SUCCEEDED **`、9 件すべて成功。
@@ -1453,7 +1451,7 @@ final class TrayContentStateTests: XCTestCase {
 - [ ] **Step 2: テストが失敗することを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `type 'TrayContentState' has no member 'make'` でコンパイルエラーになる。
@@ -1504,7 +1502,7 @@ struct TrayContentState: Codable, Hashable {
 - [ ] **Step 4: テストが通ることを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `** TEST SUCCEEDED **`
@@ -2345,7 +2343,7 @@ xcodebuild build -project IslandTray.xcodeproj -scheme "IslandTray" -configurati
 - [ ] **Step 4: 既存のテストが通り続けることを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `** TEST SUCCEEDED **`
@@ -2437,7 +2435,7 @@ EOF
 - [ ] **Step 2: テストが失敗することを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `value of type 'TrayStore' has no member 'migrateIfNeeded'` でコンパイルエラーになる。
@@ -2486,7 +2484,7 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 - [ ] **Step 4: テストが通ることを確認する**
 
 ```bash
-xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' 2>&1 | tail -20
+xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -destination 'platform=iOS Simulator,name=iPhone 18 Pro' 2>&1 | tail -20
 ```
 
 期待: `** TEST SUCCEEDED **`
@@ -2639,3 +2637,121 @@ Apple Developer Program の登録が完了したら、次を実施する。実�
 - [ ] 無料構成で預けた項目が移行されて残っていることを確認する。
 - [ ] 写真アプリの共有シートに IslandTray が出ること、選ぶと追加されることを確認する。
 - [ ] ダイナミックアイランドを長押しし、SF Symbol ではなく実サムネイルが並ぶことを確認する。
+
+---
+
+## Task 12: 未署名 IPA のパッケージング
+
+サイドローディング用に未署名の `.ipa` を作るスクリプトを用意する。`.ipa` は `Payload/` に `.app` を入れて zip しただけのものなので、専用のツールは要らない。
+
+**LiveContainer では動かない。** LiveContainer は app extension を登録できない（サンドボックス内で動くため SpringBoard が中のアプリを認識しない）。本アプリの中心である Widget Extension = Live Activity が丸ごと使えなくなるので、**SideStore で直接インストールする**こと。
+
+**TrollStore は使えない。** 対象端末は iPhone 16 Pro / iOS 27 で、TrollStore がインストールできるバージョン範囲を大きく超えている。したがって任意 entitlement の付与は不可。
+
+**App Group が SideStore で通るかは実測する。** 無料 Personal Team は Developer Portal 上で App Group を作れないが、SideStore / AltStore 側の既知の不具合報告は「App Group が 3 個を超えると失敗する」という書き方であり、1 個なら通る可能性がある。本アプリが必要とするのは 1 個。まず `Release`（App Group あり）の ipa を入れてみて、インストールが弾かれたら `Free-Release` に落とす。
+
+サイドローディングのツールは自前で再署名するため、未署名のまま渡すのが正しい。構成を引数で選べるようにして、App Group を要求する `Release`（TrollStore のように任意の entitlement を付与できるツール向け）と、要求しない `Free-Release`（AltStore / SideStore のように無料の個人 Team で署名するツール向け）の両方を出せるようにする。
+
+**Files:**
+- Create: `scripts/make-ipa.sh`
+
+**Interfaces:**
+- Consumes: Task 1 の `project.yml` と 2 つのビルド構成
+- Produces: `scripts/make-ipa.sh [Release|Free-Release]` → `build/IslandTray-<構成>.ipa`
+
+- [ ] **Step 1: スクリプトを書く**
+
+`scripts/make-ipa.sh`:
+
+```bash
+#!/usr/bin/env bash
+# Builds an UNSIGNED .ipa for sideloading. Sideloading tools re-sign the bundle
+# themselves, so signing here would only be thrown away.
+#
+#   Release       entitlements request the App Group (TrollStore and other tools
+#                 that can grant arbitrary entitlements)
+#   Free-Release  no entitlements (AltStore / SideStore, which sign with a free
+#                 personal team and cannot grant App Groups)
+set -euo pipefail
+
+CONFIG="${1:-Release}"
+case "$CONFIG" in
+  Release)      SCHEME="IslandTray" ;;
+  Free-Release) SCHEME="IslandTray (Free)" ;;
+  *) echo "usage: $0 [Release|Free-Release]" >&2; exit 2 ;;
+esac
+
+cd "$(dirname "$0")/.."
+command -v xcodegen >/dev/null && xcodegen generate
+
+BUILD_DIR="build/$CONFIG"
+rm -rf "$BUILD_DIR"
+
+xcodebuild build \
+  -project IslandTray.xcodeproj \
+  -scheme "$SCHEME" \
+  -configuration "$CONFIG" \
+  -sdk iphoneos \
+  -derivedDataPath "$BUILD_DIR" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" \
+  | tail -5
+
+APP="$BUILD_DIR/Build/Products/$CONFIG-iphoneos/IslandTray.app"
+[ -d "$APP" ] || { echo "app bundle not found at $APP" >&2; exit 1; }
+
+STAGE="$BUILD_DIR/stage"
+rm -rf "$STAGE"; mkdir -p "$STAGE/Payload"
+cp -R "$APP" "$STAGE/Payload/"
+
+OUT="$PWD/build/IslandTray-$CONFIG.ipa"
+rm -f "$OUT"
+(cd "$STAGE" && zip -qry "$OUT" Payload)
+
+echo "wrote $OUT ($(du -h "$OUT" | cut -f1))"
+```
+
+- [ ] **Step 2: 実行権限を付けて両方の構成で走らせる**
+
+```bash
+chmod +x scripts/make-ipa.sh
+./scripts/make-ipa.sh Free-Release
+./scripts/make-ipa.sh Release
+```
+
+期待: どちらも `wrote .../IslandTray-<構成>.ipa` と表示される。
+
+- [ ] **Step 3: 中身を検証する**
+
+```bash
+unzip -l build/IslandTray-Release.ipa | head -20
+```
+
+期待: `Payload/IslandTray.app/` 以下にアプリ本体があり、`Payload/IslandTray.app/PlugIns/` に Widget と Share の 2 つの拡張が含まれている。拡張が入っていなければ、アプリターゲットへの埋め込み設定を確認する。
+
+```bash
+unzip -p build/IslandTray-Release.ipa Payload/IslandTray.app/Info.plist | plutil -p - | grep -E "NSSupportsLiveActivities|CFBundleURLSchemes" -A2
+```
+
+期待: `NSSupportsLiveActivities => 1` と `islandtray` が出る。
+
+- [ ] **Step 4: build/ を git から除外する**
+
+`.gitignore` に次の行が無ければ足す:
+
+```
+build/
+```
+
+- [ ] **Step 5: コミット**
+
+```bash
+git add scripts/make-ipa.sh .gitignore
+git commit -m "$(cat <<'EOF'
+feat: package unsigned ipa for sideloading
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
