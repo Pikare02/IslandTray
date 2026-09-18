@@ -35,13 +35,34 @@ final class TrayContentStateTests: XCTestCase {
         XCTAssertEqual(state.recent.first?.symbol, "doc.text")
     }
 
-    func testStaysUnderFourKilobytesWithWorstCaseNames() {
-        // Worst case: the maximum number of previews, each with a long id and symbol.
-        let items = (0..<TrayContentState.maxPreviews).map { _ in
-            item(name: String(repeating: "x", count: 255))
+    func testStaysUnderFourKilobytesWithMaxPreviewsAndLongestSymbol() {
+        // Genuine worst case reachable through `make(from:)`: the maximum number
+        // of previews, each with the longest symbol `TrayItem.symbolName` can
+        // produce. `id` is always a fixed-length UUID string, so it does not
+        // vary; `.sourceCode`'s UTI ("public.source-code") maps to the longest
+        // entry in TrayItem.symbolName(forUTI:)'s table, "chevron.left.forwardslash.chevron.right".
+        let items = (0..<(TrayContentState.maxPreviews * 3)).map { _ in
+            item(name: "x", uti: "public.source-code")
         }
         let state = TrayContentState.make(from: items)
+        XCTAssertEqual(state.recent.count, TrayContentState.maxPreviews)
+        XCTAssertEqual(state.recent.first?.symbol, "chevron.left.forwardslash.chevron.right")
         XCTAssertLessThan(state.encodedByteCount, TrayContentState.maxEncodedBytes)
+    }
+
+    func testConstructionPathsCannotExceedEncodedLimit() {
+        // After closing the memberwise-init bypass (Finding 1), `make(from:)`
+        // and `countOnly(count:)` are the only ways left to build a
+        // `TrayContentState`. Pin that neither can produce an oversized state,
+        // even fed pathological input.
+        let manyWorstCaseItems = (0..<10_000).map { _ in
+            item(name: "x", uti: "public.source-code")
+        }
+        let madeState = TrayContentState.make(from: manyWorstCaseItems)
+        XCTAssertLessThan(madeState.encodedByteCount, TrayContentState.maxEncodedBytes)
+
+        let countOnlyState = TrayContentState.countOnly(count: .max)
+        XCTAssertLessThan(countOnlyState.encodedByteCount, TrayContentState.maxEncodedBytes)
     }
 
     func testEncodedByteCountIsNonZero() {
