@@ -116,6 +116,15 @@ final class TrayStoreTests: XCTestCase {
         try body()
     }
 
+    /// chflags uchg -- what a file locked by another process looks like to
+    /// unlink(2). Restored before tearDown so the temporary root can be removed.
+    private func withImmutable(_ url: URL, _ body: () throws -> Void) throws {
+        let fm = FileManager.default
+        try fm.setAttributes([.immutable: true], ofItemAtPath: url.path)
+        defer { try? fm.setAttributes([.immutable: false], ofItemAtPath: url.path) }
+        try body()
+    }
+
     private func corruptMetadata() throws {
         try Data("}{ not json".utf8).write(to: metadataURL)
     }
@@ -310,8 +319,10 @@ final class TrayStoreTests: XCTestCase {
         XCTAssertFalse(blobBack.name.isEmpty)
 
         // The recovered list is persisted, so the next load does not re-rebuild.
-        let persisted = try JSONDecoder.tray.decode([TrayItem].self, from: Data(contentsOf: metadataURL))
-        XCTAssertEqual(Set(persisted.map(\.id)), Set(recovered.map(\.id)))
+        // It is persisted in the current schema, not the bare array it replaced.
+        let persisted = try JSONDecoder.tray.decode(TrayMetadata.self, from: Data(contentsOf: metadataURL))
+        XCTAssertEqual(persisted.version, TrayMetadata.currentVersion)
+        XCTAssertEqual(Set(persisted.items.map(\.id)), Set(recovered.map(\.id)))
     }
 
     // MARK: - Finding 8: uncovered paths
@@ -339,4 +350,137 @@ final class TrayStoreTests: XCTestCase {
         try store.remove(id: UUID())
         XCTAssertEqual(try store.load().map(\.id), [item.id])
     }
+
+    // MARK: - Regression 1: a mutation must not rebuild from disk
+
+    func testAddOnCorruptMetadataThrowsAndLeavesNoPayload() throws {
+        let existing = try addText("old.txt")
+        try corruptMetadata()
+
+        // The payload is written before the claim is taken, so a mutation that
+        // rebuilt its baseline from disk would find the in-flight file there and
+        // insert the same id twice.
+        XCTAssertThrowsError(try self.addText("new.txt"), "a mutation must not recover behind the caller's back")
+
+        XCTAssertEqual(try itemsDirEntries().count, 1, "a failed add leaked its payload")
+        XCTAssertEqual(try store.load().map(\.id), [existing.id])
+    }
+
+    func testLoadNeverReturnsDuplicateIDs() throws {
+        let item = try addText("dupe.txt")
+        // However the duplicate got there -- a merge, an interrupted recovery,
+        // a hand-edited file. TrayItem is Identifiable and this list feeds a
+        // SwiftUI ForEach, where a repeated id is undefined behaviour.
+        try JSONEncoder.tray.encode(TrayMetadata(items: [item, item])).write(to: metadataURL)
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.count, 1)
+        XCTAssertEqual(loaded.map(\.id), [item.id])
+
+        // And the invariant survives the payload still being on disk for both.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: item.fileURL(in: itemsDir).path))
+    }
+
+    // MARK: - Regression 2: partial destruction is never reported as total failure
+
+    func testRemoveAllReportsPartialSuccessWhenOnePayloadIsLocked() throws {
+        var added: [TrayItem] = []
+        for i in 0..<5 { added.append(try addText("\(i).txt")) }
+        let stuck = added[2]
+
+        try withImmutable(stuck.fileURL(in: itemsDir)) {
+            XCTAssertThrowsError(
+                try FileManager.default.removeItem(at: stuck.fileURL(in: itemsDir)),
+                "precondition: the payload must be undeletable"
+            )
+
+            let result = try store.removeAll()
+            XCTAssertEqual(Set(result.removed), Set(added.filter { $0.id != stuck.id }.map(\.id)))
+            XCTAssertEqual(result.failed, [stuck.id])
+
+            // Metadata agrees with disk: what went is gone from both, what
+            // stayed is listed in both.
+            XCTAssertEqual(try itemsDirEntries(), [stuck.fileName])
+            XCTAssertEqual(try store.load().map(\.id), [stuck.id])
+        }
+    }
+
+    func testRemoveAllSurvivorIsNotResurrectedAndIsDeletableLater() throws {
+        let a = try addText("a.txt")
+        let stuck = try addText("stuck.txt")
+
+        try withImmutable(stuck.fileURL(in: itemsDir)) {
+            _ = try store.removeAll()
+        }
+
+        // Finding 4: the payloads that did go must not come back from a rebuild.
+        try corruptMetadata()
+        XCTAssertEqual(try store.load().map(\.id), [stuck.id])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: a.fileURL(in: itemsDir).path))
+
+        let second = try store.removeAll()
+        XCTAssertEqual(second.removed, [stuck.id])
+        XCTAssertTrue(second.failed.isEmpty)
+        XCTAssertTrue(try store.load().isEmpty)
+    }
+
+    func testRemoveAllSurfacesWhatWentWhenTheMetadataWriteFails() throws {
+        let a = try addText("a.txt")
+        let b = try addText("b.txt")
+
+        // Items/ stays writable, so the unlinks succeed; root/ does not, so the
+        // atomic rename of items.json cannot land.
+        try withPermissions(0o500, at: root) {
+            XCTAssertThrowsError(try store.removeAll()) { error in
+                guard case .partialRemoval(let result, _) = error as? TrayStoreError else {
+                    return XCTFail("a partial destruction must not surface as a plain failure: \(error)")
+                }
+                XCTAssertEqual(Set(result.removed), Set([a.id, b.id]))
+                XCTAssertTrue(result.failed.isEmpty)
+            }
+        }
+
+        XCTAssertEqual(try itemsDirEntries(), [], "the unlinks did happen")
+    }
+
+    // MARK: - Regression 3: the on-disk format is versioned and backward tolerant
+
+    func testMetadataCarriesSchemaVersion() throws {
+        _ = try addText("1.txt")
+        let stored = try JSONDecoder.tray.decode(TrayMetadata.self, from: Data(contentsOf: metadataURL))
+        XCTAssertEqual(stored.version, TrayMetadata.currentVersion)
+        XCTAssertEqual(stored.items.count, 1)
+    }
+
+    func testLegacyISO8601MetadataKeepsItsDisplayNames() throws {
+        let taxes = try addText("taxes.pdf")
+        let cat = try addText("cat.jpeg")
+
+        // Exactly what the previous build wrote: a bare array, ISO8601 dates.
+        let legacy = JSONEncoder()
+        legacy.dateEncodingStrategy = .iso8601
+        try legacy.encode([taxes, cat]).write(to: metadataURL)
+
+        let loaded = try store.load()
+        XCTAssertEqual(Set(loaded.map(\.name)), ["taxes.pdf", "cat.jpeg"], "a format change destroyed the names")
+        XCTAssertEqual(Set(loaded.map(\.id)), Set([taxes.id, cat.id]))
+    }
+
+    func testUnknownSchemaVersionThrowsAndIsNotRebuiltOver() throws {
+        _ = try addText("keep.txt")
+        let future = Data(#"{"version":9999,"items":[]}"#.utf8)
+        try future.write(to: metadataURL)
+
+        XCTAssertThrowsError(try store.load(), "metadata from a newer build is not corrupt metadata")
+        XCTAssertEqual(try Data(contentsOf: metadataURL), future, "a newer schema must never be overwritten")
+        XCTAssertThrowsError(try self.addText("2.txt"), "a mutation must not build on an unrecognised schema")
+    }
+
+    func testBytesThatAreNotJSONStillRebuild() throws {
+        let item = try addText("keep.txt")
+        try corruptMetadata()
+        // The destructive path is still reachable -- for genuine garbage only.
+        XCTAssertEqual(try store.load().map(\.id), [item.id])
+    }
 }
+
