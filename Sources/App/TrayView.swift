@@ -2,23 +2,79 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct TrayView: View {
+    @State private var model = TrayModel()
     @State private var isTargeted = false
-    @State private var dropCount = 0
+    @State private var showsSetupGuide = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("IslandTray")
-                .font(.largeTitle.bold())
-            Text("dropped: \(dropCount)")
-                .font(.title2.monospacedDigit())
-            Text(isTargeted ? "release to drop" : "drag something here")
-                .foregroundStyle(.secondary)
+        NavigationStack {
+            ZStack {
+                if model.items.isEmpty {
+                    emptyState
+                } else {
+                    strip
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(dropHighlight)
+            .navigationTitle("トレイ")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showsSetupGuide = true } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+            .sheet(isPresented: $showsSetupGuide) { SetupGuideView() }
+            .safeAreaInset(edge: .bottom) {
+                if let banner = model.banner {
+                    Text(banner)
+                        .font(.footnote)
+                        .padding(10)
+                        .frame(maxWidth: .infinity)
+                        .background(.red.opacity(0.15))
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(isTargeted ? Color.accentColor.opacity(0.15) : Color.clear)
         .onDrop(of: [UTType.item], isTargeted: $isTargeted) { providers in
-            dropCount += providers.count
+            Task { await model.ingest(providers) }
             return true
         }
+        .task {
+            model.reload()
+            await model.syncActivity()
+        }
+    }
+
+    private var strip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 16) {
+                ForEach(model.items) { item in
+                    TrayCardView(item: item) {
+                        Task { await model.remove(item) }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .scrollClipDisabled()
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("トレイは空です", systemImage: "tray")
+        } description: {
+            Text("ファイルや写真をドラッグしてここに落とすと預かります。")
+        }
+    }
+
+    private var dropHighlight: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(Color.accentColor, lineWidth: isTargeted ? 4 : 0)
+            .background(isTargeted ? Color.accentColor.opacity(0.10) : Color.clear)
+            .padding(8)
+            .animation(.snappy(duration: 0.15), value: isTargeted)
+            .ignoresSafeArea()
     }
 }
