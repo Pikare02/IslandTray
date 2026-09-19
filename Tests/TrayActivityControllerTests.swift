@@ -2,16 +2,19 @@ import ActivityKit
 import XCTest
 @testable import IslandTray
 
-/// Only the state predicate is covered here. Everything else in
-/// `TrayActivityController` needs a live ActivityKit.
+/// Only the state predicate is covered here -- but that is a historical
+/// accident, not a limit of the test host. Two claims in earlier versions of
+/// this comment were both wrong, and each cost a round of work:
 ///
-/// Note that `ActivityAuthorizationInfo().areActivitiesEnabled` is **true**
-/// in this test host, not false -- an earlier version of this comment claimed
-/// the opposite and cost a round of work: a test was built on the assumption
-/// that `restart()` would stop at that guard, and it sailed past it instead.
-/// What actually blocks the rest is `Activity.activities` always being empty
-/// and `Activity.request` never producing a real activity, so `sync`/`start`/
-/// `update`/`end`/`restart` cannot be driven down any branch that would fail.
+/// - "`areActivitiesEnabled` is false here." It is **true**. A test was built
+///   expecting `restart()` to stop at that guard; it sailed past instead.
+/// - "`Activity.request` never produces a real activity here." It **does** --
+///   a request adds an observable entry to `Activity.activities`, shown
+///   causally by mutation-testing the migration's resync path, not inferred.
+///
+/// So more of `sync`/`start`/`update`/`end`/`restart` is reachable from a test
+/// than is currently pinned. Before adding one, verify what the API actually
+/// does in this host rather than trusting a comment -- including this one.
 final class TrayActivityControllerTests: XCTestCase {
     func testOnlyOnScreenStatesCountAsLive() {
         XCTAssertTrue(TrayActivityController.isLive(.active))
