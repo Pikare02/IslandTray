@@ -3,9 +3,14 @@ import XCTest
 @testable import IslandTray
 
 /// Only the state predicate is covered here. Everything else in
-/// `TrayActivityController` needs a live ActivityKit:
-/// `ActivityAuthorizationInfo().areActivitiesEnabled` is false in a test
-/// bundle and `Activity.activities` is always empty, so `sync`/`start`/
+/// `TrayActivityController` needs a live ActivityKit.
+///
+/// Note that `ActivityAuthorizationInfo().areActivitiesEnabled` is **true**
+/// in this test host, not false -- an earlier version of this comment claimed
+/// the opposite and cost a round of work: a test was built on the assumption
+/// that `restart()` would stop at that guard, and it sailed past it instead.
+/// What actually blocks the rest is `Activity.activities` always being empty
+/// and `Activity.request` never producing a real activity, so `sync`/`start`/
 /// `update`/`end`/`restart` cannot be driven down any branch that would fail.
 final class TrayActivityControllerTests: XCTestCase {
     func testOnlyOnScreenStatesCountAsLive() {
