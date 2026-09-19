@@ -25,6 +25,14 @@ command -v xcodegen >/dev/null && xcodegen generate
 BUILD_DIR="build/$CONFIG"
 rm -rf "$BUILD_DIR"
 
+# Clear any previous .ipa for this config up front, before the build even
+# starts, not right before the final zip. A run that fails partway through
+# (build error, a verification check below) must not leave an older .ipa
+# sitting in build/ where a rerun-after-a-failure could be mistaken for
+# fresh output -- better an absent artifact than a stale one that looks current.
+OUT="$PWD/build/IslandTray-$CONFIG.ipa"
+rm -f "$OUT"
+
 xcodebuild build \
   -project IslandTray.xcodeproj \
   -scheme "$SCHEME" \
@@ -52,16 +60,28 @@ if ! plutil -p "$PLIST" | grep -qE "\"NSSupportsLiveActivities\" => (1|true)"; t
   echo "Info.plist is missing NSSupportsLiveActivities" >&2
   exit 1
 fi
-if ! plutil -p "$PLIST" | grep -q "islandtray"; then
-  echo "Info.plist is missing the islandtray URL scheme" >&2
+# Scoped to the CFBundleURLSchemes array itself, not a bare grep over the
+# whole plist dump: CFBundleIdentifier (com.pikare.islandtray) and
+# CFBundleURLName (also com.pikare.islandtray) both contain the substring
+# "islandtray", so an unscoped grep passes even with CFBundleURLTypes deleted
+# entirely -- which defeats the point of checking for the URL scheme at all.
+url_schemes() { plutil -extract CFBundleURLTypes.0.CFBundleURLSchemes json -o - "$1" 2>/dev/null; }
+url_schemes "$PLIST" | grep -q '"islandtray"' || {
+  echo "Info.plist is missing the islandtray URL scheme (CFBundleURLSchemes)" >&2
   exit 1
-fi
+}
 
 # Entitlements actually baked into each target must match what this
 # configuration intends: App Group present for Release, absent for Free-Release.
 # CODE_SIGNING_ALLOWED=NO means xcodebuild never signs the binaries, so there
 # is nothing for `codesign -d --entitlements` to read back off them -- check
 # the CODE_SIGN_ENTITLEMENTS files project.yml points each config at instead.
+# NOTE: this trusts the CONFIG->ENT_DIR mapping below to match project.yml's
+# own CODE_SIGN_ENTITLEMENTS setting for each target/config -- it does not
+# read project.yml itself, so a copy-paste slip there (e.g. Release pointed
+# at Entitlements/Free/App.entitlements) would build with the wrong
+# entitlements and this check would still report "verified". Real limit of
+# verifying an unsigned build; see task-12-review.md Important #2.
 check_entitlements_file() {
   local FILE="$1" LABEL="$2"
   local HAS_GROUP=0
@@ -85,8 +105,6 @@ STAGE="$BUILD_DIR/stage"
 rm -rf "$STAGE"; mkdir -p "$STAGE/Payload"
 cp -R "$APP" "$STAGE/Payload/"
 
-OUT="$PWD/build/IslandTray-$CONFIG.ipa"
-rm -f "$OUT"
 (cd "$STAGE" && zip -qry "$OUT" Payload)
 
 # --- Verify the packaged .ipa itself, not just the pre-zip .app --------
@@ -100,8 +118,8 @@ done
 IPA_PLIST="$(unzip -p "$OUT" Payload/IslandTray.app/Info.plist | plutil -p -)"
 echo "$IPA_PLIST" | grep -qE "\"NSSupportsLiveActivities\" => (1|true)" \
   || { echo "$OUT's Info.plist is missing NSSupportsLiveActivities" >&2; exit 1; }
-echo "$IPA_PLIST" | grep -q "islandtray" \
-  || { echo "$OUT's Info.plist is missing the islandtray URL scheme" >&2; exit 1; }
+unzip -p "$OUT" Payload/IslandTray.app/Info.plist | url_schemes - | grep -q '"islandtray"' \
+  || { echo "$OUT's Info.plist is missing the islandtray URL scheme (CFBundleURLSchemes)" >&2; exit 1; }
 
 echo "verified: PlugIns/{IslandTrayWidget,IslandTrayShare}.appex, Info.plist keys, $CONFIG entitlements"
 echo "wrote $OUT ($(du -h "$OUT" | cut -f1))"
