@@ -26,12 +26,31 @@ enum DropReceiver {
             let typeIdentifier = preferredTypeIdentifier(for: provider)
             do {
                 let payload = try await loadFile(from: provider, typeIdentifier: typeIdentifier)
-                _ = try TrayStore.shared.add(
-                    copyingFrom: payload,
-                    suggestedName: provider.suggestedName,
-                    uti: typeIdentifier
-                )
-                try? FileManager.default.removeItem(at: payload)
+                let suggestedName = provider.suggestedName
+
+                // TrayStore.add(copyingFrom:) is a synchronous, non-async call
+                // that does real disk I/O: a second full copy of the payload
+                // into the App Group container, then a coordinated
+                // read-modify-write of items.json. `loadFile` resumes back
+                // onto the MainActor (see its own comment), so without this,
+                // that copy+write would run inline on the main thread -- once
+                // per dropped item, so 20 photos would freeze the UI 20 times
+                // in a row, and one large file would freeze it for the whole
+                // copy. Task.detached hops it onto the cooperative thread
+                // pool; only Sendable values (URL, String?) cross into it, so
+                // `provider` itself (not Sendable) never has to leave the
+                // MainActor. The `defer` cleans up the staging file on both
+                // the success and the throwing path -- previously it only ran
+                // after `add` succeeded, leaking the staging file into
+                // NSTemporaryDirectory() whenever `add` threw.
+                _ = try await Task.detached(priority: .userInitiated) {
+                    defer { try? FileManager.default.removeItem(at: payload) }
+                    return try TrayStore.shared.add(
+                        copyingFrom: payload,
+                        suggestedName: suggestedName,
+                        uti: typeIdentifier
+                    )
+                }.value
                 added += 1
             } catch {
                 failed.append(provider.suggestedName ?? "unnamed item")

@@ -42,14 +42,45 @@ struct TrayCardView: View {
         }
         // onDrag rather than .draggable: this hands other apps the actual file
         // rather than a link to it.
-        .onDrag { NSItemProvider(contentsOf: item.fileURL) ?? NSItemProvider() }
+        .onDrag {
+            // NSItemProvider(contentsOf:) takes its suggested filename from
+            // the URL's last path component, which is `item.fileURL`'s
+            // UUID-based on-disk name (TrayItem deliberately never builds a
+            // path from `name`, only from the id). Overriding `suggestedName`
+            // is what makes Files/Mail/other drop targets save the file under
+            // its real display name instead of the UUID -- it does not
+            // rename anything on disk.
+            let provider = NSItemProvider(contentsOf: item.fileURL) ?? NSItemProvider()
+            provider.suggestedName = item.name
+            return provider
+        }
         .contextMenu {
-            ShareLink(item: item.fileURL) {
+            ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
                 Label("共有", systemImage: "square.and.arrow.up")
             }
             Button(role: .destructive, action: onDelete) {
                 Label("削除", systemImage: "trash")
             }
         }
+    }
+}
+
+/// Wraps a tray item for `ShareLink` so the share sheet's exported file
+/// (Save to Files, a Mail attachment, AirDrop, ...) is named after the item's
+/// display name instead of `item.fileURL`'s UUID-based on-disk filename.
+/// Storage is untouched -- this only changes the name the file carries once
+/// it leaves the tray.
+///
+/// `ProxyRepresentation` just forwards the export to `URL`'s own
+/// `Transferable` conformance, so the receiver still gets correct
+/// content-type inference from the actual file; `.suggestedFileName` (which
+/// takes a per-instance closure, not a fixed string, since every item needs a
+/// different name) is the only thing added.
+private struct SharedTrayFile: Transferable {
+    let item: TrayItem
+
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation(exporting: \.item.fileURL)
+            .suggestedFileName { $0.item.name }
     }
 }
