@@ -9,19 +9,40 @@ import Foundation
 actor TrayActivityController {
     static let shared = TrayActivityController()
 
-    /// Surfaced to the UI when starting fails, rather than swallowing the error.
+    /// Why the island does not match the tray right now, or `nil` when it does.
+    ///
+    /// Nothing reads this yet: the view model that surfaces it arrives with
+    /// the UI wiring task. Every assignment below happens before its writer's
+    /// first suspension point, so an older call resuming later can never erase
+    /// a newer one's error.
     private(set) var lastError: String?
 
-    // `static` (not an instance member) so this stays nonisolated: it only
-    // reads ActivityKit's own static registry, never `self`. `Activity` is a
-    // pre-Concurrency ActivityKit class with no `Sendable` conformance and
-    // its own `update`/`end` run detached from the caller's isolation, so an
-    // *instance* property here would tag the `Activity` it returns as part
-    // of this actor's isolation region, and hand-off to those detached calls
-    // would need `Activity` to be `Sendable` (it is not, and the escape
-    // hatches for asserting that are banned in this project).
-    private static var current: Activity<TrayActivityAttributes>? {
-        Activity<TrayActivityAttributes>.activities.first
+    /// The activities this controller treats as its own.
+    ///
+    /// `Activity.activities` is not a list of visible activities: it also
+    /// holds `.ended` and `.dismissed` entries, and the one ActivityKit ends
+    /// at the eight-hour mark lingers there until it is dismissed. Updating
+    /// such an activity is a silent no-op, so it must never be mistaken for
+    /// the current one. `.stale` is included because that activity *is* still
+    /// on screen and an update returns it to `.active`; starting a second one
+    /// beside it would put two islands up.
+    ///
+    /// `nonisolated` because this reads ActivityKit's process-global registry
+    /// and never touches `self`, which is also what lets the values it returns
+    /// be handed to `Activity`'s own detached `update`/`end`. It asserts
+    /// nothing about `Activity` being thread-safe -- ActivityKit owns that,
+    /// and this actor never stores an `Activity` of its own.
+    private nonisolated var liveActivities: [Activity<TrayActivityAttributes>] {
+        Activity<TrayActivityAttributes>.activities.filter { Self.isLive($0.activityState) }
+    }
+
+    /// Whether an activity in that state is on screen and worth updating.
+    ///
+    /// Split out of `liveActivities` because it is the one decision here that
+    /// does not need ActivityKit to be running, and so the only one a test can
+    /// pin. Internal rather than private for that test.
+    nonisolated static func isLive(_ state: ActivityState) -> Bool {
+        state == .active || state == .stale
     }
 
     func sync(items: [TrayItem]) async {
@@ -44,40 +65,91 @@ actor TrayActivityController {
         // for the fuller rationale.
         let state = TrayContentState.make(from: items)
 
-        if Self.current != nil {
-            await update(state)
-        } else {
-            await start(state)
+        // An update that lands nowhere falls through to `start` instead of
+        // being dropped: whatever removed the activity (the eight-hour end, a
+        // swipe-away, a concurrent `end()`) must not leave the tray full, the
+        // island gone and nothing said about it.
+        if await update(state) == false {
+            start(state)
         }
     }
 
     func restart() async {
-        let items = (try? TrayStore.shared.load()) ?? []
-        await end()
-        await sync(items: items)
+        let items: [TrayItem]
+        do {
+            items = try TrayStore.shared.load()
+        } catch {
+            // TrayStore.load() throws precisely so a failed read is not read
+            // back as an empty tray. Ending the island over a transient
+            // metadata failure is the one thing that must not happen here, so
+            // leave whatever is up alone and report instead.
+            lastError = "トレイを読み込めません: \(error.localizedDescription)"
+            return
+        }
+        guard !items.isEmpty else {
+            await end()
+            return
+        }
+
+        // Replace, never destroy-then-hope. `Activity.request` throws, and this
+        // method's documented caller is a background Shortcuts automation --
+        // exactly where ActivityKit is most likely to refuse. Requesting first
+        // means a failure leaves the working island untouched; the old ones go
+        // only once the replacement exists, so the success path still ends with
+        // a single activity.
+        guard let replacement = start(TrayContentState.make(from: items)) else { return }
+        for activity in liveActivities where activity.id != replacement {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 
     // MARK: - Internals
 
-    private func start(_ state: TrayContentState) async {
+    /// The new activity's id, or `nil` when the request failed.
+    ///
+    /// Not `async`: `Activity.request` is synchronous, which is what makes the
+    /// `lastError` writes here race-free without further care.
+    @discardableResult
+    private func start(_ state: TrayContentState) -> String? {
         do {
-            _ = try Activity.request(
+            let activity = try Activity.request(
                 attributes: TrayActivityAttributes(),
                 content: .init(state: state, staleDate: nil)
             )
             lastError = nil
+            return activity.id
         } catch {
             lastError = "アイランドの表示を開始できません: \(error.localizedDescription)"
+            return nil
         }
     }
 
-    private func update(_ state: TrayContentState) async {
-        guard let current = Self.current else { return }
-        await current.update(.init(state: state, staleDate: nil))
+    /// `false` when there was nothing live to update, so the caller can start one.
+    ///
+    /// Updates every live activity rather than an arbitrary `first` of an
+    /// unordered registry: that is the same set `restart()` retires, so an
+    /// update can no longer land on the one the user cannot see.
+    private func update(_ state: TrayContentState) async -> Bool {
+        let activities = liveActivities
+        guard !activities.isEmpty else { return false }
+        // Cleared here, not after the loop: `Activity.update` suspends, and on
+        // resume this assignment would wipe an error another task raised in the
+        // meantime. `update` cannot report failure anyway, so "we reached a
+        // live activity" is the most this can honestly mean.
         lastError = nil
+        for activity in activities {
+            await activity.update(.init(state: state, staleDate: nil))
+        }
+        return true
     }
 
     private func end() async {
+        // Cleared before the first suspension point, for the reason given in
+        // `update`. With no island wanted there is no failure left to report.
+        lastError = nil
+        // The whole registry, not just `liveActivities`: an `.ended` activity
+        // is still on screen until it is dismissed, and ending it with
+        // `.immediate` is what takes it off.
         for activity in Activity<TrayActivityAttributes>.activities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
