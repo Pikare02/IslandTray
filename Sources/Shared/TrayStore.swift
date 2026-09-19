@@ -110,6 +110,95 @@ final class TrayStore: Sendable {
         try sweep { _ in true }
     }
 
+    // MARK: - Migration
+
+    /// Moves items from a previous container into this one.
+    ///
+    /// Needed when the app moves from a free account (its own sandbox) to a
+    /// paid one (the App Group container): the tray would otherwise come up
+    /// empty, with the user's files stranded where nothing reads them. Safe to
+    /// call on every launch -- it no-ops when there is nothing to move.
+    ///
+    /// Reuses the paths that already hold this type's guarantees rather than
+    /// adding a second one beside them: the entries go in through `mutate`, so
+    /// the read, the mutation and the write of *this* container's metadata
+    /// still happen inside one coordinated write, and the list that lands is
+    /// one `presentable` has already deduped and checked against the files.
+    ///
+    /// Each payload is renamed into Items/ inside that same claim, before its
+    /// entry is inserted, which is what makes repeating this safe:
+    ///
+    /// - An item is taken only while its payload is still in the old
+    ///   container, so a second run finds nothing left to take and an item the
+    ///   user deleted after the first run is never brought back.
+    /// - An id this container already knows is left where it is, so an item
+    ///   that exists in both survives as the copy this container already has.
+    /// - Nothing is written outside this container. The old one is read, and
+    ///   relieved of exactly the payloads this call takes; any failure --
+    ///   including a failure of the metadata write, which happens after the
+    ///   body returns -- puts every one of them back before throwing, so an
+    ///   item is never left in neither container.
+    @discardableResult
+    func migrateIfNeeded(from oldRoot: URL) throws -> Int {
+        guard oldRoot.standardizedFileURL != root.standardizedFileURL else { return 0 }
+        let old = TrayStore(root: oldRoot)
+        let incoming = try old.itemsToMigrate()
+        guard !incoming.isEmpty else { return 0 }
+
+        var taken: [(from: URL, to: URL)] = []
+        do {
+            try mutate { items in
+                let known = Set(items.map(\.id))
+                for item in incoming where !known.contains(item.id) {
+                    let from = item.fileURL(in: old.itemsDirectory)
+                    let to = item.fileURL(in: self.itemsDirectory)
+                    // Gone from the old container since it was listed: that
+                    // deletion wins, here as everywhere else.
+                    guard FileManager.default.fileExists(atPath: from.path) else { continue }
+                    // Same id means the same item, so anything already at the
+                    // destination path is an orphan an interrupted earlier run
+                    // left behind. Replaced, exactly as add(copyingFrom:) does.
+                    if FileManager.default.fileExists(atPath: to.path) {
+                        try FileManager.default.removeItem(at: to)
+                    }
+                    try FileManager.default.moveItem(at: from, to: to)
+                    taken.append((from: from, to: to))
+                    items.insert(item, at: 0)
+                }
+            }
+        } catch {
+            for move in taken.reversed() {
+                try? FileManager.default.moveItem(at: move.to, to: move.from)
+            }
+            throw error
+        }
+        return taken.count
+    }
+
+    /// The items of a container this store does not own, read without
+    /// creating, repairing or otherwise writing to it.
+    ///
+    /// `load()` cannot stand in for this: it calls `prepare()`, which would
+    /// conjure up an old container that never existed, and its recovery path
+    /// persists the rebuilt list -- both are writes outside the destination.
+    /// So unreadable metadata falls back to the payload files in memory only,
+    /// and a corrupt old items.json strands nothing. An unrecognised schema
+    /// still propagates: data a newer build owns is not this one's to move.
+    private func itemsToMigrate() throws -> [TrayItem] {
+        guard FileManager.default.fileExists(atPath: itemsDirectory.path) else { return [] }
+        var items: [TrayItem]
+        do {
+            if let data = try coordinatedRead(), !data.isEmpty {
+                items = try Self.decodeItems(from: data)
+            } else {
+                items = []
+            }
+        } catch TrayStoreError.unreadableMetadata {
+            items = try itemsOnDisk()
+        }
+        return presentable(items)
+    }
+
     /// Unlinks every matching payload, then persists metadata describing what
     /// actually happened on disk.
     ///

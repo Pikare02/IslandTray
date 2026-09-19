@@ -631,5 +631,90 @@ final class TrayStoreTests: XCTestCase {
             XCTAssertEqual(error as? TrayStoreError, .unsupportedSchemaVersion(TrayMetadata.currentVersion))
         }
     }
-}
 
+    // MARK: - Task 11: migration from a previous container
+
+    /// A second container to migrate from, cleaned up with the test.
+    private func makeOldStore() throws -> (store: TrayStore, root: URL) {
+        let oldRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: oldRoot) }
+        let oldStore = TrayStore(root: oldRoot)
+        try oldStore.prepare()
+        return (oldStore, oldRoot)
+    }
+
+    func testMigrationMovesItemsFromLocalRoot() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        let a = try oldStore.add(data: Data("one".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+        _ = try oldStore.add(data: Data("two".utf8), suggestedName: "b.txt", uti: "public.plain-text")
+
+        let moved = try store.migrateIfNeeded(from: oldRoot)
+        XCTAssertEqual(moved, 2)
+
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.count, 2)
+        let migratedA = try XCTUnwrap(loaded.first { $0.id == a.id })
+        XCTAssertEqual(migratedA.name, "a.txt", "a moved item keeps its display name, not a placeholder")
+        XCTAssertEqual(try Data(contentsOf: migratedA.fileURL(in: itemsDir)), Data("one".utf8))
+        XCTAssertTrue(try oldStore.load().isEmpty, "the payloads were moved, not duplicated")
+    }
+
+    func testMigrationIsIdempotent() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        _ = try oldStore.add(data: Data("one".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 1)
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 0)
+        XCTAssertEqual(try store.load().count, 1)
+        XCTAssertEqual(try itemsDirEntries().count, 1)
+    }
+
+    func testMigrationFromSameRootDoesNothing() throws {
+        _ = try store.add(data: Data("x".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+        // Read-only root, so a run that got as far as rewriting metadata would
+        // throw instead of returning the same 0 by coincidence: this pins the
+        // guard itself, not the fact that every id is already known.
+        try withPermissions(0o500, at: root) {
+            XCTAssertEqual(try store.migrateIfNeeded(from: root), 0)
+        }
+        XCTAssertEqual(try store.load().count, 1)
+    }
+
+    /// The migration reads someone else's container, so it must not call
+    /// anything that prepares or repairs one: on a free-to-paid move the old
+    /// root may legitimately not exist at all.
+    func testMigrationNeverCreatesTheContainerItReadsFrom() throws {
+        let missing = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: missing) }
+
+        XCTAssertEqual(try store.migrateIfNeeded(from: missing), 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
+    }
+
+    /// Idempotence by id alone would not be enough: a migrated item the user
+    /// then deleted is absent from this container's metadata too, so a second
+    /// run must find nothing left to take rather than bringing it back.
+    func testMigrationDoesNotResurrectARemovedItem() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        let item = try oldStore.add(data: Data("one".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 1)
+        _ = try store.remove(id: item.id)
+
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 0)
+        XCTAssertTrue(try store.load().isEmpty)
+        XCTAssertEqual(try itemsDirEntries(), [])
+    }
+
+    /// Both containers hold items the other does not: the union survives.
+    func testMigrationKeepsItemsAlreadyInThisContainer() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        let mine = try store.add(data: Data("mine".utf8), suggestedName: "mine.txt", uti: "public.plain-text")
+        let theirs = try oldStore.add(data: Data("theirs".utf8), suggestedName: "theirs.txt", uti: "public.plain-text")
+
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 1)
+        XCTAssertEqual(Set(try store.load().map(\.id)), Set([mine.id, theirs.id]))
+    }
+}

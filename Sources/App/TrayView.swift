@@ -49,6 +49,7 @@ struct TrayView: View {
             // duplicated that work on every cold launch with no guarantee
             // which one's result won. Only this view's own state --
             // populating the visible list -- belongs in its first appearance.
+            await model.migrateIfNeeded()
             model.reload()
         }
     }
