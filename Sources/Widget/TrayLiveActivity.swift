@@ -51,5 +51,8 @@ struct TrayLiveActivity: Widget {
         }
         .padding(14)
         .activityBackgroundTint(Color.black.opacity(0.45))
+        // Devices without a Dynamic Island only ever show this presentation,
+        // so without its own widgetURL the drop deep link never fires there.
+        .widgetURL(TrayIDs.dropURL)
     }
 }
