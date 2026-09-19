@@ -27,6 +27,29 @@ final class TrayModel {
         }
     }
 
+    /// Carries the tray over when the app gains an App Group container after
+    /// a move to a paid developer account, before anything reads it.
+    ///
+    /// Awaited by the first `reload()` rather than fired off from the app's
+    /// own scene task: the two would otherwise race, and a reload that won
+    /// would leave the migrated tray looking empty for the whole session --
+    /// nothing reloads it again until the user drops or deletes something.
+    ///
+    /// Detached because this moves the user's files: a large tray would
+    /// otherwise copy on the main actor and hold up the first frame, the same
+    /// reason `DropReceiver` keeps `add(copyingFrom:)` off it.
+    ///
+    /// A failure is deliberately silent. The old container is left exactly as
+    /// it was, every item is still in one container or the other, and the next
+    /// launch tries again; a banner here would only report a state the user
+    /// cannot act on.
+    func migrateIfNeeded() async {
+        guard TrayContainer.isShared else { return }
+        await Task.detached(priority: .userInitiated) {
+            try? TrayStore.shared.migrateIfNeeded(from: TrayContainer.localRoot)
+        }.value
+    }
+
     func ingest(_ providers: [NSItemProvider]) async {
         let result = await DropReceiver.ingest(providers: providers)
         let reloadSucceeded = reload()
