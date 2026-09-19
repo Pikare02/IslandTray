@@ -68,13 +68,20 @@ actor TrayActivityController {
         // An update that lands nowhere falls through to `start` instead of
         // being dropped: whatever removed the activity (the eight-hour end, a
         // swipe-away, a concurrent `end()`) must not leave the tray full, the
-        // island gone and nothing said about it.
-        if await update(state) == false {
-            start(state)
+        // island gone and nothing said about it. `start` can leave an
+        // `.ended` sibling behind in the registry -- the eight-hour case is
+        // exactly that -- so sweep the rest of the registry the same way
+        // `restart()` does once the replacement exists.
+        if await update(state) == false, let replacement = start(state) {
+            await retireOthers(keeping: replacement)
         }
     }
 
     func restart() async {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            lastError = "ライブアクティビティが許可されていません"
+            return
+        }
         let items: [TrayItem]
         do {
             items = try TrayStore.shared.load()
@@ -98,9 +105,7 @@ actor TrayActivityController {
         // only once the replacement exists, so the success path still ends with
         // a single activity.
         guard let replacement = start(TrayContentState.make(from: items)) else { return }
-        for activity in liveActivities where activity.id != replacement {
-            await activity.end(nil, dismissalPolicy: .immediate)
-        }
+        await retireOthers(keeping: replacement)
     }
 
     // MARK: - Internals
@@ -127,8 +132,10 @@ actor TrayActivityController {
     /// `false` when there was nothing live to update, so the caller can start one.
     ///
     /// Updates every live activity rather than an arbitrary `first` of an
-    /// unordered registry: that is the same set `restart()` retires, so an
-    /// update can no longer land on the one the user cannot see.
+    /// unordered registry, so an update can no longer land on one the user
+    /// cannot see. This is a narrower set than `retireOthers` sweeps: that one
+    /// spans the whole registry on purpose, to also catch `.ended` entries
+    /// this method must never touch.
     private func update(_ state: TrayContentState) async -> Bool {
         let activities = liveActivities
         guard !activities.isEmpty else { return false }
@@ -151,6 +158,22 @@ actor TrayActivityController {
         // is still on screen until it is dismissed, and ending it with
         // `.immediate` is what takes it off.
         for activity in Activity<TrayActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    /// Ends every other activity in the registry once `keeping` exists.
+    ///
+    /// Iterates the whole registry, exactly like `end()` does, not
+    /// `liveActivities`: an `.ended` activity -- the one ActivityKit produces
+    /// at the eight-hour mark -- stays on screen until it is dismissed, and
+    /// `.immediate` is what takes it off. `restart()` and `sync()`'s
+    /// self-recovery path both call `start` after finding nothing live to
+    /// update, so both must sweep the whole registry afterward, or the old
+    /// `.ended` card sits on the Lock Screen next to the new one for up to
+    /// four hours.
+    private func retireOthers(keeping id: String) async {
+        for activity in Activity<TrayActivityAttributes>.activities where activity.id != id {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
