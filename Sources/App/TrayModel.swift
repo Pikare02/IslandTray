@@ -11,24 +11,69 @@ final class TrayModel {
     /// (see TrayStore), so a thrown read must never be swallowed into `[]`
     /// here. A failure leaves `items` as it was and reports through `banner`
     /// instead of quietly showing an empty tray.
-    func reload() {
+    ///
+    /// Returns whether the read succeeded, so a caller that is about to make
+    /// its own decision about `banner` (namely `ingest(_:)`) can tell "a read
+    /// failure was just posted" apart from "nothing happened" and avoid
+    /// overwriting it.
+    @discardableResult
+    func reload() -> Bool {
         do {
             items = try TrayStore.shared.load()
+            return true
         } catch {
             banner = "トレイを読み込めません: \(error.localizedDescription)"
+            return false
         }
     }
 
     func ingest(_ providers: [NSItemProvider]) async {
         let result = await DropReceiver.ingest(providers: providers)
-        reload()
+        let reloadSucceeded = reload()
 
-        if !result.failed.isEmpty {
-            banner = "取り込めませんでした: \(result.failed.joined(separator: ", "))"
-        } else if result.added > 0 {
-            banner = nil
+        switch Self.ingestBanner(reloadSucceeded: reloadSucceeded, result: result) {
+        case .keep:
+            break
+        case .set(let value):
+            banner = value
         }
         await syncActivity()
+    }
+
+    /// What `ingest(_:)` should do to `banner` after a drop, given whether
+    /// the `reload()` that just ran succeeded and what `DropReceiver`
+    /// reported.
+    enum BannerUpdate: Equatable {
+        /// Leave `banner` exactly as it is.
+        case keep
+        /// Overwrite `banner`, `nil` meaning "clear it".
+        case set(String?)
+    }
+
+    /// Precedence, highest first:
+    /// 1. `reload()` just failed -- its "トレイを読み込めません: …" message must
+    ///    survive. This is the whole point of Critical Finding 2: an ingest
+    ///    that partially or fully succeeded must never paper over a read that
+    ///    just failed, or the user sees no banner at all while `items` is
+    ///    silently stale.
+    /// 2. Otherwise, any provider that failed to import is reported.
+    /// 3. Otherwise, a clean import (`added > 0`) clears the banner.
+    /// 4. An empty drop (`added == 0`, nothing failed) leaves `banner`
+    ///    untouched -- unspecified by the brief, kept as-is.
+    ///
+    /// Pulled out as a pure static function, mirroring `removalBanner(for:)`,
+    /// so this precedence can be pinned by a unit test without driving it
+    /// through `DropReceiver`'s real `NSItemProvider`/`TrayStore.shared`
+    /// machinery.
+    static func ingestBanner(reloadSucceeded: Bool, result: DropReceiver.Result) -> BannerUpdate {
+        guard reloadSucceeded else { return .keep }
+        if !result.failed.isEmpty {
+            return .set("取り込めませんでした: \(result.failed.joined(separator: ", "))")
+        }
+        if result.added > 0 {
+            return .set(nil)
+        }
+        return .keep
     }
 
     /// Updates the Live Activity and surfaces any failure rather than

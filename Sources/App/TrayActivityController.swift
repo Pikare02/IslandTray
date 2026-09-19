@@ -92,6 +92,19 @@ actor TrayActivityController {
             // sync(items:) from a drop in progress -- on disk I/O. Task.detached
             // hops the synchronous call onto the cooperative thread pool; this
             // method only resumes back onto the actor once it has a result.
+            //
+            // Deliberately `Task.detached`, not a plain `Task { }`: a plain
+            // task created from inside an actor method inherits that actor's
+            // isolation, so `TrayStore.shared.load()` would still run on
+            // this actor's executor and block it exactly as before --
+            // `Task.detached` is what actually gets off the actor. The price
+            // is losing task-local values (unused anywhere in this codebase
+            // today) and this task's link to its caller's cancellation --
+            // the `Task { await restart() }` in IslandTrayApp's
+            // `onChange(of: scenePhase)` is never itself cancelled, so this
+            // is inert today, but do not "simplify" this back to a plain
+            // `Task { }`; that reintroduces the actor-blocking bug this fix
+            // exists for.
             items = try await Task.detached(priority: .userInitiated) {
                 try TrayStore.shared.load()
             }.value

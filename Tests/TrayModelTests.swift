@@ -45,4 +45,60 @@ final class TrayModelTests: XCTestCase {
             "削除に失敗しました"
         )
     }
+
+    // MARK: - ingestBanner(reloadSucceeded:result:)
+
+    /// Pins the precedence from Critical Finding 2: a `reload()` failure
+    /// must survive a subsequent partial or total ingest success. Without
+    /// this guard, `ingest(_:)` used to overwrite that banner unconditionally
+    /// whenever at least one provider succeeded or any failed, leaving the
+    /// user with no explanation and a stale item list.
+
+    func testAReloadFailureIsKeptEvenWhenEverythingWasImported() {
+        let result = DropReceiver.Result(added: 1, failed: [])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: false, result: result),
+            .keep
+        )
+    }
+
+    func testAReloadFailureIsKeptEvenWhenSomeImportsFailed() {
+        let result = DropReceiver.Result(added: 0, failed: ["photo.heic"])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: false, result: result),
+            .keep
+        )
+    }
+
+    func testAReloadFailureIsKeptOnAnEmptyDrop() {
+        let result = DropReceiver.Result(added: 0, failed: [])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: false, result: result),
+            .keep
+        )
+    }
+
+    func testFailedImportsAreReportedAfterASuccessfulReload() {
+        let result = DropReceiver.Result(added: 0, failed: ["photo.heic", "video.mov"])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: true, result: result),
+            .set("取り込めませんでした: photo.heic, video.mov")
+        )
+    }
+
+    func testACleanImportClearsTheBannerAfterASuccessfulReload() {
+        let result = DropReceiver.Result(added: 2, failed: [])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: true, result: result),
+            .set(nil)
+        )
+    }
+
+    func testAnEmptyDropLeavesTheBannerUntouchedAfterASuccessfulReload() {
+        let result = DropReceiver.Result(added: 0, failed: [])
+        XCTAssertEqual(
+            TrayModel.ingestBanner(reloadSucceeded: true, result: result),
+            .keep
+        )
+    }
 }
