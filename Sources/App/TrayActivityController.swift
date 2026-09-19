@@ -84,7 +84,17 @@ actor TrayActivityController {
         }
         let items: [TrayItem]
         do {
-            items = try TrayStore.shared.load()
+            // TrayStore.load() can escalate through prepare()/rebuildFromDisk()
+            // into a coordinated *write*, which blocks its caller on file I/O.
+            // restart() now runs on every foreground (scenePhase -> .active),
+            // so calling load() directly here would block this actor's serial
+            // executor -- and every other call queued behind it, including
+            // sync(items:) from a drop in progress -- on disk I/O. Task.detached
+            // hops the synchronous call onto the cooperative thread pool; this
+            // method only resumes back onto the actor once it has a result.
+            items = try await Task.detached(priority: .userInitiated) {
+                try TrayStore.shared.load()
+            }.value
         } catch {
             // TrayStore.load() throws precisely so a failed read is not read
             // back as an empty tray. Ending the island over a transient
