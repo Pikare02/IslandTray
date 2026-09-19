@@ -59,6 +59,24 @@ enum DropReceiver {
         return Result(added: added, failed: failed)
     }
 
+    /// What the share sheet tells the user an ingest did.
+    ///
+    /// Lives here rather than in `ShareViewController` because this file is
+    /// the one both the share extension (project.yml adds it to that target)
+    /// and the test bundle can see: the extension's own sources are not
+    /// reachable from a test bundle, and an unpinned summary is how "3 of 5
+    /// failed" got reported as a success.
+    ///
+    /// A partial outcome names both sides, the same rule `TrayRemovalResult`,
+    /// `incompleteRemoval` and `ingestBanner` follow. Counts, not names: the
+    /// sheet is a few lines tall and a long share can fail a dozen items.
+    static func shareSheetMessage(for result: Result) -> String {
+        guard result.added > 0 else { return "追加できませんでした" }
+        let landed = "\(result.added) 件をトレイに追加しました"
+        guard !result.failed.isEmpty else { return landed }
+        return landed + "（\(result.failed.count) 件は追加できませんでした）"
+    }
+
     /// Prefer the most specific concrete type the provider offers, ignoring
     /// container-ish identifiers that would give us a useless extension.
     ///

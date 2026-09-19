@@ -1,3 +1,4 @@
+import ActivityKit
 import XCTest
 @testable import IslandTray
 
@@ -100,5 +101,71 @@ final class TrayModelTests: XCTestCase {
             TrayModel.ingestBanner(reloadSucceeded: true, result: result),
             .keep
         )
+    }
+
+    // MARK: - Round 5, Important 2: start() and the Live Activity
+
+    /// A temporary container, cleaned up with the test.
+    private func makeStore(containing names: [String]) throws -> (TrayStore, URL) {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let store = TrayStore(root: root)
+        try store.prepare()
+        for name in names {
+            _ = try store.add(data: Data("x".utf8), suggestedName: name, uti: "public.plain-text")
+        }
+        return (store, root)
+    }
+
+    /// Live activities this test host put up. `Activity.request` does succeed
+    /// here (only its UI is missing), so whether `start()` reached
+    /// `syncActivity()` is directly observable -- no seam, no banner text to
+    /// depend on. Ended ones linger in the registry until dismissed, which is
+    /// what `isLive` is for.
+    private func liveActivityCount() -> Int {
+        Activity<TrayActivityAttributes>.activities
+            .filter { TrayActivityController.isLive($0.activityState) }
+            .count
+    }
+
+    private func clearActivities() async {
+        for activity in Activity<TrayActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    override func tearDown() async throws {
+        await clearActivities()
+    }
+
+    func testAMigrationResyncsTheIslandOnTheLaunchThatMigrated() async throws {
+        await clearActivities()
+        let (_, oldRoot) = try makeStore(containing: ["a.txt"])
+        let (store, _) = try makeStore(containing: [])
+        let model = TrayModel(store: store)
+
+        await model.start(migratingFrom: oldRoot)
+
+        XCTAssertEqual(model.items.count, 1, "the migrated item is in the list")
+        XCTAssertEqual(
+            liveActivityCount(), 1,
+            "scenePhase's restart() read the container before the migration and put no island "
+                + "up; nothing else syncs it this session, so the launch that migrated has to"
+        )
+    }
+
+    /// The other half: with nothing to migrate, the island is scenePhase's
+    /// `restart()`'s business and syncing here would only duplicate it.
+    func testALaunchWithNothingToMigrateLeavesTheIslandAlone() async throws {
+        await clearActivities()
+        let (_, oldRoot) = try makeStore(containing: [])
+        let (store, _) = try makeStore(containing: ["a.txt"])
+        let model = TrayModel(store: store)
+
+        await model.start(migratingFrom: oldRoot)
+
+        XCTAssertEqual(model.items.count, 1)
+        XCTAssertEqual(liveActivityCount(), 0, "an ordinary launch must not sync the island twice")
     }
 }

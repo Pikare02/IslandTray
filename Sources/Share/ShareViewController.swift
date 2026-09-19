@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 final class ShareViewController: UIViewController {
     override func viewDidLoad() {
@@ -16,55 +15,20 @@ final class ShareViewController: UIViewController {
         Task { await ingest() }
     }
 
+    /// Shares the app's own drop path instead of a second copy of it.
+    ///
+    /// `DropReceiver` already picks the most specific type identifier the
+    /// provider offers (a generic `public.data` standing first would store the
+    /// payload with no extension and no thumbnail), stages the file before the
+    /// completion handler invalidates it, keeps the copy and the coordinated
+    /// write off the main actor, and counts what failed. Reimplementing any of
+    /// that here is how this extension lost both the type selection and the
+    /// failure count; project.yml compiles that file into this target.
     private func ingest() async {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? [])
             .flatMap { $0.attachments ?? [] }
-
-        var added = 0
-        for provider in providers {
-            let typeIdentifier = provider.registeredTypeIdentifiers.first
-                ?? UTType.data.identifier
-            guard let staged = await loadFile(from: provider, typeIdentifier: typeIdentifier)
-            else { continue }
-            let suggestedName = provider.suggestedName
-
-            // Copying the payload into the container and the coordinated
-            // metadata write are both disk work, and this method runs on the
-            // main actor: detached, or the sheet freezes for as long as the
-            // copy takes -- the same reason DropReceiver keeps `add` off it.
-            // Only Sendable values cross in; `provider` itself stays here.
-            // The `defer` drops the staging copy on the throwing path too.
-            added += await Task.detached(priority: .userInitiated) {
-                defer { try? FileManager.default.removeItem(at: staged) }
-                let stored = try? TrayStore.shared.add(
-                    copyingFrom: staged,
-                    suggestedName: suggestedName,
-                    uti: typeIdentifier
-                )
-                return stored == nil ? 0 : 1
-            }.value
-        }
-
-        present(message: added > 0 ? "\(added) 件をトレイに追加しました" : "追加できませんでした")
-    }
-
-    private func loadFile(from provider: NSItemProvider, typeIdentifier: String) async -> URL? {
-        await withCheckedContinuation { continuation in
-            provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { url, _ in
-                guard let url else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                // Must copy synchronously: url is deleted once this returns.
-                let staging = URL(fileURLWithPath: NSTemporaryDirectory())
-                    .appendingPathComponent(UUID().uuidString)
-                    .appendingPathExtension(url.pathExtension)
-                try? FileManager.default.copyItem(at: url, to: staging)
-                continuation.resume(
-                    returning: FileManager.default.fileExists(atPath: staging.path) ? staging : nil
-                )
-            }
-        }
+        let result = await DropReceiver.ingest(providers: providers)
+        present(message: DropReceiver.shareSheetMessage(for: result))
     }
 
     private func present(message: String) {
