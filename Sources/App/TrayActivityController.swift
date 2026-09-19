@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import OSLog
 
 /// Owns the tray's Live Activity.
 ///
@@ -8,6 +9,14 @@ import Foundation
 /// RefreshTrayActivityIntent that the Shortcuts automation triggers.
 actor TrayActivityController {
     static let shared = TrayActivityController()
+
+    /// `restart()`'s only caller besides the foreground scene-phase handler is
+    /// `RefreshTrayActivityIntent`, which the system runs in a background-
+    /// launched process with no UI and no one reading `lastError` back. The
+    /// system log is the one record that outlives that process, so every
+    /// failure branch below writes here too -- static, non-interpolated text
+    /// only: never a filename, item name, or count from the user's tray.
+    private static let logger = Logger(subsystem: "com.pikare.islandtray", category: "TrayActivityController")
 
     /// Why the island does not match the tray right now, or `nil` when it does.
     ///
@@ -46,6 +55,11 @@ actor TrayActivityController {
     }
 
     func sync(items: [TrayItem]) async {
+        // No os_log call here, unlike restart(): sync()'s only callers are
+        // TrayModel.ingest(_:)/remove(_:), which read lastError back into
+        // `banner` in the same foreground session, right after this returns.
+        // That failure is never silent the way a background restart() is, so
+        // logging it too would just be noise.
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             lastError = "ライブアクティビティが許可されていません"
             return
@@ -80,6 +94,7 @@ actor TrayActivityController {
     func restart() async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             lastError = "ライブアクティビティが許可されていません"
+            Self.logger.error("restart() aborted: Live Activities are disabled.")
             return
         }
         let items: [TrayItem]
@@ -114,6 +129,7 @@ actor TrayActivityController {
             // metadata failure is the one thing that must not happen here, so
             // leave whatever is up alone and report instead.
             lastError = "トレイを読み込めません: \(error.localizedDescription)"
+            Self.logger.error("restart() aborted: TrayStore.load() threw.")
             return
         }
         guard !items.isEmpty else {
@@ -148,6 +164,11 @@ actor TrayActivityController {
             return activity.id
         } catch {
             lastError = "アイランドの表示を開始できません: \(error.localizedDescription)"
+            // Shared by restart() and sync()'s self-recovery path -- either
+            // way, Activity.request refused a request that should have
+            // succeeded, and this is worth a durable record regardless of
+            // which caller hit it.
+            Self.logger.error("Activity.request failed.")
             return nil
         }
     }

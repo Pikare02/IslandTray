@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct SetupGuideView: View {
@@ -18,7 +19,14 @@ struct SetupGuideView: View {
                     step(2, "「+」から「時刻」を選びます。")
                     step(3, "時刻を 07:00 に設定し、「毎日」を選びます。")
                     step(4, "「すぐに実行」を選びます。確認を求める設定のままだと自動で動きません。")
-                    step(5, "アクションで「トレイの表示を更新」を選びます。")
+                    step(
+                        5,
+                        // Interpolates the intent's own title rather than a
+                        // second hard-typed copy, so this instruction and the
+                        // action name Shortcuts actually shows cannot drift
+                        // apart.
+                        "アクションで「\(String(localized: RefreshTrayActivityIntent.title))」を選びます。"
+                    )
                     step(6, "同じ手順を 15:00 と 23:00 でも繰り返します。")
                 } header: {
                     Text("設定手順")
