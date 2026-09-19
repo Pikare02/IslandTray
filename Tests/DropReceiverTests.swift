@@ -45,4 +45,31 @@ final class DropReceiverTests: XCTestCase {
         let empty = NSItemProvider()
         XCTAssertEqual(DropReceiver.preferredTypeIdentifier(for: empty), UTType.data.identifier)
     }
+
+    // MARK: - Round 5, Important 2: the share sheet's summary
+
+    func testACleanImportReportsOnlyWhatLanded() {
+        XCTAssertEqual(
+            DropReceiver.shareSheetMessage(for: .init(added: 2, failed: [])),
+            "2 件をトレイに追加しました"
+        )
+    }
+
+    /// The share sheet closes itself, so a count that hides the failures is
+    /// the user's last word on files that never arrived. Same rule as
+    /// `TrayRemovalResult`, `incompleteRemoval` and `ingestBanner`: a partial
+    /// outcome is never reported as a clean one.
+    func testAPartialImportReportsBothCounts() {
+        XCTAssertEqual(
+            DropReceiver.shareSheetMessage(for: .init(added: 2, failed: ["a.txt", "b.txt", "c.txt"])),
+            "2 件をトレイに追加しました（3 件は追加できませんでした）"
+        )
+    }
+
+    func testAnImportThatLandedNothingReportsAPlainFailure() {
+        XCTAssertEqual(
+            DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["a.txt"])),
+            "追加できませんでした"
+        )
+    }
 }

@@ -125,19 +125,37 @@ final class TrayStore: Sendable {
     /// still happen inside one coordinated write, and the list that lands is
     /// one `presentable` has already deduped and checked against the files.
     ///
-    /// Each payload is renamed into Items/ inside that same claim, before its
-    /// entry is inserted, which is what makes repeating this safe:
+    /// The order is copy, commit, *then* unlink the originals -- never rename
+    /// first. The tray holds the user's only copy of these files, so no
+    /// interruption may leave one in neither container, and every step here is
+    /// interruptible:
     ///
-    /// - An item is taken only while its payload is still in the old
-    ///   container, so a second run finds nothing left to take and an item the
-    ///   user deleted after the first run is never brought back.
-    /// - An id this container already knows is left where it is, so an item
+    /// - Killed mid-copy: this container has payloads with no entries (the
+    ///   metadata write has not happened yet) and the old one is untouched, so
+    ///   every item is still reachable there. The next run overwrites those
+    ///   orphans and copies again.
+    /// - Killed at the metadata write: it is atomic, so the file is either the
+    ///   old list or the new one. The old container is untouched either way.
+    /// - Killed while unlinking the originals: the ones already unlinked live
+    ///   here, the rest live in both. Duplicates, never absences.
+    ///
+    /// A rename-first migration has no such story: between the rename and the
+    /// write, the payload is here with no entry and listed there with no file,
+    /// and nothing recovers that -- `rebuildFromDisk()` only runs when the
+    /// metadata is unreadable, which it is not.
+    ///
+    /// Repeating it stays safe, and the cleanup is what makes it so:
+    ///
+    /// - An id this container already knows is not copied again, so an item
     ///   that exists in both survives as the copy this container already has.
-    /// - Nothing is written outside this container. The old one is read, and
-    ///   relieved of exactly the payloads this call takes; any failure --
-    ///   including a failure of the metadata write, which happens after the
-    ///   body returns -- puts every one of them back before throwing, so an
-    ///   item is never left in neither container.
+    /// - Every incoming item this container can now show -- freshly copied or
+    ///   already known -- gives up its old payload afterwards. Leaving a
+    ///   committed item's original behind is what would let a later deletion
+    ///   be undone by the run after it.
+    /// - Nothing is created or repaired outside this container, and a failure
+    ///   removes the copies it made rather than leaving orphans for
+    ///   `rebuildFromDisk()` to resurrect. The old container is only ever
+    ///   relieved of payloads this container has committed.
     @discardableResult
     func migrateIfNeeded(from oldRoot: URL) throws -> Int {
         guard oldRoot.standardizedFileURL != root.standardizedFileURL else { return 0 }
@@ -145,9 +163,10 @@ final class TrayStore: Sendable {
         let incoming = try old.itemsToMigrate()
         guard !incoming.isEmpty else { return 0 }
 
-        var taken: [(from: URL, to: URL)] = []
+        var copied: [URL] = []
+        let landed: [TrayItem]
         do {
-            try mutate { items in
+            landed = try mutate { items in
                 let known = Set(items.map(\.id))
                 for item in incoming where !known.contains(item.id) {
                     let from = item.fileURL(in: old.itemsDirectory)
@@ -161,18 +180,27 @@ final class TrayStore: Sendable {
                     if FileManager.default.fileExists(atPath: to.path) {
                         try FileManager.default.removeItem(at: to)
                     }
-                    try FileManager.default.moveItem(at: from, to: to)
-                    taken.append((from: from, to: to))
+                    try FileManager.default.copyItem(at: from, to: to)
+                    copied.append(to)
                     items.insert(item, at: 0)
                 }
             }
         } catch {
-            for move in taken.reversed() {
-                try? FileManager.default.moveItem(at: move.to, to: move.from)
-            }
+            // Nothing was committed, so these are entryless payloads in this
+            // container: drop them. The originals were never touched.
+            for url in copied { try? FileManager.default.removeItem(at: url) }
             throw error
         }
-        return taken.count
+
+        // Committed. `landed` is what `presentable` let through, so every id
+        // in it has both an entry and a payload here: the old copies are now
+        // duplicates. Failing to unlink one is harmless -- the item is
+        // reachable from this container and the next run tries again.
+        let reachable = Set(landed.map(\.id))
+        for item in incoming where reachable.contains(item.id) {
+            try? FileManager.default.removeItem(at: item.fileURL(in: old.itemsDirectory))
+        }
+        return copied.count
     }
 
     /// The items of a container this store does not own, read without

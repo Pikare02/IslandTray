@@ -717,4 +717,78 @@ final class TrayStoreTests: XCTestCase {
         XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 1)
         XCTAssertEqual(Set(try store.load().map(\.id)), Set([mine.id, theirs.id]))
     }
+
+    // MARK: - Round 5, Critical 1: an interrupted migration loses nothing
+
+    /// The tray holds the user's only copy, so the migration must never be in
+    /// a state where a payload belongs to neither container. That rules out
+    /// taking the payload first: a process death between the rename and the
+    /// metadata write would leave the entry in the old container with no file
+    /// and the file in this one with no entry, and nothing recovers that.
+    ///
+    /// An old `Items/` that cannot be written stands in for that death: the
+    /// payload cannot leave the old container at all. A copy-then-commit
+    /// migration still lands the item here and leaves the original behind as
+    /// a duplicate; a move-then-commit one fails the rename and rolls the
+    /// whole migration back, which is the shape that loses files for real.
+    func testMigrationCommitsBeforeGivingUpTheOldPayload() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        let a = try oldStore.add(data: Data("one".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+        let oldItems = oldRoot.appendingPathComponent("Items", isDirectory: true)
+
+        try withPermissions(0o500, at: oldItems) {
+            XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 1)
+        }
+        XCTAssertEqual(try store.load().map(\.id), [a.id])
+        XCTAssertEqual(try Data(contentsOf: a.fileURL(in: itemsDir)), Data("one".utf8))
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: a.fileURL(in: oldItems).path),
+            "an interruption must leave the payload in the old container, never in neither"
+        )
+
+        // The leftover is a duplicate of an item this container now owns, not
+        // a second item: the next run clears it. That cleanup is what keeps a
+        // later deletion final -- an old payload left lying about is exactly
+        // what a subsequent run would copy back in.
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 0)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: a.fileURL(in: oldItems).path),
+            "a committed item's old payload must be dropped, not kept forever"
+        )
+        XCTAssertEqual(try store.load().map(\.id), [a.id])
+        XCTAssertEqual(try itemsDirEntries().count, 1)
+
+        _ = try store.remove(id: a.id)
+        XCTAssertEqual(try store.migrateIfNeeded(from: oldRoot), 0)
+        XCTAssertTrue(try store.load().isEmpty, "and the cleared duplicate cannot come back")
+        XCTAssertEqual(try itemsDirEntries(), [])
+    }
+
+    // MARK: - Round 5, Important 3: the rollback path
+
+    /// A migration that cannot commit must undo the copies it made, or every
+    /// launch adds another orphan to `Items/` that `rebuildFromDisk()` would
+    /// one day resurrect as a recovered placeholder.
+    ///
+    /// `Items/` stays writable and `root` does not, so every copy succeeds and
+    /// only the atomic metadata write fails -- the one ordering that reaches
+    /// this path. Relies on `mutate` writing unconditionally; a future
+    /// "nothing changed, skip the write" optimisation would un-pin it.
+    func testFailedMigrationLeavesBothContainersAsTheyWere() throws {
+        let (oldStore, oldRoot) = try makeOldStore()
+        let a = try oldStore.add(data: Data("one".utf8), suggestedName: "a.txt", uti: "public.plain-text")
+        let oldItems = oldRoot.appendingPathComponent("Items", isDirectory: true)
+
+        try withPermissions(0o500, at: root) {
+            XCTAssertThrowsError(try store.migrateIfNeeded(from: oldRoot))
+        }
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: a.fileURL(in: oldItems).path),
+            "a failed migration must leave the payload in the old container"
+        )
+        XCTAssertEqual(try oldStore.load().count, 1)
+        XCTAssertEqual(try itemsDirEntries(), [], "and must leave no orphan in this one")
+        XCTAssertTrue(try store.load().isEmpty)
+    }
 }

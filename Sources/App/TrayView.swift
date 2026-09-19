@@ -41,16 +41,11 @@ struct TrayView: View {
             return true
         }
         .task {
-            // Live Activity sync on cold launch is scenePhase's job:
-            // IslandTrayApp's `.onChange(of: scenePhase)` fires `restart()`
-            // on the transition to `.active`, which also happens on launch,
-            // and `restart()` already reloads items and does the full
-            // start-or-continue dance. Calling `syncActivity()` here too just
-            // duplicated that work on every cold launch with no guarantee
-            // which one's result won. Only this view's own state --
-            // populating the visible list -- belongs in its first appearance.
-            await model.migrateIfNeeded()
-            model.reload()
+            // Migrate, reload, and -- only when the migration actually moved
+            // something -- resync the island that scenePhase's `restart()`
+            // already built from the pre-migration container. The ordering
+            // and the condition are `start()`'s, where a test can reach them.
+            await model.start()
         }
     }
 

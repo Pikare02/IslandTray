@@ -64,6 +64,11 @@ targets:
     sources:
       - Sources/Shared
       - Sources/Share
+      # The share sheet ingests NSItemProviders exactly as a drop does --
+      # same type-identifier selection, same staging, same failure counting.
+      # Compiled in rather than copied, so the two can never diverge. The
+      # rest of Sources/App is not pulled in: this is a single file.
+      - path: Sources/App/DropReceiver.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.share
