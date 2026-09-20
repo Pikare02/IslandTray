@@ -12,6 +12,24 @@ struct SetupGuideView: View {
         NavigationStack {
             List {
                 Section {
+                    if DropDiagnostics.lines.isEmpty {
+                        Text("まだ記録がありません。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(DropDiagnostics.lines.enumerated()), id: \.offset) { _, line in
+                            Text(line)
+                                .font(.system(.caption2, design: .monospaced))
+                        }
+                        Button("記録を消す", role: .destructive) { DropDiagnostics.clear() }
+                    }
+                } header: {
+                    Text("取り込みの記録")
+                } footer: {
+                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file / photo-id / photo-exif）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
+                }
+
+                Section {
                     Toggle("トレイが空でも表示する", isOn: $showActivityWhenEmpty)
                         .onChange(of: showActivityWhenEmpty) { _, newValue in
                             TraySettings().showActivityWhenEmpty = newValue
@@ -63,24 +81,6 @@ struct SetupGuideView: View {
                     Text("アプリを開いたときにも表示は作り直されます。オートメーションが動かなかった場合は、アプリを一度開けば復帰します。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    if DropDiagnostics.lines.isEmpty {
-                        Text("まだ記録がありません。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(DropDiagnostics.lines.enumerated()), id: \.offset) { _, line in
-                            Text(line)
-                                .font(.system(.caption2, design: .monospaced))
-                        }
-                        Button("記録を消す", role: .destructive) { DropDiagnostics.clear() }
-                    }
-                } header: {
-                    Text("取り込みの記録")
-                } footer: {
-                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file / photo-id / photo-exif）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
                 }
 
                 Section {

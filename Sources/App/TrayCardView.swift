@@ -48,6 +48,16 @@ struct TrayCardView: View {
         // onDrag rather than .draggable: this hands other apps the actual file
         // rather than a link to it.
         .onDrag {
+            // Take the background time now, while this app is still the one
+            // in front. By the time the receiving app asks for the bytes the
+            // user is in that app and this one is on its way to suspension,
+            // which is too late to ask -- and was why the move only ever
+            // completed once the user came back here.
+            //
+            // `assumeIsolated` rather than a hop: SwiftUI calls this closure
+            // on the main thread, and a hop would put the request back on the
+            // wrong side of that suspension.
+            MainActor.assumeIsolated { model.beginHandover() }
             let provider = NSItemProvider()
             // NSItemProvider takes its suggested filename from the URL's last
             // path component, which is `item.fileURL`'s UUID-based on-disk
