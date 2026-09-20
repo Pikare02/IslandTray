@@ -24,6 +24,19 @@ enum TrayItemOrigin: Codable, Hashable {
     /// Deletes only on an unambiguous match: two photos taken in the same
     /// second at the same size resolve to nothing rather than to a guess.
     case photoMetadata(creationDate: Date, pixelWidth: Int, pixelHeight: Int)
+
+    /// Whether deleting this needs the app to be in front.
+    ///
+    /// PhotoKit puts its own confirmation in front of every deletion, and
+    /// there is nowhere to show it from the background -- so a photo cannot
+    /// be deleted while the user is still in the app they dragged it into,
+    /// however the rest of the move is arranged. A file has no such dialog.
+    var needsUIToDelete: Bool {
+        switch self {
+        case .file: return false
+        case .photo, .photoMetadata: return true
+        }
+    }
 }
 
 struct TrayItem: Codable, Hashable, Identifiable {

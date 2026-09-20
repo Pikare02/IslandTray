@@ -311,16 +311,59 @@ final class TrayModel {
     /// still holds -- the setting is re-read, the register is what decides
     /// what to remove, and a kill in the middle leaves the move to be
     /// finished at the next launch.
+    /// Background time, taken while the app is still in front.
+    ///
+    /// This is the whole reason the move used to need the user to come back.
+    /// Asking for it at the handover was too late: by then they are already in
+    /// the other app and this one is being suspended, so the request -- and
+    /// everything queued behind it -- simply did not run until the app was
+    /// next resumed, which is exactly when the deletions were observed to
+    /// happen. Taken at the *start* of the drag instead, the process is still
+    /// running and the assertion is already held when the handover arrives.
+    private var handover: UIBackgroundTaskIdentifier = .invalid
+
+    /// Called as a drag leaves a card, on the main thread, with the app in
+    /// front.
+    func beginHandover() {
+        guard handover == .invalid else { return }
+        handover = UIApplication.shared.beginBackgroundTask(withName: "tray handover") { [weak self] in
+            // iOS reclaiming the time. Ending it here is required; the move
+            // is finished at the next launch from the register on disk.
+            self?.endHandover()
+        }
+        DropDiagnostics.record("持ち出し: 背景時間\(handover == .invalid ? "不可" : "確保")")
+    }
+
+    private func endHandover() {
+        guard handover != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(handover)
+        handover = .invalid
+    }
+
     private func finishExportWhileAway(_ id: UUID) async {
         let bytes = items.first { $0.id == id }?.size ?? 0
         // 5 MB/s is a deliberately pessimistic copy rate; the floor matters
         // more than the slope, since most items are small and the cap keeps
         // the whole thing inside the background window.
         let grace = min(20, max(6, Double(bytes) / 5_000_000))
-        let assertion = UIApplication.shared.beginBackgroundTask(withName: "finish tray move")
-        defer { UIApplication.shared.endBackgroundTask(assertion) }
+        // Every step is recorded. Whether this pass runs at all is the whole
+        // question -- iOS can refuse the time, suspend us before the wait is
+        // over, or kill the app outright -- and none of that is visible from
+        // here or from a test.
+        DropDiagnostics.record("背景処理: \(Int(grace))秒待機")
         try? await Task.sleep(for: .seconds(grace))
+        DropDiagnostics.record("背景処理: 実行 state=\(Self.stateName(UIApplication.shared.applicationState))")
         await flushExported()
+        endHandover()
+    }
+
+    private static func stateName(_ state: UIApplication.State) -> String {
+        switch state {
+        case .active: return "active"
+        case .inactive: return "inactive"
+        case .background: return "background"
+        @unknown default: return "?"
+        }
     }
 
     /// Takes everything handed out since the last flush out of the tray, if
@@ -348,15 +391,24 @@ final class TrayModel {
             // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
             let origin = item.origin
-            if case .photo = origin, !canPresentUI { exported.insert(id); continue }
-            if case .photoMetadata = origin, !canPresentUI { exported.insert(id); continue }
+            if origin?.needsUIToDelete == true, !canPresentUI {
+                exported.insert(id)
+                DropDiagnostics.record("取り出し: \(item.name) 写真は前面に戻ってから")
+                continue
+            }
             await remove(item)
             // The tray copy goes first: whatever happens to the original, the
             // destination already has the file, so neither order can lose it.
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
-            guard let origin else { continue }
-            if case .failed(let reason) = await OriginalRemover.remove(origin, named: item.name) {
+            guard let origin else {
+                DropDiagnostics.record("取り出し: \(item.name) 元なし(コピー扱い)")
+                continue
+            }
+            switch await OriginalRemover.remove(origin, named: item.name) {
+            case .removed:
+                DropDiagnostics.record("取り出し: \(item.name) 元も削除")
+            case .failed(let reason):
                 banner = "元のファイルは削除できませんでした（\(reason)）"
             }
         }
