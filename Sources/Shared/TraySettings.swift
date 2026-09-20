@@ -34,6 +34,7 @@ struct TraySettings {
 
     private enum Keys {
         static let showActivityWhenEmpty = "showActivityWhenEmpty"
+        static let removeOnExport = "removeOnExport"
     }
 
     /// Whether the Live Activity should stay up while the tray has zero
@@ -44,5 +45,17 @@ struct TraySettings {
     var showActivityWhenEmpty: Bool {
         get { defaults.object(forKey: Keys.showActivityWhenEmpty) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Keys.showActivityWhenEmpty) }
+    }
+
+    /// Whether handing an item to another app takes it out of the tray --
+    /// the tray as a cut buffer rather than a copy buffer. Defaults to
+    /// `true`, which is what the user asked for.
+    ///
+    /// Only the app process ever reads this; the widget has no say in what
+    /// leaves the tray. It lives here anyway because `TraySettings` is the
+    /// one place a setting is defined, not because the widget needs it.
+    var removeOnExport: Bool {
+        get { defaults.object(forKey: Keys.removeOnExport) as? Bool ?? true }
+        nonmutating set { defaults.set(newValue, forKey: Keys.removeOnExport) }
     }
 }

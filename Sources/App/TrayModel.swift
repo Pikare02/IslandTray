@@ -137,6 +137,50 @@ final class TrayModel {
         }
     }
 
+    // MARK: - Handing items to other apps
+
+    /// Items whose bytes another app has taken, waiting to leave the tray.
+    ///
+    /// Removal is deferred rather than done at the handoff for one reason:
+    /// the receiving app copies our file *after* the provider hands over the
+    /// URL, and the tray may hold the user's only copy. Deleting while that
+    /// copy is in flight destroys the file on both sides. The next time this
+    /// app comes forward -- which is when the user has finished whatever they
+    /// dragged the file into -- the copy is long done.
+    ///
+    /// `private(set)` rather than `private` so a test can see that a flush
+    /// empties it even when nothing was removed.
+    private(set) var exported: Set<UUID> = []
+
+    /// Records that another app took `id`'s bytes.
+    ///
+    /// `nonisolated` because `NSItemProvider` calls its load handler on
+    /// whatever queue it likes; the hop to the main actor is this method's
+    /// whole job. It deliberately does not consult the setting: the setting
+    /// that matters is the one in force when the item actually leaves, and
+    /// `flushExported` reads it there.
+    nonisolated func markExported(_ id: UUID) {
+        Task { @MainActor in self.exported.insert(id) }
+    }
+
+    /// Takes everything handed out since the last flush out of the tray, if
+    /// the tray is configured as a cut buffer.
+    ///
+    /// The set is emptied either way, so turning the setting on later cannot
+    /// retroactively delete items handed out while it was off.
+    func flushExported(settings: TraySettings = TraySettings()) async {
+        let ids = exported
+        exported = []
+        guard settings.removeOnExport else { return }
+        for id in ids {
+            // Re-read `items` each time rather than resolving the whole batch
+            // up front: `remove(_:)` reloads, and an id that is already gone
+            // must not be handed to the store again as a failed removal.
+            guard let item = items.first(where: { $0.id == id }) else { continue }
+            await remove(item)
+        }
+    }
+
     func remove(_ item: TrayItem) async {
         // remove(id:) returns what actually happened on disk. A partial failure
         // must not be reported to the user as a clean delete, nor as a no-op.

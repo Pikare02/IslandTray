@@ -6,6 +6,7 @@ struct SetupGuideView: View {
     let model: TrayModel
 
     @State private var showActivityWhenEmpty = TraySettings().showActivityWhenEmpty
+    @State private var removeOnExport = TraySettings().removeOnExport
 
     var body: some View {
         NavigationStack {
@@ -20,6 +21,17 @@ struct SetupGuideView: View {
                     Text("ライブアクティビティ")
                 } footer: {
                     Text("オンにすると、アプリがバックグラウンドで生きている間はトレイが空でもアイランドの表示を続けます。オフにすると、トレイが空になった時点で表示を終了します。")
+                }
+
+                Section {
+                    Toggle("取り出したらトレイから削除する", isOn: $removeOnExport)
+                        .onChange(of: removeOnExport) { _, newValue in
+                            TraySettings().removeOnExport = newValue
+                        }
+                } header: {
+                    Text("取り出し")
+                } footer: {
+                    Text("オンにすると、他のアプリへドラッグして渡した項目はトレイから消えます（切り取り）。オフにすると残ります（コピー）。共有シートから渡した場合は、成功したかどうかを iOS が教えてくれないため、この設定に関わらず残ります。")
                 }
 
                 Section {
@@ -56,7 +68,7 @@ struct SetupGuideView: View {
                 Section {
                     LabeledContent("共有コンテナ", value: TrayContainer.isShared ? "有効" : "無効")
                     if !TrayContainer.isShared {
-                        Text("有料の Apple Developer アカウントがないため、共有シートからの追加と、アイランド内の実サムネイルは利用できません。それ以外の機能はすべて動作します。")
+                        Text("有料の Apple Developer アカウントがないため、共有シートからの追加は利用できません。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

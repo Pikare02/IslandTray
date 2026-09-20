@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct TrayView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = TrayModel()
     @State private var isTargeted = false
     @State private var showsSetupGuide = false
@@ -47,13 +48,22 @@ struct TrayView: View {
             // and the condition are `start()`'s, where a test can reach them.
             await model.start()
         }
+        .onChange(of: scenePhase) { _, phase in
+            // Items another app took while we were in the background leave the
+            // tray now: the receiving app has finished copying by the time the
+            // user is back here. Deleting at the handoff instead would race
+            // that copy, and the tray can hold the only copy.
+            if phase == .active {
+                Task { await model.flushExported() }
+            }
+        }
     }
 
     private var strip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 16) {
                 ForEach(model.items) { item in
-                    TrayCardView(item: item) {
+                    TrayCardView(item: item, model: model) {
                         Task { await model.remove(item) }
                     }
                 }
