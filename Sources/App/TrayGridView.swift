@@ -13,6 +13,7 @@ import UIKit
 struct TrayGridView: UIViewRepresentable {
     let items: [TrayItem]
     let ordering: TrayOrdering
+    let layout: TrayLayout
     let isSelecting: Bool
     @Binding var selection: Set<UUID>
     let model: TrayModel
@@ -22,7 +23,10 @@ struct TrayGridView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UICollectionView {
-        let view = UICollectionView(frame: .zero, collectionViewLayout: Self.layout(headers: ordering.groupsByKind))
+        let view = UICollectionView(
+            frame: .zero,
+            collectionViewLayout: Self.collectionLayout(headers: ordering.groupsByKind, layout: layout)
+        )
         view.backgroundColor = .clear
         view.alwaysBounceVertical = true
         // Off by default on iPhone -- without this the grid cannot be dragged
@@ -45,19 +49,33 @@ struct TrayGridView: UIViewRepresentable {
 
     func updateUIView(_ view: UICollectionView, context: Context) {
         context.coordinator.parent = self
-        // The layout carries the headers, so it has to be swapped when
-        // grouping is turned on or off rather than only re-sectioned.
-        if context.coordinator.headers != ordering.groupsByKind {
+        // The layout carries both the headers and the shape of a row, so it
+        // has to be swapped when either changes rather than only re-sectioned.
+        if context.coordinator.headers != ordering.groupsByKind || context.coordinator.layout != layout {
             context.coordinator.headers = ordering.groupsByKind
-            view.setCollectionViewLayout(Self.layout(headers: ordering.groupsByKind), animated: false)
+            context.coordinator.layout = layout
+            view.setCollectionViewLayout(
+                Self.collectionLayout(headers: ordering.groupsByKind, layout: layout), animated: false
+            )
         }
         context.coordinator.apply(ordering.arrange(items))
     }
 
     /// As many square tiles per row as fit at roughly 110pt, never fewer than
     /// two, with room under each for one line of filename.
-    private static func layout(headers: Bool) -> UICollectionViewCompositionalLayout {
+    private static func collectionLayout(
+        headers: Bool, layout: TrayLayout
+    ) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, environment in
+            if layout == .list {
+                // The system's own list section, so rows, separators and
+                // insets match everything else on iOS rather than being
+                // approximated here.
+                var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
+                configuration.headerMode = headers ? .supplementary : .none
+                configuration.backgroundColor = .clear
+                return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
+            }
             let spacing: CGFloat = 12
             let inset: CGFloat = 16
             let available = environment.container.effectiveContentSize.width - inset * 2
@@ -103,6 +121,8 @@ struct TrayGridView: UIViewRepresentable {
         /// Mirrors `ordering.groupsByKind`, so `updateUIView` can tell when
         /// the layout itself has to be replaced.
         var headers = false
+        /// Mirrors the board's layout, for the same reason as `headers`.
+        var layout: TrayLayout = .grid
         private var dataSource: UICollectionViewDiffableDataSource<String, UUID>!
         /// Section titles by section id, for the headers.
         private var titles: [String: String] = [:]
@@ -125,14 +145,15 @@ struct TrayGridView: UIViewRepresentable {
                 .CellRegistration<UICollectionViewCell, UUID> { [unowned self] cell, _, id in
                     guard let item = shown[id] else { return }
                     cell.contentConfiguration = UIHostingConfiguration {
-                        TrayCardView(
+                        TrayItemView(
                             item: item,
+                            style: parent.layout == .list ? .row : .card,
                             isSelecting: parent.isSelecting,
                             isSelected: parent.selection.contains(id),
                             onDelete: { [parent] in parent.onDelete(item) }
                         )
                     }
-                    .margins(.all, 0)
+                    .margins(.all, parent.layout == .list ? 8 : 0)
                 }
             let header = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(
                 elementKind: UICollectionView.elementKindSectionHeader

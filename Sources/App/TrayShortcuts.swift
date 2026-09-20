@@ -20,5 +20,14 @@ struct TrayShortcuts: AppShortcutsProvider {
             shortTitle: "トレイに追加",
             systemImageName: "tray.and.arrow.down"
         )
+        AppShortcut(
+            intent: AddToClipboardIntent(),
+            phrases: [
+                "\(.applicationName) にコピー",
+                "\(.applicationName) のクリップボードに追加"
+            ],
+            shortTitle: "クリップボードに追加",
+            systemImageName: "list.clipboard"
+        )
     }
 }

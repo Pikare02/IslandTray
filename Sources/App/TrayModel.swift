@@ -245,7 +245,9 @@ final class TrayModel {
     /// Updates the Live Activity and surfaces any failure rather than
     /// swallowing it — the spec requires the reason to be visible.
     func syncActivity() async {
-        await TrayActivityController.shared.sync(items: visible)
+        // The island is the tray. What is on the clipboard board has its own
+        // screen and does not belong in a count of what is in the tray.
+        await TrayActivityController.shared.sync(items: visible(on: .tray))
         if let error = await TrayActivityController.shared.lastError {
             banner = error
         }
@@ -278,6 +280,13 @@ final class TrayModel {
     /// the island right then -- waiting for the deferred removal left it
     /// showing a count that no longer matched what the user had just done.
     var visible: [TrayItem] { items.filter { !exported.contains($0.id) } }
+
+    /// What one board shows. Both boards live in one store and are told apart
+    /// by this, which is also why everything else -- sorting, selection,
+    /// dragging, the preview -- is written once.
+    func visible(on board: TrayBoard) -> [TrayItem] {
+        visible.filter { $0.boardOrTray == board }
+    }
 
     /// Records that another app took `id`'s bytes, and takes it off the
     /// island immediately.

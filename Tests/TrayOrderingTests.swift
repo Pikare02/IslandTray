@@ -108,3 +108,27 @@ final class TrayOrderingTests: XCTestCase {
         XCTAssertEqual(TrayItemKind(uti: "not a real uti at all"), .other)
     }
 }
+
+/// The clipboard names itself after what was copied: a card reading
+/// "clipboard.txt" over and over is no use for finding anything again.
+final class ClipboardNamingTests: XCTestCase {
+    func testTheFirstLineBecomesTheName() {
+        XCTAssertEqual(AddToClipboardIntent.name(for: "hello world"), "hello world.txt")
+    }
+
+    func testOnlyTheFirstLine() {
+        XCTAssertEqual(AddToClipboardIntent.name(for: "first\nsecond\nthird"), "first.txt")
+    }
+
+    func testALongTextIsCutToSomethingReadable() {
+        let name = AddToClipboardIntent.name(for: String(repeating: "x", count: 500))
+        XCTAssertLessThanOrEqual(name.count, 44)
+        XCTAssertTrue(name.hasSuffix(".txt"))
+    }
+
+    func testWhitespaceOnlyTextStillGetsAName() {
+        // Sanitizing an empty name would leave "Untitled"; giving it one here
+        // keeps the card honest about what it is.
+        XCTAssertEqual(AddToClipboardIntent.name(for: "   \n  "), "clipboard.txt")
+    }
+}

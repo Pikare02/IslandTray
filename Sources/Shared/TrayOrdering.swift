@@ -60,6 +60,12 @@ struct TrayOrdering: Equatable {
     }
 }
 
+/// How a board draws what is on it.
+enum TrayLayout: String, CaseIterable {
+    case grid
+    case list
+}
+
 /// The coarse kind of a tray item, for grouping.
 ///
 /// Deliberately few: this exists to break a screenful of cards into runs the

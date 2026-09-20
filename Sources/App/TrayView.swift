@@ -1,94 +1,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// The two boards, and everything that belongs to the app rather than to one
+/// of them: the drop target, the first-run work, and the questions only the
+/// model can answer.
 struct TrayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = TrayModel()
     @State private var isTargeted = false
-    @State private var showsSetupGuide = false
-    @State private var isSelecting = false
-    @State private var selection: Set<UUID> = []
-    @State private var previewing: TrayItem?
-    /// Watched rather than read once: these live in UserDefaults, which a
-    /// SwiftUI view is not told about, and the settings sheet writes them
-    /// while this view is on screen behind it.
-    @AppStorage("orderingKey", store: TraySettings.store) private var orderingKey = TrayOrdering.Key.addedAt.rawValue
-    @AppStorage("orderingAscending", store: TraySettings.store) private var orderingAscending = false
-    @AppStorage("groupsByKind", store: TraySettings.store) private var groupsByKind = false
-
-    private var ordering: TrayOrdering {
-        TrayOrdering(
-            key: TrayOrdering.Key(rawValue: orderingKey) ?? .addedAt,
-            ascending: orderingAscending,
-            groupsByKind: groupsByKind
-        )
-    }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                if model.visible.isEmpty {
-                    emptyState
-                } else {
-                    grid
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(dropHighlight)
-            .navigationTitle(L.s("tray.title"))
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if !model.visible.isEmpty {
-                        Button(isSelecting ? L.s("common.done") : L.s("common.select")) {
-                            isSelecting.toggle()
-                            if !isSelecting { selection = [] }
-                        }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if !isSelecting && !model.visible.isEmpty { arrangeMenu }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if isSelecting {
-                        Button(allSelected ? L.s("common.deselectAll") : L.s("common.selectAll")) {
-                            selection = allSelected ? [] : Set(model.visible.map(\.id))
-                        }
-                    } else {
-                        Button { showsSetupGuide = true } label: {
-                            Image(systemName: "gearshape")
-                        }
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
-            .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
-            .fullScreenCover(item: $previewing) { item in
-                QuickLookView(url: item.fileURL, name: item.name) { previewing = nil }
-                    .ignoresSafeArea()
-            }
-            // The setter ignores dismissal: an alert can only go away through
-            // one of its buttons, and each of those clears the list itself.
-            // Clearing it from here too would discard the files the user just
-            // asked to keep.
-            .alert(
-                L.s("dup.title"),
-                isPresented: Binding(get: { !model.pendingDuplicates.isEmpty }, set: { _ in })
-            ) {
-                Button(L.s("dup.keep"), role: .cancel) { Task { await model.discardPendingDuplicates() } }
-                Button(L.s("dup.add")) { Task { await model.addPendingDuplicates() } }
-            } message: {
-                Text(model.duplicatePrompt)
-            }
-            .safeAreaInset(edge: .bottom) {
-                if let banner = model.banner {
-                    Text(banner)
-                        .font(.footnote)
-                        .padding(10)
-                        .frame(maxWidth: .infinity)
-                        .background(.red.opacity(0.15))
-                }
-            }
+        TabView {
+            BoardView(board: .tray, model: model)
+                .tabItem { Label(L.s("tray.title"), systemImage: "tray") }
+            BoardView(board: .clipboard, model: model)
+                .tabItem { Label(L.s("clipboard.title"), systemImage: "list.clipboard") }
         }
+        .background(dropHighlight)
+        // The drop target is the whole app, not one board: something dropped
+        // on the app goes to the tray wherever the user happens to be.
         .onDrop(of: [UTType.item], isTargeted: $isTargeted) { providers in
             // Cleared by hand as well as by the binding: a drag that ends in
             // certain ways -- cancelled over the app, or handed off while the
@@ -97,6 +27,18 @@ struct TrayView: View {
             isTargeted = false
             Task { await model.ingest(providers) }
             return true
+        }
+        // The setter ignores dismissal: an alert can only go away through one
+        // of its buttons, and each of those clears the list itself. Clearing
+        // it from here too would discard the files the user just asked to keep.
+        .alert(
+            L.s("dup.title"),
+            isPresented: Binding(get: { !model.pendingDuplicates.isEmpty }, set: { _ in })
+        ) {
+            Button(L.s("dup.keep"), role: .cancel) { Task { await model.discardPendingDuplicates() } }
+            Button(L.s("dup.add")) { Task { await model.addPendingDuplicates() } }
+        } message: {
+            Text(model.duplicatePrompt)
         }
         .task {
             // Migrate, reload, and -- only when the migration actually moved
@@ -124,21 +66,123 @@ struct TrayView: View {
         }
     }
 
-    private var grid: some View {
+    private var dropHighlight: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(Color.accentColor, lineWidth: isTargeted ? 4 : 0)
+            .background(isTargeted ? Color.accentColor.opacity(0.10) : Color.clear)
+            .padding(8)
+            .animation(.snappy(duration: 0.15), value: isTargeted)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+    }
+}
+
+/// One board. The tray and the clipboard differ in what they hold and how
+/// they are filled, not in what can be done with what is in them, so this is
+/// written once and told which board it is.
+struct BoardView: View {
+    let board: TrayBoard
+    let model: TrayModel
+
+    @State private var showsSetupGuide = false
+    @State private var isSelecting = false
+    @State private var selection: Set<UUID> = []
+    @State private var previewing: TrayItem?
+    /// Watched rather than read once: these live in UserDefaults, which a
+    /// SwiftUI view is not told about, and the menu writes them.
+    @AppStorage("orderingKey", store: TraySettings.store) private var orderingKey = TrayOrdering.Key.addedAt.rawValue
+    @AppStorage("orderingAscending", store: TraySettings.store) private var orderingAscending = false
+    @AppStorage("groupsByKind", store: TraySettings.store) private var groupsByKind = false
+    /// Per board, with its own key and its own default: a tray of files reads
+    /// as a grid of thumbnails, while a clipboard reads as a timeline.
+    @AppStorage private var layoutRaw: String
+
+    init(board: TrayBoard, model: TrayModel) {
+        self.board = board
+        self.model = model
+        _layoutRaw = AppStorage(
+            wrappedValue: board == .clipboard ? TrayLayout.list.rawValue : TrayLayout.grid.rawValue,
+            "layout.\(board.rawValue)",
+            store: TraySettings.store
+        )
+    }
+
+    private var items: [TrayItem] { model.visible(on: board) }
+    private var layout: TrayLayout { TrayLayout(rawValue: layoutRaw) ?? .grid }
+
+    private var ordering: TrayOrdering {
+        TrayOrdering(
+            key: TrayOrdering.Key(rawValue: orderingKey) ?? .addedAt,
+            ascending: orderingAscending,
+            groupsByKind: groupsByKind
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                if items.isEmpty { emptyState } else { list }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle(L.s(board == .tray ? "tray.title" : "clipboard.title"))
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !items.isEmpty {
+                        Button(isSelecting ? L.s("common.done") : L.s("common.select")) {
+                            isSelecting.toggle()
+                            if !isSelecting { selection = [] }
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !isSelecting && !items.isEmpty { arrangeMenu }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if isSelecting {
+                        Button(allSelected ? L.s("common.deselectAll") : L.s("common.selectAll")) {
+                            selection = allSelected ? [] : Set(items.map(\.id))
+                        }
+                    } else {
+                        Button { showsSetupGuide = true } label: {
+                            Image(systemName: "gearshape")
+                        }
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
+            .safeAreaInset(edge: .bottom) {
+                if let banner = model.banner {
+                    Text(banner)
+                        .font(.footnote)
+                        .padding(10)
+                        .frame(maxWidth: .infinity)
+                        .background(.red.opacity(0.15))
+                }
+            }
+            .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
+            .fullScreenCover(item: $previewing) { item in
+                QuickLookView(url: item.fileURL, name: item.name) { previewing = nil }
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    private var list: some View {
         TrayGridView(
-            items: model.visible,
+            items: items,
             ordering: ordering,
+            layout: layout,
             isSelecting: isSelecting,
             selection: $selection,
             model: model,
             onDelete: { item in Task { await model.remove(item) } },
             onOpen: { previewing = $0 }
         )
-        // Items can leave the tray while the sheet of checkmarks is open --
-        // handed to another app, deleted from a context menu -- and a
-        // selection holding ids that no longer exist would share or delete
-        // nothing while claiming a count.
-        .onChange(of: model.visible.map(\.id)) { _, ids in
+        // Items can leave while the sheet of checkmarks is open -- handed to
+        // another app, deleted from a context menu -- and a selection holding
+        // ids that no longer exist would share or delete nothing while
+        // claiming a count.
+        .onChange(of: items.map(\.id)) { _, ids in
             selection.formIntersection(ids)
         }
     }
@@ -178,9 +222,8 @@ struct TrayView: View {
         .background(.bar)
     }
 
-    /// On the screen it rearranges, not in the settings sheet: this is a
-    /// thing you reach for while looking at the grid, and the settings are for
-    /// what you set once.
+    /// On the screen it rearranges, not in the settings sheet: this is reached
+    /// while looking at what it changes, unlike the things you set once.
     private var arrangeMenu: some View {
         Menu {
             Picker(L.s("settings.sort.order"), selection: $orderingKey) {
@@ -193,33 +236,32 @@ struct TrayView: View {
                 Text(L.s("settings.sort.ascending")).tag(true)
             }
             Toggle(L.s("settings.group"), isOn: $groupsByKind)
+            Divider()
+            Picker(L.s("layout.title"), selection: $layoutRaw) {
+                Text(L.s("layout.list")).tag(TrayLayout.list.rawValue)
+                Text(L.s("layout.grid")).tag(TrayLayout.grid.rawValue)
+            }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
     }
 
     private var selectedItems: [TrayItem] {
-        model.visible.filter { selection.contains($0.id) }
+        items.filter { selection.contains($0.id) }
     }
 
     private var allSelected: Bool {
-        !model.visible.isEmpty && model.visible.allSatisfy { selection.contains($0.id) }
+        !items.isEmpty && items.allSatisfy { selection.contains($0.id) }
     }
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(L.s("tray.empty.title"), systemImage: "tray")
+            Label(
+                L.s(board == .tray ? "tray.empty.title" : "clipboard.empty.title"),
+                systemImage: board == .tray ? "tray" : "list.clipboard"
+            )
         } description: {
-            Text(L.s("tray.empty.body"))
+            Text(L.s(board == .tray ? "tray.empty.body" : "clipboard.empty.body"))
         }
-    }
-
-    private var dropHighlight: some View {
-        RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(Color.accentColor, lineWidth: isTargeted ? 4 : 0)
-            .background(isTargeted ? Color.accentColor.opacity(0.10) : Color.clear)
-            .padding(8)
-            .animation(.snappy(duration: 0.15), value: isTargeted)
-            .ignoresSafeArea()
     }
 }
