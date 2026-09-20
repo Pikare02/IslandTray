@@ -98,4 +98,42 @@ final class DocumentsInboxTests: XCTestCase {
         XCTAssertEqual(result.added, 0)
         XCTAssertEqual(result.failed, [])
     }
+
+
+    func testTheMarkerKeepsTheFolderVisibleAndIsNotTakenIn() throws {
+        // The Files app hides an app's folder while it is empty, so an empty
+        // inbox cannot be found -- and it is empty exactly when the user is
+        // hunting for somewhere to save their first file. The marker must
+        // therefore exist, and must never be swept into the tray itself.
+        try write("note.txt")
+
+        let result = sweep()
+
+        XCTAssertEqual(result.added, 1, "only the real file")
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: inbox.appendingPathComponent(DocumentsInbox.markerName).path
+            )
+        )
+    }
+
+    func testTheMarkerComesBackAfterTheUserDeletesIt() throws {
+        DocumentsInbox.ensureVisible(in: inbox)
+        try FileManager.default.removeItem(at: inbox.appendingPathComponent(DocumentsInbox.markerName))
+
+        _ = sweep()
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: inbox.appendingPathComponent(DocumentsInbox.markerName).path
+            )
+        )
+    }
+
+    func testAnInboxHoldingOnlyTheMarkerIsANoOp() {
+        DocumentsInbox.ensureVisible(in: inbox)
+        let result = sweep()
+        XCTAssertEqual(result.added, 0)
+        XCTAssertEqual(result.failed, [])
+    }
 }

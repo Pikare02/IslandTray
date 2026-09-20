@@ -168,14 +168,21 @@ enum OriginalRemover {
         // -- 4032x3024 is what every 12MP iPhone photo measures, so "same
         // dimensions" can be most of a library -- and this runs once, on an
         // export the user asked for.
+        //
+        // Compared without the extension, and case-insensitively. Photos
+        // converts on the way out: the device reported a drag arriving as
+        // "IMG_9787.jpeg" against a library holding "IMG_9787.HEIC", so
+        // comparing whole filenames matched nothing while the stem matched
+        // exactly. The stem is the part Photos actually assigns.
         var byName: [PHAsset] = []
         let nameScanLimit = 2000
-        if bySize.count <= nameScanLimit {
+        let stem = (name as NSString).deletingPathExtension.lowercased()
+        if bySize.count <= nameScanLimit, !stem.isEmpty {
             bySize.enumerateObjects { asset, _, _ in
-                if PHAssetResource.assetResources(for: asset)
-                    .contains(where: { $0.originalFilename == name }) {
-                    byName.append(asset)
+                let matches = PHAssetResource.assetResources(for: asset).contains {
+                    ($0.originalFilename as NSString).deletingPathExtension.lowercased() == stem
                 }
+                if matches { byName.append(asset) }
             }
             if byName.count == 1 { return .one(byName) }
         }

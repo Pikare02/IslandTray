@@ -67,6 +67,9 @@ final class TrayModel {
         // handed a file to came back to a move that never finished.
         await flushExported()
         await importFromFilesFolder()
+        // Even when nothing was taken in: the folder has to exist and be
+        // non-empty before the user can find it to save into.
+        DocumentsInbox.ensureVisible()
     }
 
     /// Takes in anything the user saved into the app's folder in the Files
