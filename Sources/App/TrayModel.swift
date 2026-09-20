@@ -319,8 +319,8 @@ final class TrayModel {
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
             guard let origin else { continue }
-            if await OriginalRemover.remove(origin) == false {
-                banner = "元のファイルは削除できませんでした"
+            if case .failed(let reason) = await OriginalRemover.remove(origin) {
+                banner = "元のファイルは削除できませんでした（\(reason)）"
             }
         }
     }
