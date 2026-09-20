@@ -86,11 +86,17 @@ final class TrayStore: Sendable {
     }
 
     @discardableResult
-    func add(copyingFrom source: URL, suggestedName: String?, uti: String?) throws -> TrayItem {
+    /// - Parameter origin: a handle back to the file this was copied from, so
+    ///   taking the item out of the tray can delete it there too. Defaulted,
+    ///   since most sources have nothing that can be deleted.
+    func add(
+        copyingFrom source: URL, suggestedName: String?, uti: String?, origin: TrayItemOrigin? = nil
+    ) throws -> TrayItem {
         try prepare()
         let name = suggestedName ?? source.lastPathComponent
         let size = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        let item = makeItem(suggestedName: name, uti: uti, size: size)
+        var item = makeItem(suggestedName: name, uti: uti, size: size)
+        item.origin = origin
         let destination = item.fileURL(in: itemsDirectory)
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
