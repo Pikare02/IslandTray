@@ -54,6 +54,23 @@ actor TrayActivityController {
         state == .active || state == .stale
     }
 
+    /// What `sync`/`restart` should do about the island, given the tray's
+    /// current item count and the "show when empty" setting.
+    ///
+    /// Pulled out as a pure, ActivityKit-free function so it can be pinned by
+    /// a test without a live Activity: everything else in this file needs
+    /// ActivityKit actually running to observe.
+    enum SyncDecision: Equatable {
+        /// Start or keep an island up, even with `itemCount == 0`.
+        case show
+        /// End whatever is up; the tray is empty and the setting says hide.
+        case end
+    }
+
+    nonisolated static func syncDecision(itemCount: Int, showActivityWhenEmpty: Bool) -> SyncDecision {
+        itemCount > 0 || showActivityWhenEmpty ? .show : .end
+    }
+
     func sync(items: [TrayItem]) async {
         // No os_log call here, unlike restart(): sync()'s only callers are
         // TrayModel.ingest(_:)/remove(_:), which read lastError back into
@@ -64,7 +81,11 @@ actor TrayActivityController {
             lastError = "ライブアクティビティが許可されていません"
             return
         }
-        guard !items.isEmpty else {
+        let decision = Self.syncDecision(
+            itemCount: items.count,
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+        )
+        guard decision == .show else {
             await end()
             return
         }
@@ -132,7 +153,11 @@ actor TrayActivityController {
             Self.logger.error("restart() aborted: TrayStore.load() threw.")
             return
         }
-        guard !items.isEmpty else {
+        let decision = Self.syncDecision(
+            itemCount: items.count,
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+        )
+        guard decision == .show else {
             await end()
             return
         }

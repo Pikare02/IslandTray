@@ -28,4 +28,32 @@ final class TrayActivityControllerTests: XCTestCase {
         )
         XCTAssertFalse(TrayActivityController.isLive(.dismissed))
     }
+
+    // MARK: - syncDecision
+
+    func testEmptyTrayWithShowWhenEmptyOnStaysUp() {
+        XCTAssertEqual(
+            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: true),
+            .show
+        )
+    }
+
+    func testEmptyTrayWithShowWhenEmptyOffEnds() {
+        XCTAssertEqual(
+            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: false),
+            .end
+        )
+    }
+
+    func testNonEmptyTrayAlwaysShowsRegardlessOfSetting() {
+        XCTAssertEqual(
+            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: true),
+            .show
+        )
+        XCTAssertEqual(
+            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: false),
+            .show,
+            "a non-empty tray must show even if the empty-tray setting is off"
+        )
+    }
 }

@@ -25,7 +25,7 @@ struct TrayView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showsSetupGuide) { SetupGuideView() }
+            .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
             .safeAreaInset(edge: .bottom) {
                 if let banner = model.banner {
                     Text(banner)

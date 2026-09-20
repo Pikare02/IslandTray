@@ -3,10 +3,25 @@ import SwiftUI
 
 struct SetupGuideView: View {
     @Environment(\.dismiss) private var dismiss
+    let model: TrayModel
+
+    @State private var showActivityWhenEmpty = TraySettings().showActivityWhenEmpty
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Toggle("トレイが空でも表示する", isOn: $showActivityWhenEmpty)
+                        .onChange(of: showActivityWhenEmpty) { _, newValue in
+                            TraySettings().showActivityWhenEmpty = newValue
+                            Task { await model.syncActivity() }
+                        }
+                } header: {
+                    Text("ライブアクティビティ")
+                } footer: {
+                    Text("オンにすると、アプリがバックグラウンドで生きている間はトレイが空でもアイランドの表示を続けます。オフにすると、トレイが空になった時点で表示を終了します。")
+                }
+
                 Section {
                     Text("ダイナミックアイランドの表示は 8 時間で自動的に消えます。ショートカットのオートメーションで 8 時間ごとに作り直すと、24 時間途切れずに表示できます。")
                         .font(.callout)
