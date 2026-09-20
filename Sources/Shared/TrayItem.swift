@@ -13,8 +13,17 @@ enum TrayItemOrigin: Codable, Hashable {
     /// drag's in-place access was still open, because that access ends with
     /// the drag and the deletion happens much later.
     case file(bookmark: Data)
-    /// A photo library asset's local identifier.
+    /// A photo library asset's local identifier, when the drag named one.
     case photo(localIdentifier: String)
+    /// What a photo's own metadata says about it, for the common case where
+    /// the drag hands over pixels and says nothing about which asset they
+    /// came from. Resolved to an asset only at deletion time, which is also
+    /// the only time the photo library is opened at all -- matching at drop
+    /// time would mean asking for library access in the middle of a drag.
+    ///
+    /// Deletes only on an unambiguous match: two photos taken in the same
+    /// second at the same size resolve to nothing rather than to a guess.
+    case photoMetadata(creationDate: Date, pixelWidth: Int, pixelHeight: Int)
 }
 
 struct TrayItem: Codable, Hashable, Identifiable {

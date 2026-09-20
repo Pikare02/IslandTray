@@ -24,7 +24,14 @@ enum OriginalRemover {
         case .file(let bookmark):
             return removeFile(bookmark: bookmark)
         case .photo(let localIdentifier):
-            return await removePhoto(localIdentifier: localIdentifier)
+            return await removePhoto(matching: PHAsset.fetchAssets(
+                withLocalIdentifiers: [localIdentifier], options: nil
+            ))
+        case .photoMetadata(let creationDate, let pixelWidth, let pixelHeight):
+            guard await authorized else { return false }
+            return await removePhoto(matching: asset(
+                takenAt: creationDate, width: pixelWidth, height: pixelHeight
+            ))
         }
     }
 
@@ -53,6 +60,15 @@ enum OriginalRemover {
             logger.error("The original's bookmark is stale; leaving the file alone.")
             return false
         }
+        // Never the tray's own storage. A file URL handed over by a drag
+        // normally points somewhere else entirely, but the tray is reachable
+        // through the Files app now, and deleting out of it here would race
+        // TrayStore's own bookkeeping for the same bytes.
+        guard !url.resolvingSymlinksInPath().path
+            .hasPrefix(TrayContainer.root.resolvingSymlinksInPath().path) else {
+            logger.error("The original resolves inside the tray's own container; leaving it alone.")
+            return false
+        }
         // Not a guard: `startAccessingSecurityScopedResource` answers false
         // for a URL that needs no scope at all, and refusing there would skip
         // deletions that would have worked. A scope that was genuinely needed
@@ -72,20 +88,46 @@ enum OriginalRemover {
         return removed
     }
 
+    /// The single asset whose capture time and dimensions match, or an empty
+    /// result.
+    ///
+    /// Seconds resolution on the date, because that is all EXIF records, and
+    /// the dimensions alongside it. More than one match means two photos were
+    /// taken in the same second at the same size -- burst frames -- and there
+    /// is no way to tell which one the user dragged, so nothing is deleted.
+    private static func asset(takenAt date: Date, width: Int, height: Int) -> PHFetchResult<PHAsset> {
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(
+            format: "creationDate >= %@ AND creationDate <= %@ AND pixelWidth == %d AND pixelHeight == %d",
+            date.addingTimeInterval(-1) as NSDate,
+            date.addingTimeInterval(1) as NSDate,
+            width, height
+        )
+        let matches = PHAsset.fetchAssets(with: .image, options: options)
+        if matches.count != 1 {
+            logger.error("The photo matched no single asset; leaving the library alone.")
+            return PHFetchResult<PHAsset>()
+        }
+        return matches
+    }
+
+    private static var authorized: Bool {
+        get async { await PHPhotoLibrary.requestAuthorization(for: .readWrite) == .authorized }
+    }
+
     /// Deletes the asset through PhotoKit.
     ///
     /// iOS puts its own confirmation in front of this, with a thumbnail of
     /// what is about to go, and a deleted photo lands in Recently Deleted for
-    /// thirty days. That is what makes deleting from an identifier the drag
-    /// handed us safe enough to do at all: the user sees the photo and says
-    /// yes, and a mistake is recoverable.
-    private static func removePhoto(localIdentifier: String) async -> Bool {
-        guard await PHPhotoLibrary.requestAuthorization(for: .readWrite) == .authorized else {
+    /// thirty days. That is what makes deleting on a metadata match safe
+    /// enough to do at all: the user sees the photo and says yes, and a
+    /// mistake is recoverable.
+    private static func removePhoto(matching assets: PHFetchResult<PHAsset>) async -> Bool {
+        guard assets.count > 0 else { return false }
+        guard await authorized else {
             logger.error("The photo library is not available to this app.")
             return false
         }
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
-        guard assets.count > 0 else { return false }
         do {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.deleteAssets(assets)

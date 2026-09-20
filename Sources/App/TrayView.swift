@@ -35,7 +35,7 @@ struct TrayView: View {
                 "同じファイルがすでにトレイにあります",
                 isPresented: Binding(get: { !model.pendingDuplicates.isEmpty }, set: { _ in })
             ) {
-                Button("追加しない", role: .cancel) { model.discardPendingDuplicates() }
+                Button("追加しない", role: .cancel) { Task { await model.discardPendingDuplicates() } }
                 Button("追加する") { Task { await model.addPendingDuplicates() } }
             } message: {
                 Text(model.duplicatePrompt)
