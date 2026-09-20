@@ -18,9 +18,9 @@ final class TrayModelExportTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         store = TrayStore(root: root)
         try store.prepare()
-        model = TrayModel(store: store)
         suiteName = "TrayModelExportTests.\(UUID().uuidString)"
         userDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        model = TrayModel(store: store, exports: ExportRegister(defaults: userDefaults))
     }
 
     override func tearDown() async throws {
@@ -159,5 +159,38 @@ final class TrayModelExportTests: XCTestCase {
 
         XCTAssertTrue(model.exported.isEmpty)
         XCTAssertTrue(model.visible.contains { $0.id == item.id })
+    }
+
+
+    func testAHandoverSurvivesTheAppBeingKilled() async throws {
+        // Handing a file over takes the user into the other app, and a
+        // backgrounded sideloaded app is routinely killed before they come
+        // back. Held in memory, the record died with it: the item was back in
+        // the tray and the original never touched.
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: true)
+        try await waitForMark(item.id)
+
+        // A second model over the same register is what a relaunch looks like.
+        let relaunched = TrayModel(store: store, exports: ExportRegister(defaults: userDefaults))
+        relaunched.reload()
+
+        XCTAssertEqual(relaunched.exported, [item.id])
+        XCTAssertTrue(relaunched.visible.isEmpty)
+        await relaunched.flushExported(settings: settings(removeOnExport: true))
+        XCTAssertTrue(try store.load().isEmpty, "the move finishes on the next launch")
+    }
+
+    func testAFlushClearsWhatIsKeptOnDisk() async throws {
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: true)
+        try await waitForMark(item.id)
+
+        await model.flushExported(settings: settings(removeOnExport: false))
+
+        XCTAssertTrue(
+            ExportRegister(defaults: userDefaults).ids.isEmpty,
+            "or every later launch would try the same removal again"
+        )
     }
 }

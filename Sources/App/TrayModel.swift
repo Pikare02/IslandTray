@@ -11,9 +11,14 @@ final class TrayModel {
     /// app always uses; a parameter only so `start(migratingFrom:)` can be
     /// pinned against temporary containers instead of the real one.
     private let store: TrayStore
+    /// Where `exported` lives between launches. A parameter so a test can use
+    /// an isolated suite instead of the real user defaults.
+    private let exports: ExportRegister
 
-    init(store: TrayStore = .shared) {
+    init(store: TrayStore = .shared, exports: ExportRegister = ExportRegister()) {
         self.store = store
+        self.exports = exports
+        self.exported = exports.ids
     }
 
     /// `load()` deliberately distinguishes a failed read from an empty tray
@@ -55,6 +60,11 @@ final class TrayModel {
         let migrated = await migrateIfNeeded(from: oldRoot)
         reload()
         if migrated { await syncActivity() }
+        // Before the inbox, and here rather than only in the scene-phase
+        // handler: `onChange` does not fire for the phase a launch starts in,
+        // so a user whose app was killed while they were in the app they
+        // handed a file to came back to a move that never finished.
+        await flushExported()
         await importFromFilesFolder()
     }
 
@@ -249,8 +259,12 @@ final class TrayModel {
     /// dragged the file into -- the copy is long done.
     ///
     /// `private(set)` rather than `private` so a test can see that a flush
-    /// empties it even when nothing was removed.
-    private(set) var exported: Set<UUID> = []
+    /// empties it even when nothing was removed. Every change is written
+    /// through to `exports`, which is what survives the app being killed
+    /// while the user is in the app they handed the file to.
+    private(set) var exported: Set<UUID> = [] {
+        didSet { exports.ids = exported }
+    }
 
     /// The items the tray still shows.
     ///
