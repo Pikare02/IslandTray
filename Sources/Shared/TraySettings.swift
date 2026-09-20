@@ -35,7 +35,16 @@ struct TraySettings {
     private enum Keys {
         static let showActivityWhenEmpty = "showActivityWhenEmpty"
         static let removeOnExport = "removeOnExport"
+        static let orderingKey = "orderingKey"
+        static let orderingAscending = "orderingAscending"
+        static let groupsByKind = "groupsByKind"
+        static let language = "language"
     }
+
+    /// The suite everything here reads, exposed so `@AppStorage` can watch the
+    /// same keys -- a SwiftUI view has to be told when one of these changes,
+    /// and this type is a plain value with nothing to observe.
+    static var store: UserDefaults { UserDefaults(suiteName: TrayIDs.appGroupID) ?? .standard }
 
     /// Whether the Live Activity should stay up while the tray has zero
     /// items, as long as the app is alive in the background. Defaults to
@@ -57,5 +66,38 @@ struct TraySettings {
     var removeOnExport: Bool {
         get { defaults.object(forKey: Keys.removeOnExport) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Keys.removeOnExport) }
+    }
+
+    /// How the grid is arranged. Stored as its parts rather than as encoded
+    /// data, so a value written by a build that did not know one of them
+    /// still reads back with that part at its default.
+    var ordering: TrayOrdering {
+        get {
+            var ordering = TrayOrdering()
+            if let raw = defaults.string(forKey: Keys.orderingKey),
+               let key = TrayOrdering.Key(rawValue: raw) {
+                ordering.key = key
+            }
+            ordering.ascending = defaults.object(forKey: Keys.orderingAscending) as? Bool ?? false
+            ordering.groupsByKind = defaults.object(forKey: Keys.groupsByKind) as? Bool ?? false
+            return ordering
+        }
+        nonmutating set {
+            defaults.set(newValue.key.rawValue, forKey: Keys.orderingKey)
+            defaults.set(newValue.ascending, forKey: Keys.orderingAscending)
+            defaults.set(newValue.groupsByKind, forKey: Keys.groupsByKind)
+        }
+    }
+
+    /// The language the app is shown in: "en", "ja", or nil for whatever the
+    /// device is set to.
+    ///
+    /// Not a cross-process setting like the others in spirit -- but the widget
+    /// reads it too, and without an App Group it will not see a choice the app
+    /// wrote, so it falls back to the device's own language. That is the right
+    /// thing to fall back to.
+    var language: String? {
+        get { defaults.string(forKey: Keys.language) }
+        nonmutating set { defaults.set(newValue, forKey: Keys.language) }
     }
 }

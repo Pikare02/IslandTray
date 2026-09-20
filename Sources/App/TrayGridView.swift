@@ -12,6 +12,7 @@ import UIKit
 /// too rather than being solved twice.
 struct TrayGridView: UIViewRepresentable {
     let items: [TrayItem]
+    let ordering: TrayOrdering
     let isSelecting: Bool
     @Binding var selection: Set<UUID>
     let model: TrayModel
@@ -21,7 +22,7 @@ struct TrayGridView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UICollectionView {
-        let view = UICollectionView(frame: .zero, collectionViewLayout: Self.layout())
+        let view = UICollectionView(frame: .zero, collectionViewLayout: Self.layout(headers: ordering.groupsByKind))
         view.backgroundColor = .clear
         view.alwaysBounceVertical = true
         // Off by default on iPhone -- without this the grid cannot be dragged
@@ -44,13 +45,18 @@ struct TrayGridView: UIViewRepresentable {
 
     func updateUIView(_ view: UICollectionView, context: Context) {
         context.coordinator.parent = self
-        view.allowsMultipleSelection = isSelecting
-        context.coordinator.apply(items)
+        // The layout carries the headers, so it has to be swapped when
+        // grouping is turned on or off rather than only re-sectioned.
+        if context.coordinator.headers != ordering.groupsByKind {
+            context.coordinator.headers = ordering.groupsByKind
+            view.setCollectionViewLayout(Self.layout(headers: ordering.groupsByKind), animated: false)
+        }
+        context.coordinator.apply(ordering.arrange(items))
     }
 
     /// As many square tiles per row as fit at roughly 110pt, never fewer than
     /// two, with room under each for one line of filename.
-    private static func layout() -> UICollectionViewCompositionalLayout {
+    private static func layout(headers: Bool) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, environment in
             let spacing: CGFloat = 12
             let inset: CGFloat = 16
@@ -78,6 +84,15 @@ struct TrayGridView: UIViewRepresentable {
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = spacing
             section.contentInsets = .init(top: inset, leading: inset, bottom: inset, trailing: inset)
+            if headers {
+                section.boundarySupplementaryItems = [NSCollectionLayoutBoundarySupplementaryItem(
+                    layoutSize: .init(
+                        widthDimension: .fractionalWidth(1), heightDimension: .estimated(28)
+                    ),
+                    elementKind: UICollectionView.elementKindSectionHeader,
+                    alignment: .top
+                )]
+            }
             return section
         }
     }
@@ -85,7 +100,12 @@ struct TrayGridView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UICollectionViewDelegate, UICollectionViewDragDelegate {
         var parent: TrayGridView
-        private var dataSource: UICollectionViewDiffableDataSource<Int, UUID>!
+        /// Mirrors `ordering.groupsByKind`, so `updateUIView` can tell when
+        /// the layout itself has to be replaced.
+        var headers = false
+        private var dataSource: UICollectionViewDiffableDataSource<String, UUID>!
+        /// Section titles by section id, for the headers.
+        private var titles: [String: String] = [:]
         /// The items behind the ids the data source carries. Identity is the
         /// id alone, so a changed item reconfigures its cell instead of
         /// replacing it and interrupting a drag.
@@ -114,17 +134,54 @@ struct TrayGridView: UIViewRepresentable {
                     }
                     .margins(.all, 0)
                 }
+            let header = UICollectionView.SupplementaryRegistration<UICollectionViewCell>(
+                elementKind: UICollectionView.elementKindSectionHeader
+            ) { [unowned self] cell, _, indexPath in
+                let id = dataSource.snapshot().sectionIdentifiers[indexPath.section]
+                let ids = dataSource.snapshot().itemIdentifiers(inSection: id)
+                let allSelected = !ids.isEmpty && ids.allSatisfy(parent.selection.contains)
+                cell.contentConfiguration = UIHostingConfiguration {
+                    HStack {
+                        Text(titles[id] ?? "")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if parent.isSelecting {
+                            Button(allSelected ? "すべて解除" : "すべて選択") {
+                                [unowned self] in toggleSection(ids, allSelected: allSelected)
+                            }
+                            .font(.footnote)
+                        }
+                    }
+                }
+                .margins(.horizontal, 16)
+                .margins(.vertical, 2)
+            }
             dataSource = UICollectionViewDiffableDataSource(collectionView: view) {
                 [unowned self] view, indexPath, id in
                 view.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: id)
             }
+            dataSource.supplementaryViewProvider = { view, _, indexPath in
+                view.dequeueConfiguredReusableSupplementary(using: header, for: indexPath)
+            }
         }
 
-        func apply(_ items: [TrayItem]) {
+        func apply(_ sections: [TrayOrdering.Section]) {
+            let items = sections.flatMap(\.items)
             shown = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            var snapshot = NSDiffableDataSourceSnapshot<Int, UUID>()
-            snapshot.appendSections([0])
-            snapshot.appendItems(items.map(\.id))
+            titles = Dictionary(
+                sections.compactMap { section in
+                    section.kind.map { (Self.sectionID(for: $0), Self.title(for: $0)) }
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+
+            var snapshot = NSDiffableDataSourceSnapshot<String, UUID>()
+            for section in sections {
+                let id = section.kind.map(Self.sectionID(for:)) ?? ""
+                snapshot.appendSections([id])
+                snapshot.appendItems(section.items.map(\.id), toSection: id)
+            }
             // Everything that survives the update is reconfigured, because
             // selection and edit mode are read inside the cell's content and
             // the diff alone would not notice them changing.
@@ -133,25 +190,52 @@ struct TrayGridView: UIViewRepresentable {
             dataSource.apply(snapshot, animatingDifferences: true)
         }
 
+        private static func sectionID(for kind: TrayItemKind) -> String { kind.rawValue }
+
+        private static func title(for kind: TrayItemKind) -> String {
+            switch kind {
+            case .image: return "画像"
+            case .video: return "ビデオ"
+            case .audio: return "オーディオ"
+            case .document: return "書類"
+            case .archive: return "アーカイブ"
+            case .other: return "その他"
+            }
+        }
+
         // MARK: - Selection
 
+        /// Selection is ours, not the collection view's.
+        ///
+        /// UIKit's own selected state is deliberately left switched off and
+        /// every cell is deselected as soon as it is tapped: selecting a whole
+        /// section, or everything, from outside changes only our set, and the
+        /// two would drift apart -- a cell UIKit thought was unselected would
+        /// then need two taps to clear.
         func collectionView(_ view: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+            view.deselectItem(at: indexPath, animated: false)
             guard let id = dataSource.itemIdentifier(for: indexPath) else { return }
             guard parent.isSelecting else {
-                // Outside selection mode a tap opens the item. The cell must
-                // not stay selected behind the preview.
-                view.deselectItem(at: indexPath, animated: false)
                 if let item = shown[id] { parent.onOpen(item) }
                 return
             }
-            parent.selection.insert(id)
+            if parent.selection.contains(id) {
+                parent.selection.remove(id)
+            } else {
+                parent.selection.insert(id)
+            }
             reconfigure(id)
         }
 
-        func collectionView(_ view: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
-            guard let id = dataSource.itemIdentifier(for: indexPath) else { return }
-            parent.selection.remove(id)
-            reconfigure(id)
+        private func toggleSection(_ ids: [UUID], allSelected: Bool) {
+            if allSelected {
+                parent.selection.subtract(ids)
+            } else {
+                parent.selection.formUnion(ids)
+            }
+            var snapshot = dataSource.snapshot()
+            snapshot.reconfigureItems(ids)
+            dataSource.apply(snapshot, animatingDifferences: false)
         }
 
         private func reconfigure(_ id: UUID) {
@@ -170,7 +254,7 @@ struct TrayGridView: UIViewRepresentable {
         ) -> [UIDragItem] {
             guard let id = dataSource.itemIdentifier(for: indexPath) else { return [] }
             let ids = parent.selection.contains(id)
-                ? parent.items.map(\.id).filter(parent.selection.contains)
+                ? dataSource.snapshot().itemIdentifiers.filter(parent.selection.contains)
                 : [id]
             return ids.compactMap { shown[$0] }.map(dragItem(for:))
         }

@@ -9,6 +9,20 @@ struct TrayView: View {
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var previewing: TrayItem?
+    /// Watched rather than read once: these live in UserDefaults, which a
+    /// SwiftUI view is not told about, and the settings sheet writes them
+    /// while this view is on screen behind it.
+    @AppStorage("orderingKey", store: TraySettings.store) private var orderingKey = TrayOrdering.Key.addedAt.rawValue
+    @AppStorage("orderingAscending", store: TraySettings.store) private var orderingAscending = false
+    @AppStorage("groupsByKind", store: TraySettings.store) private var groupsByKind = false
+
+    private var ordering: TrayOrdering {
+        TrayOrdering(
+            key: TrayOrdering.Key(rawValue: orderingKey) ?? .addedAt,
+            ascending: orderingAscending,
+            groupsByKind: groupsByKind
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,8 +46,14 @@ struct TrayView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showsSetupGuide = true } label: {
-                        Image(systemName: "gearshape")
+                    if isSelecting {
+                        Button(allSelected ? "すべて解除" : "すべて選択") {
+                            selection = allSelected ? [] : Set(model.visible.map(\.id))
+                        }
+                    } else {
+                        Button { showsSetupGuide = true } label: {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
             }
@@ -104,6 +124,7 @@ struct TrayView: View {
     private var grid: some View {
         TrayGridView(
             items: model.visible,
+            ordering: ordering,
             isSelecting: isSelecting,
             selection: $selection,
             model: model,
@@ -156,6 +177,10 @@ struct TrayView: View {
 
     private var selectedItems: [TrayItem] {
         model.visible.filter { selection.contains($0.id) }
+    }
+
+    private var allSelected: Bool {
+        !model.visible.isEmpty && model.visible.allSatisfy { selection.contains($0.id) }
     }
 
     private var emptyState: some View {
