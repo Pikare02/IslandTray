@@ -90,15 +90,16 @@ actor TrayActivityController {
             return
         }
 
-        // No encodedByteCount/countOnly degrade path here: `make(from:)` caps
-        // `recent` at `maxPreviews` and only ever encodes a fixed-length UUID
-        // `id` plus a `symbol` drawn from TrayItem's closed vocabulary, so its
-        // output is provably always under `maxEncodedBytes`
-        // (TrayContentStateTests.testStaysUnderFourKilobytesWithMaxPreviewsAndLongestSymbol
-        // and .testExplicitFactoryPathsCannotExceedEncodedLimit pin this for the
-        // worst case). A size guard here could never fire; see task-8-report.md
-        // for the fuller rationale.
-        let state = TrayContentState.make(from: items)
+        // No size guard around this call: the state now carries JPEG bytes and
+        // so can genuinely exceed `maxEncodedBytes`, but `make(from:atlas:)`
+        // is what enforces the budget -- it drops the atlas, then the
+        // previews, and returns something that fits in every case
+        // (TrayContentStateTests pins the worst case). A second guard here
+        // would be unreachable, exactly as the pre-atlas one was.
+        let state = TrayContentState.make(
+            from: items,
+            atlas: await ThumbnailService.shared.islandAtlas(for: items)
+        )
 
         // An update that lands nowhere falls through to `start` instead of
         // being dropped: whatever removed the activity (the eight-hour end, a
@@ -168,7 +169,11 @@ actor TrayActivityController {
         // means a failure leaves the working island untouched; the old ones go
         // only once the replacement exists, so the success path still ends with
         // a single activity.
-        guard let replacement = start(TrayContentState.make(from: items)) else { return }
+        let state = TrayContentState.make(
+            from: items,
+            atlas: await ThumbnailService.shared.islandAtlas(for: items)
+        )
+        guard let replacement = start(state) else { return }
         await retireOthers(keeping: replacement)
     }
 

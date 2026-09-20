@@ -44,6 +44,111 @@ actor ThumbnailService {
         try? FileManager.default.removeItem(at: item.thumbnailURL)
     }
 
+    // MARK: - Dynamic Island atlas
+
+    /// Tile side in pixels for the island strip.
+    ///
+    /// 48px against a 40pt tile is barely over 1x — soft on a 3x screen, and
+    /// chosen anyway because the whole strip has to fit in what is left of
+    /// ActivityKit's 4096 bytes after four names and four ids. Measured worst
+    /// case (16 screenshots, the worst content for JPEG) as base64: 48px/0.3
+    /// = 2496 bytes and fits with ~460 to spare; 64px/0.3 = 3684 and does
+    /// not, so a tray of four screenshots would lose its thumbnails
+    /// altogether. A soft thumbnail beats a generic icon, which is what this
+    /// whole path exists to replace.
+    private static let atlasTile = 48
+    private static let atlasQuality: CGFloat = 0.3
+
+    /// Last strip built, keyed by the exact item ids it covers.
+    ///
+    /// `sync()` runs on every drop, delete and foreground, and the foreground
+    /// case usually asks for a strip identical to the last one. One entry is
+    /// enough for that; any change to the tray rebuilds all of it, which is a
+    /// handful of thumbnail requests on a user action.
+    private var cachedAtlas: (ids: [UUID], atlas: TrayContentState.Atlas?)?
+
+    /// A JPEG strip of up to `TrayContentState.maxPreviews` tiles for the
+    /// Live Activity, or `nil` when no item yielded a thumbnail.
+    ///
+    /// This does not go through `thumbnail(for:scale:)` or its disk cache on
+    /// purpose. That cache is keyed by item alone with the scale supplied by
+    /// the caller, so priming it from here — where there is no display scale
+    /// to read — would leave the card view loading pixels rendered for a
+    /// different scale. The island needs 64px; asking QuickLook for exactly
+    /// that is cheaper than the 240px the card wants anyway.
+    func islandAtlas(for items: [TrayItem]) async -> TrayContentState.Atlas? {
+        let items = Array(items.prefix(TrayContentState.maxPreviews))
+        let ids = items.map(\.id)
+        if let cached = cachedAtlas, cached.ids == ids { return cached.atlas }
+
+        var tiles: [UIImage?] = []
+        for item in items {
+            tiles.append(await islandTile(for: item))
+        }
+        let atlas = tiles.contains(where: { $0 != nil }) ? Self.strip(from: tiles) : nil
+        cachedAtlas = (ids, atlas)
+        return atlas
+    }
+
+    private func islandTile(for item: TrayItem) async -> UIImage? {
+        let side = CGFloat(Self.atlasTile)
+        let request = QLThumbnailGenerator.Request(
+            fileAt: item.fileURL,
+            size: CGSize(width: side, height: side),
+            scale: 1,
+            representationTypes: .all
+        )
+        guard let rep = try? await QLThumbnailGenerator.shared
+            .generateBestRepresentation(for: request) else { return nil }
+        return rep.uiImage
+    }
+
+    /// Composites the tiles left to right, aspect-filled, into one opaque JPEG.
+    ///
+    /// Every element gets a tile, including the `nil` ones: the widget slices
+    /// the strip by index, so a missing tile has to occupy its slot rather
+    /// than shift the rest. A flat black tile costs almost nothing once
+    /// compressed, and the widget draws the SF Symbol over that slot anyway
+    /// (`Preview.hasThumbnail` is false for it).
+    private static func strip(from tiles: [UIImage?]) -> TrayContentState.Atlas? {
+        guard !tiles.isEmpty else { return nil }
+        let side = CGFloat(atlasTile)
+        let format = UIGraphicsImageRendererFormat.preferred()
+        // Pixels, not points: `size` below is already in pixels, and the
+        // renderer would otherwise multiply it by the device scale.
+        format.scale = 1
+        format.opaque = true
+        let size = CGSize(width: side * CGFloat(tiles.count), height: side)
+        let strip = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.black.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            for (index, tile) in tiles.enumerated() {
+                guard let tile else { continue }
+                let slot = CGRect(x: side * CGFloat(index), y: 0, width: side, height: side)
+                context.cgContext.saveGState()
+                context.cgContext.clip(to: slot)
+                tile.draw(in: aspectFill(tile.size, in: slot))
+                context.cgContext.restoreGState()
+            }
+        }
+        guard let jpeg = strip.jpegData(compressionQuality: atlasQuality) else { return nil }
+        return TrayContentState.Atlas(jpeg: jpeg, filled: tiles.map { $0 != nil })
+    }
+
+    /// The rect to draw `size` into so it covers `slot` without distortion.
+    private static func aspectFill(_ size: CGSize, in slot: CGRect) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return slot }
+        let scale = max(slot.width / size.width, slot.height / size.height)
+        let scaled = CGSize(width: size.width * scale, height: size.height * scale)
+        return CGRect(
+            x: slot.midX - scaled.width / 2,
+            y: slot.midY - scaled.height / 2,
+            width: scaled.width,
+            height: scaled.height
+        )
+    }
+
+
     // MARK: - Disk cache
     //
     // The cache lives in the container so the widget process can read it too,
