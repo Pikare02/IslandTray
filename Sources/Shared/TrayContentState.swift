@@ -2,83 +2,203 @@ import Foundation
 
 /// Dynamic data shown by the Live Activity.
 ///
-/// ActivityKit rejects a content state whose encoded form exceeds 4096 bytes,
-/// so this never carries image data — only an id the widget uses to locate a
-/// thumbnail file on disk, plus an SF Symbol name to fall back to.
+/// ActivityKit rejects a content state whose encoded form exceeds 4096 bytes.
+/// The widget process can only read thumbnail files off disk when the App
+/// Group entitlement survives (it does not under SideStore re-signing, which
+/// is the real deployment), so the actual image bytes travel here instead —
+/// as one JPEG strip covering every preview, not one JPEG per preview.
+///
+/// One strip, not four: a baseline JPEG carries ~600 bytes of quantization
+/// and Huffman tables before a single pixel, so four separate 48px thumbnails
+/// measured 5872 base64 bytes against 2496 for the same four tiles composited
+/// side by side. Four real thumbnails only fit at all because the tables are
+/// paid for once. (Measured over 16 screenshots, which are the worst case for
+/// JPEG — dense text and hard edges — not photographs.) `ThumbnailService`
+/// owns the tile size that measurement picked.
 struct TrayContentState: Codable, Hashable {
     /// Maximum number of previews the Dynamic Island can show at once.
     static let maxPreviews = 4
     /// ActivityKit's hard limit for an encoded content state.
     static let maxEncodedBytes = 4096
 
+    /// What `make(from:atlas:)` aims for, below `maxEncodedBytes`.
+    ///
+    /// `encodedByteCount` measures a vanilla `JSONEncoder`, which is not
+    /// verified byte-identical to whatever ActivityKit encodes with. Before
+    /// the atlas the margin was ~8x and the difference could not matter; a
+    /// state carrying image bytes runs near the limit by design, so the
+    /// build path leaves 512 bytes of headroom for that uncertainty.
+    static let buildBudget = maxEncodedBytes - 512
+
+    /// Longest display name carried per preview, in UTF-8 bytes.
+    ///
+    /// The island draws these under a 40pt tile, so roughly ten characters
+    /// are legible however many are sent; the cap exists so four long names
+    /// cannot push the atlas out of the budget.
+    static let maxNameBytes = 32
+
     struct Preview: Codable, Hashable {
-        /// TrayItem id. The widget derives the thumbnail path from this.
+        /// TrayItem id. The widget derives the thumbnail path from this when
+        /// the App Group container is readable.
         let id: String
-        /// SF Symbol name, used when the App Group container is unavailable.
+        /// SF Symbol name, used when no real thumbnail is available.
         let symbol: String
+        /// Display name, already capped to `maxNameBytes`.
+        let name: String
+        /// Whether this preview's tile in `atlas` holds a real thumbnail.
+        ///
+        /// The atlas always has one tile per preview so indices line up, but
+        /// `QLThumbnailGenerator` returns nothing for some item types; those
+        /// tiles are blank and must fall back to `symbol` rather than draw an
+        /// empty box.
+        let hasThumbnail: Bool
 
         /// Restricted to this file so every `Preview` built through
-        /// `make(from:)` has `id` (a UUID string) and `symbol`
-        /// (`TrayItem.symbolName`'s closed set) bounded. This does not bound
-        /// `Preview`'s own synthesized `Decodable` initializer — Swift
-        /// generates `init(from:)` independently of this initializer's
-        /// access level. The overall size invariant for a *decoded*
-        /// `TrayContentState` is enforced one level up, in
-        /// `TrayContentState.init(from:)`, which validates encoded size
-        /// after decoding and degrades if needed.
-        fileprivate init(id: String, symbol: String) {
+        /// `make(from:atlas:)` has `id` (a UUID string), `symbol`
+        /// (`TrayItem.symbolName`'s closed set) and `name` (capped) bounded.
+        /// This does not bound `Preview`'s own synthesized `Decodable`
+        /// initializer — Swift generates `init(from:)` independently of this
+        /// initializer's access level. The overall size invariant for a
+        /// *decoded* `TrayContentState` is enforced one level up, in
+        /// `TrayContentState.init(from:)`, which validates encoded size after
+        /// decoding and degrades if needed.
+        fileprivate init(id: String, symbol: String, name: String, hasThumbnail: Bool) {
             self.id = id
             self.symbol = symbol
+            self.name = name
+            self.hasThumbnail = hasThumbnail
         }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent
+        case count, recent, atlas
     }
 
     let count: Int
     let recent: [Preview]
+    /// JPEG holding `recent.count` square tiles left to right, in `recent`'s
+    /// order, or `nil` when no thumbnail was available or the bytes did not
+    /// fit. The tile side is not carried: the tiles are square and there is
+    /// one per preview, so the strip's own height is the side and
+    /// `recent.count` is the rest of what the widget needs to slice it.
+    let atlas: Data?
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
-    /// Build a `TrayContentState` via `make(from:)` or `countOnly(count:)`.
-    private init(count: Int, recent: [Preview]) {
+    /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
+    private init(count: Int, recent: [Preview], atlas: Data?) {
         self.count = count
         self.recent = recent
+        self.atlas = atlas
     }
 
     /// Decoding is a real construction path: ActivityKit decodes this type
-    /// in the widget process. The synthesized `init(from:)` would set
-    /// `count`/`recent` directly, bypassing `maxPreviews` and the bounded
-    /// symbol vocabulary that `make(from:)` enforces — a crafted payload
-    /// (e.g. one oversized `id`) could decode into a state well over
-    /// `maxEncodedBytes`. This custom initializer clamps `recent` to
-    /// `maxPreviews` and then, if the result is still oversized (a single
-    /// pathologically long `id`/`symbol` is enough to blow the budget by
-    /// itself), degrades to the same count-only shape `countOnly(count:)`
-    /// produces — which is always within the limit regardless of `count`.
-    /// It never throws for a size problem; only a malformed/missing `count`
-    /// (a genuine schema error, not a size issue) propagates.
+    /// in the widget process. The synthesized `init(from:)` would set the
+    /// stored properties directly, bypassing `maxPreviews` and the bounded
+    /// vocabulary that `make(from:atlas:)` enforces — a crafted payload (one
+    /// oversized `id`, or an atlas of any size at all) could decode into a
+    /// state well over `maxEncodedBytes`. This initializer clamps `recent`
+    /// to `maxPreviews`, then drops the atlas, then drops the previews,
+    /// taking the first form that fits.
+    ///
+    /// It never throws for a size problem, and it never throws because a
+    /// field it did not expect was absent: an activity started by an older
+    /// build of the app is still on screen after an update, and its state
+    /// decodes here. Only a malformed/missing `count` (a genuine schema
+    /// error) propagates.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let decodedCount = try container.decode(Int.self, forKey: .count)
         let decodedRecent = (try? container.decode([Preview].self, forKey: .recent)) ?? []
-        let clamped = TrayContentState(count: decodedCount, recent: Array(decodedRecent.prefix(Self.maxPreviews)))
-        self = clamped.encodedByteCount <= Self.maxEncodedBytes
-            ? clamped
-            : TrayContentState(count: decodedCount, recent: [])
+        let decodedAtlas = try? container.decodeIfPresent(Data.self, forKey: .atlas)
+        let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
+
+        let full = TrayContentState(count: decodedCount, recent: clampedRecent, atlas: decodedAtlas)
+        if full.encodedByteCount <= Self.maxEncodedBytes {
+            self = full
+            return
+        }
+        let noAtlas = TrayContentState(count: decodedCount, recent: clampedRecent, atlas: nil)
+        self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
+            ? noAtlas
+            : TrayContentState(count: decodedCount, recent: [], atlas: nil)
     }
 
-    static func make(from items: [TrayItem]) -> TrayContentState {
-        let previews = items.prefix(maxPreviews).map {
-            Preview(id: $0.id.uuidString, symbol: $0.symbolName)
+    /// A JPEG strip built for one `make(from:atlas:)` call, plus which of
+    /// its tiles actually hold an image.
+    ///
+    /// `filled` is not encoded — it is what sets each `Preview.hasThumbnail`.
+    /// It exists because a tile has to be reserved for every preview to keep
+    /// the slicing indices honest, including the ones
+    /// `QLThumbnailGenerator` had nothing for.
+    struct Atlas {
+        let jpeg: Data
+        let filled: [Bool]
+
+        init(jpeg: Data, filled: [Bool]) {
+            self.jpeg = jpeg
+            self.filled = filled
         }
-        return TrayContentState(count: items.count, recent: Array(previews))
+    }
+
+    /// - Parameter atlas: a strip with one tile per preview, in the same
+    ///   order as `items`, or `nil`. Dropped whole if it does not fit; never
+    ///   partially, since a strip cannot be shortened without re-encoding.
+    static func make(from items: [TrayItem], atlas: Atlas? = nil) -> TrayContentState {
+        let previews = items.prefix(maxPreviews).enumerated().map { index, item in
+            Preview(
+                id: item.id.uuidString,
+                symbol: item.symbolName,
+                name: islandName(item.name),
+                // `indices.contains` rather than `index < count`: a caller
+                // that built a shorter `filled` than there are previews must
+                // fall back to symbols, not read past the end.
+                hasThumbnail: atlas?.filled.indices.contains(index) == true && atlas?.filled[index] == true
+            )
+        }
+        let withAtlas = TrayContentState(count: items.count, recent: Array(previews), atlas: atlas?.jpeg)
+        if withAtlas.encodedByteCount <= buildBudget { return withAtlas }
+
+        let withoutAtlas = TrayContentState(
+            count: items.count,
+            recent: previews.map {
+                Preview(id: $0.id, symbol: $0.symbol, name: $0.name, hasThumbnail: false)
+            },
+            atlas: nil
+        )
+        return withoutAtlas.encodedByteCount <= maxEncodedBytes
+            ? withoutAtlas
+            : countOnly(count: items.count)
     }
 
     /// Degraded state carrying only the count, for when the full state (with
     /// previews) would exceed `maxEncodedBytes`.
     static func countOnly(count: Int) -> TrayContentState {
-        TrayContentState(count: count, recent: [])
+        TrayContentState(count: count, recent: [], atlas: nil)
+    }
+
+    /// `name` capped to `maxNameBytes`, cut in the middle so the extension
+    /// survives — "which file" is mostly carried by the extension once the
+    /// island has already truncated the stem visually.
+    static func islandName(_ name: String) -> String {
+        guard name.utf8.count > maxNameBytes else { return name }
+        // Budget in bytes, but cut on Characters: removing a byte can split a
+        // grapheme. Two thirds to the head, the rest to the tail.
+        let ellipsis = "…"
+        var head = ""
+        var tail = ""
+        let headBudget = (maxNameBytes - ellipsis.utf8.count) * 2 / 3
+        for character in name {
+            let next = head + String(character)
+            if next.utf8.count > headBudget { break }
+            head = next
+        }
+        let tailBudget = maxNameBytes - ellipsis.utf8.count - head.utf8.count
+        for character in name.reversed() {
+            let next = String(character) + tail
+            if next.utf8.count > tailBudget { break }
+            tail = next
+        }
+        return head + ellipsis + tail
     }
 
     var encodedByteCount: Int {

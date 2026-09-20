@@ -22,7 +22,7 @@ struct TrayLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     // No ScrollView: widget views cannot receive gestures, so the
                     // full swipeable list lives in the app.
-                    TrayPreviewStrip(previews: context.state.recent, side: 40)
+                    TrayPreviewStrip(previews: context.state.recent, atlas: context.state.atlas, side: 40)
                         .padding(.top, 2)
                 }
             } compactLeading: {
@@ -45,7 +45,7 @@ struct TrayLiveActivity: Widget {
             VStack(alignment: .leading, spacing: 6) {
                 Text("トレイに \(state.count) 件")
                     .font(.subheadline.bold())
-                TrayPreviewStrip(previews: state.recent, side: 32)
+                TrayPreviewStrip(previews: state.recent, atlas: state.atlas, side: 32)
             }
             Spacer()
         }
