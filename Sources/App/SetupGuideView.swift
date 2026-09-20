@@ -11,29 +11,62 @@ struct SetupGuideView: View {
     /// the old lines on screen until the sheet was closed and reopened.
     @State private var diagnostics = DropDiagnostics.lines
     @State private var removeOnExport = TraySettings().removeOnExport
+    @AppStorage("orderingKey", store: TraySettings.store) private var orderingKey = TrayOrdering.Key.addedAt.rawValue
+    @AppStorage("orderingAscending", store: TraySettings.store) private var orderingAscending = false
+    @AppStorage("groupsByKind", store: TraySettings.store) private var groupsByKind = false
+    @AppStorage("language", store: TraySettings.store) private var language = ""
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    if diagnostics.isEmpty {
-                        Text("まだ記録がありません。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(diagnostics.enumerated()), id: \.offset) { _, line in
-                            Text(line)
-                                .font(.system(.caption2, design: .monospaced))
-                        }
-                        Button("記録を消す", role: .destructive) {
-                            DropDiagnostics.clear()
-                            diagnostics = []
+                    // Collapsed: this is a debug record, and left expanded it
+                    // filled the first screen of the settings with a dozen
+                    // lines before anything a person came here to change.
+                    DisclosureGroup("取り込みの記録") {
+                        if diagnostics.isEmpty {
+                            Text("まだ記録がありません。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(diagnostics.enumerated()), id: \.offset) { _, line in
+                                Text(line)
+                                    .font(.system(.caption2, design: .monospaced))
+                            }
+                            Button("記録を消す", role: .destructive) {
+                                DropDiagnostics.clear()
+                                diagnostics = []
+                            }
                         }
                     }
-                } header: {
-                    Text("取り込みの記録")
                 } footer: {
-                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file / photo-id / photo-exif）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
+                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
+                }
+
+                Section {
+                    Picker("並び順", selection: $orderingKey) {
+                        Text("名前").tag(TrayOrdering.Key.name.rawValue)
+                        Text("追加日時").tag(TrayOrdering.Key.addedAt.rawValue)
+                        Text("サイズ").tag(TrayOrdering.Key.size.rawValue)
+                    }
+                    Picker("順序", selection: $orderingAscending) {
+                        Text("降順").tag(false)
+                        Text("昇順").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle("種類ごとにまとめる", isOn: $groupsByKind)
+                } header: {
+                    Text("並べ方")
+                }
+
+                Section {
+                    Picker("言語", selection: $language) {
+                        Text("システムに従う").tag("")
+                        Text("日本語").tag("ja")
+                        Text("English").tag("en")
+                    }
+                } header: {
+                    Text("言語")
                 }
 
                 Section {
