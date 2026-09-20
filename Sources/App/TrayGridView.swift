@@ -16,6 +16,7 @@ struct TrayGridView: UIViewRepresentable {
     @Binding var selection: Set<UUID>
     let model: TrayModel
     let onDelete: (TrayItem) -> Void
+    let onOpen: (TrayItem) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -135,10 +136,12 @@ struct TrayGridView: UIViewRepresentable {
         // MARK: - Selection
 
         func collectionView(_ view: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-            guard parent.isSelecting, let id = dataSource.itemIdentifier(for: indexPath) else {
-                // Outside selection mode a tap does nothing; leaving the cell
-                // selected would show it highlighted forever.
+            guard let id = dataSource.itemIdentifier(for: indexPath) else { return }
+            guard parent.isSelecting else {
+                // Outside selection mode a tap opens the item. The cell must
+                // not stay selected behind the preview.
                 view.deselectItem(at: indexPath, animated: false)
+                if let item = shown[id] { parent.onOpen(item) }
                 return
             }
             parent.selection.insert(id)

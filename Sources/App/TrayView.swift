@@ -8,6 +8,7 @@ struct TrayView: View {
     @State private var showsSetupGuide = false
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
+    @State private var previewing: TrayItem?
 
     var body: some View {
         NavigationStack {
@@ -38,6 +39,10 @@ struct TrayView: View {
             }
             .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
             .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
+            .fullScreenCover(item: $previewing) { item in
+                QuickLookView(url: item.fileURL, name: item.name) { previewing = nil }
+                    .ignoresSafeArea()
+            }
             // The setter ignores dismissal: an alert can only go away through
             // one of its buttons, and each of those clears the list itself.
             // Clearing it from here too would discard the files the user just
@@ -62,6 +67,11 @@ struct TrayView: View {
             }
         }
         .onDrop(of: [UTType.item], isTargeted: $isTargeted) { providers in
+            // Cleared by hand as well as by the binding: a drag that ends in
+            // certain ways -- cancelled over the app, or handed off while the
+            // app is going to the background -- leaves `isTargeted` stuck
+            // true, and the highlight then sits there with no drag in sight.
+            isTargeted = false
             Task { await model.ingest(providers) }
             return true
         }
@@ -78,6 +88,9 @@ struct TrayView: View {
             // user is back here. Deleting at the handoff instead would race
             // that copy, and the tray can hold the only copy.
             if phase == .active {
+                // Same reason as in the drop handler: a drag that left with
+                // the app can leave the highlight behind it.
+                isTargeted = false
                 Task {
                     await model.flushExported()
                     // Whatever the user sent here through another app's
@@ -94,7 +107,8 @@ struct TrayView: View {
             isSelecting: isSelecting,
             selection: $selection,
             model: model,
-            onDelete: { item in Task { await model.remove(item) } }
+            onDelete: { item in Task { await model.remove(item) } },
+            onOpen: { previewing = $0 }
         )
         // Items can leave the tray while the sheet of checkmarks is open --
         // handed to another app, deleted from a context menu -- and a

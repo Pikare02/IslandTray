@@ -6,22 +6,29 @@ struct SetupGuideView: View {
     let model: TrayModel
 
     @State private var showActivityWhenEmpty = TraySettings().showActivityWhenEmpty
+    /// Held in state, not read straight from `DropDiagnostics` in the body:
+    /// it is plain UserDefaults with nothing to observe, so clearing it left
+    /// the old lines on screen until the sheet was closed and reopened.
+    @State private var diagnostics = DropDiagnostics.lines
     @State private var removeOnExport = TraySettings().removeOnExport
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    if DropDiagnostics.lines.isEmpty {
+                    if diagnostics.isEmpty {
                         Text("まだ記録がありません。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(Array(DropDiagnostics.lines.enumerated()), id: \.offset) { _, line in
+                        ForEach(Array(diagnostics.enumerated()), id: \.offset) { _, line in
                             Text(line)
                                 .font(.system(.caption2, design: .monospaced))
                         }
-                        Button("記録を消す", role: .destructive) { DropDiagnostics.clear() }
+                        Button("記録を消す", role: .destructive) {
+                            DropDiagnostics.clear()
+                            diagnostics = []
+                        }
                     }
                 } header: {
                     Text("取り込みの記録")
@@ -86,7 +93,11 @@ struct SetupGuideView: View {
                 Section {
                     LabeledContent("共有コンテナ", value: TrayContainer.isShared ? "有効" : "無効")
                     if !TrayContainer.isShared {
-                        Text("有料の Apple Developer アカウントがないため、共有シートからこのアプリを直接選ぶことはできません。他のアプリからは「ファイルに保存」→「IslandTray」フォルダに保存すると、次にアプリを開いたときトレイへ取り込まれます。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("有料の Apple Developer アカウントがないため、共有シートからこのアプリを直接選ぶことはできません。かわりに「ファイルに保存」を使ってください。")
+                            Text("保存先: 「ファイル」App →「ブラウズ」→「このiPhone内」→「IslandTray」")
+                            Text("そこに保存したファイルは、次にこのアプリを開いたときトレイへ取り込まれ、フォルダからは消えます。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
+                        }
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -94,6 +105,7 @@ struct SetupGuideView: View {
                     Text("状態")
                 }
             }
+            .onAppear { diagnostics = DropDiagnostics.lines }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
