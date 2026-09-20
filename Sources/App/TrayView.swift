@@ -27,6 +27,19 @@ struct TrayView: View {
                 }
             }
             .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
+            // The setter ignores dismissal: an alert can only go away through
+            // one of its buttons, and each of those clears the list itself.
+            // Clearing it from here too would discard the files the user just
+            // asked to keep.
+            .alert(
+                "同じファイルがすでにトレイにあります",
+                isPresented: Binding(get: { !model.pendingDuplicates.isEmpty }, set: { _ in })
+            ) {
+                Button("追加しない", role: .cancel) { model.discardPendingDuplicates() }
+                Button("追加する") { Task { await model.addPendingDuplicates() } }
+            } message: {
+                Text(model.duplicatePrompt)
+            }
             .safeAreaInset(edge: .bottom) {
                 if let banner = model.banner {
                     Text(banner)
