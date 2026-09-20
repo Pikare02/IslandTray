@@ -157,7 +157,7 @@ final class TrayModel {
     /// Updates the Live Activity and surfaces any failure rather than
     /// swallowing it — the spec requires the reason to be visible.
     func syncActivity() async {
-        await TrayActivityController.shared.sync(items: items)
+        await TrayActivityController.shared.sync(items: visible)
         if let error = await TrayActivityController.shared.lastError {
             banner = error
         }
@@ -178,15 +178,34 @@ final class TrayModel {
     /// empties it even when nothing was removed.
     private(set) var exported: Set<UUID> = []
 
-    /// Records that another app took `id`'s bytes.
+    /// The items the tray still shows.
+    ///
+    /// An item another app has taken drops out of this the moment it is taken,
+    /// while `items` keeps it until the file is really gone. The island and
+    /// the card list both read this, so handing a file to another app updates
+    /// the island right then -- waiting for the deferred removal left it
+    /// showing a count that no longer matched what the user had just done.
+    var visible: [TrayItem] { items.filter { !exported.contains($0.id) } }
+
+    /// Records that another app took `id`'s bytes, and takes it off the
+    /// island immediately.
     ///
     /// `nonisolated` because `NSItemProvider` calls its load handler on
     /// whatever queue it likes; the hop to the main actor is this method's
-    /// whole job. It deliberately does not consult the setting: the setting
-    /// that matters is the one in force when the item actually leaves, and
-    /// `flushExported` reads it there.
-    nonisolated func markExported(_ id: UUID) {
-        Task { @MainActor in self.exported.insert(id) }
+    /// whole job.
+    ///
+    /// The setting is read here *as well as* in `flushExported`, and both
+    /// must say yes. Nothing may disappear from the island in copy mode, and
+    /// reading it again at the flush keeps the safe direction: a user who
+    /// switches to copy mode in between gets their file kept, not deleted.
+    /// `removeOnExport` is a parameter only so a test can set it without
+    /// writing to the real user defaults.
+    nonisolated func markExported(_ id: UUID, removeOnExport: Bool = TraySettings().removeOnExport) {
+        guard removeOnExport else { return }
+        Task { @MainActor in
+            guard self.exported.insert(id).inserted else { return }
+            await self.syncActivity()
+        }
     }
 
     /// Takes everything handed out since the last flush out of the tray, if
@@ -202,6 +221,8 @@ final class TrayModel {
             // Re-read `items` each time rather than resolving the whole batch
             // up front: `remove(_:)` reloads, and an id that is already gone
             // must not be handed to the store again as a failed removal.
+            // `items`, not `visible`: `exported` has just been emptied, but
+            // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
             await remove(item)
         }
