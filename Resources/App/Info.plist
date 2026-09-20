@@ -31,8 +31,6 @@
 	<string>1</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>トレイから他のアプリへ渡した写真を、ライブラリからも削除するために使います。削除の直前に iOS が確認します。</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

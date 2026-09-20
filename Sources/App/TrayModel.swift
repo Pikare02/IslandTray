@@ -374,15 +374,7 @@ final class TrayModel {
     ///
     /// The set is emptied either way, so turning the setting on later cannot
     /// retroactively delete items handed out while it was off.
-    /// - Parameter canPresentUI: whether the app is in front. Deleting a
-    ///   photo needs it: PhotoKit shows its own confirmation, and there is
-    ///   nowhere to show it from the background. Those items stay in the
-    ///   register and are dealt with the next time the app is open, which is
-    ///   also when the user can answer the dialog.
-    func flushExported(
-        settings: TraySettings = TraySettings(),
-        canPresentUI: Bool = UIApplication.shared.applicationState == .active
-    ) async {
+    func flushExported(settings: TraySettings = TraySettings()) async {
         let ids = exported
         exported = []
         guard settings.removeOnExport else { return }
@@ -394,21 +386,16 @@ final class TrayModel {
             // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
             let origin = item.origin
-            if origin?.needsUIToDelete == true, !canPresentUI {
-                exported.insert(id)
-                DropDiagnostics.record("取り出し: \(item.name) 写真は前面に戻ってから")
-                continue
-            }
             await remove(item)
             // The tray copy goes first: whatever happens to the original, the
             // destination already has the file, so neither order can lose it.
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
-            guard let origin else {
+            guard let origin, origin.deletesOriginal else {
                 DropDiagnostics.record("取り出し: \(item.name) 元なし(コピー扱い)")
                 continue
             }
-            switch await OriginalRemover.remove(origin, named: item.name) {
+            switch OriginalRemover.remove(origin) {
             case .removed:
                 DropDiagnostics.record("取り出し: \(item.name) 元も削除")
             case .failed(let reason):
