@@ -29,8 +29,13 @@ enum OriginalRemover {
         case failed(String)
     }
 
-    static func remove(_ origin: TrayItemOrigin) async -> Outcome {
-        let outcome = await attempt(origin)
+    /// - Parameter name: the item's display name, which for a photo is the
+    ///   filename the drag suggested. Passed in rather than stored in the
+    ///   origin: adding a field to a persisted enum case makes every item
+    ///   written before it fail to decode, and an item that fails to decode
+    ///   is what TrayStore answers with a destructive rebuild.
+    static func remove(_ origin: TrayItemOrigin, named name: String) async -> Outcome {
+        let outcome = await attempt(origin, named: name)
         if case .failed(let reason) = outcome {
             logger.error("The original was not deleted.")
             DropDiagnostics.record("削除できず: \(reason)")
@@ -38,17 +43,16 @@ enum OriginalRemover {
         return outcome
     }
 
-    private static func attempt(_ origin: TrayItemOrigin) async -> Outcome {
+    private static func attempt(_ origin: TrayItemOrigin, named name: String) async -> Outcome {
         switch origin {
         case .file(let bookmark):
             return removeFile(bookmark: bookmark)
         case .photo(let localIdentifier):
-            return await removePhoto(matching: PHAsset.fetchAssets(
-                withLocalIdentifiers: [localIdentifier], options: nil
-            ))
+            let fetched = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+            return await removePhoto(matching: (0..<fetched.count).map(fetched.object(at:)))
         case .photoMetadata(let creationDate, let pixelWidth, let pixelHeight):
             guard await authorized else { return .failed("photo: 権限なし") }
-            switch asset(takenAt: creationDate, width: pixelWidth, height: pixelHeight) {
+            switch asset(takenAt: creationDate, width: pixelWidth, height: pixelHeight, named: name) {
             case .one(let assets):
                 return await removePhoto(matching: assets)
             case .noneOrSeveral(let reason):
@@ -120,34 +124,67 @@ enum OriginalRemover {
         return .removed
     }
 
-    /// The single asset whose capture time and dimensions match, or an empty
-    /// result.
+    /// The one asset the dropped photo came from.
     ///
-    /// Seconds resolution on the date, because that is all EXIF records, and
-    /// the dimensions alongside it. More than one match means two photos were
-    /// taken in the same second at the same size -- burst frames -- and there
-    /// is no way to tell which one the user dragged, so nothing is deleted.
+    /// Dimensions first, because they are exact and indexable, then the
+    /// capture time, then the filename. The date alone was not enough on the
+    /// device: a photo whose pixels matched to the pixel matched no asset at
+    /// all by date, which is what a re-encoded copy carrying a rewritten (or
+    /// differently zoned) EXIF timestamp looks like. So the date is now a
+    /// filter over the size-matched set rather than a database predicate, and
+    /// the filename the drag suggested is the fallback when it finds nothing.
+    ///
+    /// Anything other than exactly one candidate deletes nothing, and says
+    /// how many it found at each step -- the numbers are what makes the next
+    /// attempt something other than a guess.
     private enum AssetMatch {
-        case one(PHFetchResult<PHAsset>)
+        case one([PHAsset])
         case noneOrSeveral(String)
     }
 
-    private static func asset(takenAt date: Date, width: Int, height: Int) -> AssetMatch {
+    private static func asset(
+        takenAt date: Date, width: Int, height: Int, named name: String
+    ) -> AssetMatch {
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(
-            format: "creationDate >= %@ AND creationDate <= %@ AND pixelWidth == %d AND pixelHeight == %d",
-            date.addingTimeInterval(-1) as NSDate,
-            date.addingTimeInterval(1) as NSDate,
-            width, height
-        )
-        let matches = PHAsset.fetchAssets(with: .image, options: options)
-        guard matches.count == 1 else {
-            // The numbers are what makes this actionable: 0 means the search
-            // was wrong (a converted copy, a shifted timestamp), more than 1
-            // means the library really does hold several.
-            return .noneOrSeveral("photo: 該当 \(matches.count) 件 \(width)x\(height)")
+        options.predicate = NSPredicate(format: "pixelWidth == %d AND pixelHeight == %d", width, height)
+        let bySize = PHAsset.fetchAssets(with: .image, options: options)
+        guard bySize.count > 0 else {
+            return .noneOrSeveral("photo: サイズ一致0 \(width)x\(height)")
         }
-        return .one(matches)
+
+        var byDate: [PHAsset] = []
+        var nearest: TimeInterval?
+        bySize.enumerateObjects { asset, _, _ in
+            guard let created = asset.creationDate else { return }
+            let delta = created.timeIntervalSince(date)
+            if nearest == nil || abs(delta) < abs(nearest!) { nearest = delta }
+            if abs(delta) <= 2 { byDate.append(asset) }
+        }
+        if byDate.count == 1 { return .one(byDate) }
+
+        // Only when the date found nothing usable, and only over a set small
+        // enough to walk: `assetResources` is a per-asset round trip, not a
+        // column of the index. The cap is high because the set is not small
+        // -- 4032x3024 is what every 12MP iPhone photo measures, so "same
+        // dimensions" can be most of a library -- and this runs once, on an
+        // export the user asked for.
+        var byName: [PHAsset] = []
+        let nameScanLimit = 2000
+        if bySize.count <= nameScanLimit {
+            bySize.enumerateObjects { asset, _, _ in
+                if PHAssetResource.assetResources(for: asset)
+                    .contains(where: { $0.originalFilename == name }) {
+                    byName.append(asset)
+                }
+            }
+            if byName.count == 1 { return .one(byName) }
+        }
+
+        let delta = nearest.map { "\(Int($0))秒" } ?? "なし"
+        let scanned = bySize.count <= nameScanLimit ? "\(byName.count)件" : "未走査"
+        return .noneOrSeveral(
+            "photo: サイズ\(bySize.count)件 日時\(byDate.count)件 名前\(scanned) 最近差\(delta) 名\(name)"
+        )
     }
 
     private static var authorized: Bool {
@@ -161,12 +198,12 @@ enum OriginalRemover {
     /// thirty days. That is what makes deleting on a metadata match safe
     /// enough to do at all: the user sees the photo and says yes, and a
     /// mistake is recoverable.
-    private static func removePhoto(matching assets: PHFetchResult<PHAsset>) async -> Outcome {
-        guard assets.count > 0 else { return .failed("photo: 該当なし") }
+    private static func removePhoto(matching assets: [PHAsset]) async -> Outcome {
+        guard !assets.isEmpty else { return .failed("photo: 該当なし") }
         guard await authorized else { return .failed("photo: 権限なし") }
         do {
             try await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.deleteAssets(assets)
+                PHAssetChangeRequest.deleteAssets(assets as NSArray)
             }
             return .removed
         } catch {
