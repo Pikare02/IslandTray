@@ -51,7 +51,8 @@ enum DropReceiver {
         for provider in providers {
             let typeIdentifier = preferredTypeIdentifier(for: provider)
             do {
-                let payload = try await loadFile(from: provider, typeIdentifier: typeIdentifier)
+                let loaded = try await load(from: provider, typeIdentifier: typeIdentifier)
+                let payload = loaded.payload
                 let suggestedName = provider.suggestedName
 
                 if !allowingDuplicates,
@@ -68,7 +69,10 @@ enum DropReceiver {
                 }
 
                 existing.append(try await add(
-                    payload: payload, suggestedName: suggestedName, uti: typeIdentifier
+                    payload: payload,
+                    suggestedName: suggestedName,
+                    uti: typeIdentifier,
+                    origin: loaded.origin
                 ))
                 added += 1
             } catch {
@@ -89,11 +93,13 @@ enum DropReceiver {
     /// values cross into the task; the `NSItemProvider` never leaves the
     /// MainActor. The `defer` cleans up the staging file on the throwing path
     /// too, which is how it used to leak into NSTemporaryDirectory().
-    static func add(payload: URL, suggestedName: String?, uti: String) async throws -> TrayItem {
+    static func add(
+        payload: URL, suggestedName: String?, uti: String, origin: TrayItemOrigin? = nil
+    ) async throws -> TrayItem {
         try await Task.detached(priority: .userInitiated) {
             defer { try? FileManager.default.removeItem(at: payload) }
             return try TrayStore.shared.add(
-                copyingFrom: payload, suggestedName: suggestedName, uti: uti
+                copyingFrom: payload, suggestedName: suggestedName, uti: uti, origin: origin
             )
         }.value
     }
@@ -178,6 +184,98 @@ enum DropReceiver {
             ?? UTType.data.identifier
     }
 
+    /// A staged copy of the dropped file, plus a way back to the original
+    /// when there is one.
+    struct Loaded {
+        let payload: URL
+        let origin: TrayItemOrigin?
+    }
+
+    /// Stages the dropped bytes, and keeps a handle on the source when the
+    /// provider offers one.
+    ///
+    /// Asks for the in-place representation first. That is the only form that
+    /// names the *original* file rather than a copy of it, and a bookmark
+    /// taken while its access is open is what lets a later export delete the
+    /// file where it actually lives. A provider that has no in-place form
+    /// hands back a copy with `isInPlace == false`, which is exactly what the
+    /// old path produced; a provider that refuses the call outright falls
+    /// through to that old path unchanged, so nothing that worked before can
+    /// stop working because of this.
+    @MainActor
+    private static func load(from provider: NSItemProvider, typeIdentifier: String) async throws -> Loaded {
+        if let loaded = try? await loadInPlace(from: provider, typeIdentifier: typeIdentifier) {
+            if loaded.origin != nil { return loaded }
+            return Loaded(payload: loaded.payload, origin: await photoOrigin(of: provider))
+        }
+        return Loaded(
+            payload: try await loadFile(from: provider, typeIdentifier: typeIdentifier),
+            origin: await photoOrigin(of: provider)
+        )
+    }
+
+    @MainActor
+    private static func loadInPlace(
+        from provider: NSItemProvider, typeIdentifier: String
+    ) async throws -> Loaded {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadInPlaceFileRepresentation(forTypeIdentifier: typeIdentifier) { url, isInPlace, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let url else {
+                    continuation.resume(throwing: CocoaError(.fileNoSuchFile))
+                    return
+                }
+                // The bookmark has to be taken here, inside the access the
+                // system opened for this call: it ends when this returns, and
+                // the deletion it is for happens much later.
+                let accessed = isInPlace && url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                let bookmark = isInPlace ? try? url.bookmarkData() : nil
+                do {
+                    continuation.resume(returning: Loaded(
+                        payload: try stage(url), origin: bookmark.map(TrayItemOrigin.file)
+                    ))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// The photo library asset a drag from Photos came from, if it says.
+    ///
+    /// A photo has no file to bookmark -- the provider hands over image bytes,
+    /// not the library. This identifier is the only thing that names the asset
+    /// itself, and a provider that does not offer it leaves the item with no
+    /// origin, which simply means the photo stays where it is.
+    @MainActor
+    private static func photoOrigin(of provider: NSItemProvider) async -> TrayItemOrigin? {
+        let assetType = "com.apple.photos.asset-identifier"
+        guard provider.registeredTypeIdentifiers.contains(assetType) else { return nil }
+        let identifier: String? = await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: assetType) { item, _ in
+                continuation.resume(returning: item as? String)
+            }
+        }
+        return identifier.map(TrayItemOrigin.photo)
+    }
+
+    /// Copies a file that is about to become invalid into a staging location.
+    ///
+    /// Both load paths need this and both need it synchronously: the URL they
+    /// are handed stops being readable the moment their completion handler
+    /// returns.
+    private static func stage(_ url: URL) throws -> URL {
+        let staging = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(url.pathExtension)
+        try FileManager.default.copyItem(at: url, to: staging)
+        return staging
+    }
+
     /// Copies the provider's file representation into a temporary location that
     /// stays valid after the completion handler returns.
     @MainActor
@@ -194,13 +292,8 @@ enum DropReceiver {
                     continuation.resume(throwing: CocoaError(.fileNoSuchFile))
                     return
                 }
-                // Must copy synchronously: url is deleted once this returns.
-                let staging = URL(fileURLWithPath: NSTemporaryDirectory())
-                    .appendingPathComponent(UUID().uuidString)
-                    .appendingPathExtension(url.pathExtension)
                 do {
-                    try FileManager.default.copyItem(at: url, to: staging)
-                    continuation.resume(returning: staging)
+                    continuation.resume(returning: try stage(url))
                 } catch {
                     continuation.resume(throwing: error)
                 }

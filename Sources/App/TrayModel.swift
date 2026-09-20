@@ -274,7 +274,16 @@ final class TrayModel {
             // `items`, not `visible`: `exported` has just been emptied, but
             // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
+            let origin = item.origin
             await remove(item)
+            // The tray copy goes first: whatever happens to the original, the
+            // destination already has the file, so neither order can lose it.
+            // Items with no origin -- most of them -- are simply copies, and
+            // say nothing about it.
+            guard let origin else { continue }
+            if await OriginalRemover.remove(origin) == false {
+                banner = "元のファイルは削除できませんでした"
+            }
         }
     }
 
