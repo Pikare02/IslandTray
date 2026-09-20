@@ -23,17 +23,18 @@ final class OriginalRemoverTests: XCTestCase {
         try Data("hello".utf8).write(to: original)
         let bookmark = try original.bookmarkData()
 
-        let removed = await OriginalRemover.remove(.file(bookmark: bookmark))
+        let outcome = await OriginalRemover.remove(.file(bookmark: bookmark))
 
-        XCTAssertTrue(removed)
+        XCTAssertEqual(outcome, .removed)
         XCTAssertFalse(FileManager.default.fileExists(atPath: original.path))
     }
 
     func testAnUnresolvableBookmarkIsReportedRatherThanIgnored() async {
         // The tray copy is removed either way; the user has to be told their
         // original is still sitting there.
-        let removed = await OriginalRemover.remove(.file(bookmark: Data([0x00, 0x01, 0x02])))
-        XCTAssertFalse(removed)
+        let outcome = await OriginalRemover.remove(.file(bookmark: Data([0x00, 0x01, 0x02])))
+        guard case .failed(let reason) = outcome else { return XCTFail("got \(outcome)") }
+        XCTAssertTrue(reason.contains("file:"), "the reason names the step that refused: \(reason)")
     }
 
     func testAFileThatIsAlreadyGoneIsNotReportedAsDeleted() async throws {
@@ -42,8 +43,9 @@ final class OriginalRemoverTests: XCTestCase {
         let bookmark = try original.bookmarkData()
         try FileManager.default.removeItem(at: original)
 
-        let removed = await OriginalRemover.remove(.file(bookmark: bookmark))
+        let outcome = await OriginalRemover.remove(.file(bookmark: bookmark))
 
-        XCTAssertFalse(removed)
+        guard case .failed(let reason) = outcome else { return XCTFail("got \(outcome)") }
+        XCTAssertTrue(reason.contains("file:"), "the reason names the step that refused: \(reason)")
     }
 }

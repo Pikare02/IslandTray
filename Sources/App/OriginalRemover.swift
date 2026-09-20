@@ -13,13 +13,32 @@ enum OriginalRemover {
         subsystem: "com.pikare.islandtray", category: "OriginalRemover"
     )
 
-    /// Whether the original is gone.
+    /// What happened to the original.
     ///
-    /// `false` means it is still where it was -- the bookmark went stale, the
-    /// provider refused, the photo was already deleted, or the user declined
-    /// the system's confirmation. Never a reason to keep the tray copy: the
-    /// file the user asked for has already reached its destination.
-    static func remove(_ origin: TrayItemOrigin) async -> Bool {
+    /// A failure carries the reason as text rather than a flag. Which step
+    /// refused -- resolving the bookmark, opening its scope, the coordinated
+    /// delete, the photo match, the library -- decides what to do about it,
+    /// and none of those steps can be reached from a simulator or a test: the
+    /// answer only exists on the device. It goes in the banner and in the
+    /// settings screen's record.
+    ///
+    /// A failure is never a reason to keep the tray copy: the file the user
+    /// asked for has already reached its destination.
+    enum Outcome: Equatable {
+        case removed
+        case failed(String)
+    }
+
+    static func remove(_ origin: TrayItemOrigin) async -> Outcome {
+        let outcome = await attempt(origin)
+        if case .failed(let reason) = outcome {
+            logger.error("The original was not deleted.")
+            DropDiagnostics.record("削除できず: \(reason)")
+        }
+        return outcome
+    }
+
+    private static func attempt(_ origin: TrayItemOrigin) async -> Outcome {
         switch origin {
         case .file(let bookmark):
             return removeFile(bookmark: bookmark)
@@ -28,10 +47,13 @@ enum OriginalRemover {
                 withLocalIdentifiers: [localIdentifier], options: nil
             ))
         case .photoMetadata(let creationDate, let pixelWidth, let pixelHeight):
-            guard await authorized else { return false }
-            return await removePhoto(matching: asset(
-                takenAt: creationDate, width: pixelWidth, height: pixelHeight
-            ))
+            guard await authorized else { return .failed("photo: 権限なし") }
+            switch asset(takenAt: creationDate, width: pixelWidth, height: pixelHeight) {
+            case .one(let assets):
+                return await removePhoto(matching: assets)
+            case .noneOrSeveral(let reason):
+                return .failed(reason)
+            }
         }
     }
 
@@ -43,7 +65,7 @@ enum OriginalRemover {
     /// the file lives in someone else's document provider (the Files app,
     /// iCloud Drive, a third party) and deleting it from under an open
     /// coordinated read is what corrupts the provider's own bookkeeping.
-    private static func removeFile(bookmark: Data) -> Bool {
+    private static func removeFile(bookmark: Data) -> Outcome {
         var isStale = false
         guard let url = try? URL(
             resolvingBookmarkData: bookmark,
@@ -51,14 +73,12 @@ enum OriginalRemover {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
-            logger.error("The original's bookmark no longer resolves.")
-            return false
+            return .failed("file: ブックマーク解決不可")
         }
         // A stale bookmark still resolves, but to where the file *was*. Acting
         // on it could delete something that moved into that path since.
         guard !isStale else {
-            logger.error("The original's bookmark is stale; leaving the file alone.")
-            return false
+            return .failed("file: ブックマークが古い")
         }
         // Never the tray's own storage. A file URL handed over by a drag
         // normally points somewhere else entirely, but the tray is reachable
@@ -66,8 +86,7 @@ enum OriginalRemover {
         // TrayStore's own bookkeeping for the same bytes.
         guard !url.resolvingSymlinksInPath().path
             .hasPrefix(TrayContainer.root.resolvingSymlinksInPath().path) else {
-            logger.error("The original resolves inside the tray's own container; leaving it alone.")
-            return false
+            return .failed("file: トレイ自身の中")
         }
         // Not a guard: `startAccessingSecurityScopedResource` answers false
         // for a URL that needs no scope at all, and refusing there would skip
@@ -77,15 +96,28 @@ enum OriginalRemover {
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
-        var removed = false
+        var removalError: NSError?
         var coordinationError: NSError?
         NSFileCoordinator().coordinate(
             writingItemAt: url, options: .forDeleting, error: &coordinationError
         ) { url in
-            removed = (try? FileManager.default.removeItem(at: url)) != nil
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                removalError = error as NSError
+            }
         }
-        if !removed { logger.error("The original could not be deleted.") }
-        return removed
+        // The codes are the point: 257/513 is a sandbox refusal, 4 is a file
+        // that is no longer there, and a coordination error means the
+        // provider never let us near it. Guessing between those is what this
+        // avoids.
+        if let coordinationError {
+            return .failed("file: 調整不可 \(coordinationError.domain) \(coordinationError.code)\(accessed ? "" : " (scope無)")")
+        }
+        if let removalError {
+            return .failed("file: 削除拒否 \(removalError.domain) \(removalError.code)\(accessed ? "" : " (scope無)")")
+        }
+        return .removed
     }
 
     /// The single asset whose capture time and dimensions match, or an empty
@@ -95,7 +127,12 @@ enum OriginalRemover {
     /// the dimensions alongside it. More than one match means two photos were
     /// taken in the same second at the same size -- burst frames -- and there
     /// is no way to tell which one the user dragged, so nothing is deleted.
-    private static func asset(takenAt date: Date, width: Int, height: Int) -> PHFetchResult<PHAsset> {
+    private enum AssetMatch {
+        case one(PHFetchResult<PHAsset>)
+        case noneOrSeveral(String)
+    }
+
+    private static func asset(takenAt date: Date, width: Int, height: Int) -> AssetMatch {
         let options = PHFetchOptions()
         options.predicate = NSPredicate(
             format: "creationDate >= %@ AND creationDate <= %@ AND pixelWidth == %d AND pixelHeight == %d",
@@ -104,11 +141,13 @@ enum OriginalRemover {
             width, height
         )
         let matches = PHAsset.fetchAssets(with: .image, options: options)
-        if matches.count != 1 {
-            logger.error("The photo matched no single asset; leaving the library alone.")
-            return PHFetchResult<PHAsset>()
+        guard matches.count == 1 else {
+            // The numbers are what makes this actionable: 0 means the search
+            // was wrong (a converted copy, a shifted timestamp), more than 1
+            // means the library really does hold several.
+            return .noneOrSeveral("photo: 該当 \(matches.count) 件 \(width)x\(height)")
         }
-        return matches
+        return .one(matches)
     }
 
     private static var authorized: Bool {
@@ -122,22 +161,18 @@ enum OriginalRemover {
     /// thirty days. That is what makes deleting on a metadata match safe
     /// enough to do at all: the user sees the photo and says yes, and a
     /// mistake is recoverable.
-    private static func removePhoto(matching assets: PHFetchResult<PHAsset>) async -> Bool {
-        guard assets.count > 0 else { return false }
-        guard await authorized else {
-            logger.error("The photo library is not available to this app.")
-            return false
-        }
+    private static func removePhoto(matching assets: PHFetchResult<PHAsset>) async -> Outcome {
+        guard assets.count > 0 else { return .failed("photo: 該当なし") }
+        guard await authorized else { return .failed("photo: 権限なし") }
         do {
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.deleteAssets(assets)
             }
-            return true
+            return .removed
         } catch {
             // Cancelling the confirmation lands here too, which is correct:
             // the photo is still there.
-            logger.error("The photo was not deleted.")
-            return false
+            return .failed("photo: \((error as NSError).code)")
         }
     }
 }
