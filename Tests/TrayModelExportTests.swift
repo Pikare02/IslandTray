@@ -49,9 +49,30 @@ final class TrayModelExportTests: XCTestCase {
         return settings
     }
 
+    func testAnItemLeavesTheIslandTheMomentItIsTaken() async throws {
+        // Not at the next foreground, which is when the file itself goes: the
+        // user hands a photo to another app and looks straight at the island.
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: true)
+        try await waitForMark(item.id)
+
+        XCTAssertEqual(model.visible, [], "the island reads `visible`")
+        XCTAssertEqual(model.items.map(\.id), [item.id], "the file is still there until the flush")
+    }
+
+    func testCopyModeTakesNothingOffTheIsland() async throws {
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: false)
+        // Nothing to wait for -- the call returns without recording anything.
+        await Task.yield()
+
+        XCTAssertTrue(model.exported.isEmpty)
+        XCTAssertEqual(model.visible.map(\.id), [item.id])
+    }
+
     func testAnItemAnotherAppTookLeavesTheTray() async throws {
         let item = try addItem()
-        model.markExported(item.id)
+        model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
         await model.flushExported(settings: settings(removeOnExport: true))
@@ -63,7 +84,7 @@ final class TrayModelExportTests: XCTestCase {
     func testAnItemNobodyTookStays() async throws {
         let taken = try addItem("taken.txt")
         let kept = try addItem("kept.txt")
-        model.markExported(taken.id)
+        model.markExported(taken.id, removeOnExport: true)
         try await waitForMark(taken.id)
 
         await model.flushExported(settings: settings(removeOnExport: true))
@@ -73,7 +94,7 @@ final class TrayModelExportTests: XCTestCase {
 
     func testNothingIsRemovedWhenTheSettingIsOff() async throws {
         let item = try addItem()
-        model.markExported(item.id)
+        model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
         await model.flushExported(settings: settings(removeOnExport: false))
@@ -87,7 +108,7 @@ final class TrayModelExportTests: XCTestCase {
         // who shares ten files with the setting off and then turns it on
         // loses all ten the next time the app comes forward.
         let item = try addItem()
-        model.markExported(item.id)
+        model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
         await model.flushExported(settings: settings(removeOnExport: false))

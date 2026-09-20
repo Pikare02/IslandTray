@@ -10,7 +10,7 @@ struct TrayView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if model.items.isEmpty {
+                if model.visible.isEmpty {
                     emptyState
                 } else {
                     strip
@@ -67,7 +67,7 @@ struct TrayView: View {
     private var strip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 16) {
-                ForEach(model.items) { item in
+                ForEach(model.visible) { item in
                     TrayCardView(item: item, model: model) {
                         Task { await model.remove(item) }
                     }
