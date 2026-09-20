@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -293,7 +294,33 @@ final class TrayModel {
         Task { @MainActor in
             guard self.exported.insert(id).inserted else { return }
             await self.syncActivity()
+            await self.finishExportWhileAway(id)
         }
+    }
+
+    /// Finishes the move without waiting for the user to come back.
+    ///
+    /// The handover happens while they are on their way into the other app,
+    /// and this app is about to be suspended. `beginBackgroundTask` buys the
+    /// ~30 seconds that need to pass first: the receiving app is still
+    /// copying our file, and deleting it mid-copy is how a move loses the
+    /// file it was moving. The wait is scaled to the size, since that is what
+    /// the copy takes, and capped well inside the window iOS grants.
+    ///
+    /// Every guard that made this safe when it ran on the next foreground
+    /// still holds -- the setting is re-read, the register is what decides
+    /// what to remove, and a kill in the middle leaves the move to be
+    /// finished at the next launch.
+    private func finishExportWhileAway(_ id: UUID) async {
+        let bytes = items.first { $0.id == id }?.size ?? 0
+        // 5 MB/s is a deliberately pessimistic copy rate; the floor matters
+        // more than the slope, since most items are small and the cap keeps
+        // the whole thing inside the background window.
+        let grace = min(20, max(6, Double(bytes) / 5_000_000))
+        let assertion = UIApplication.shared.beginBackgroundTask(withName: "finish tray move")
+        defer { UIApplication.shared.endBackgroundTask(assertion) }
+        try? await Task.sleep(for: .seconds(grace))
+        await flushExported()
     }
 
     /// Takes everything handed out since the last flush out of the tray, if
@@ -301,7 +328,15 @@ final class TrayModel {
     ///
     /// The set is emptied either way, so turning the setting on later cannot
     /// retroactively delete items handed out while it was off.
-    func flushExported(settings: TraySettings = TraySettings()) async {
+    /// - Parameter canPresentUI: whether the app is in front. Deleting a
+    ///   photo needs it: PhotoKit shows its own confirmation, and there is
+    ///   nowhere to show it from the background. Those items stay in the
+    ///   register and are dealt with the next time the app is open, which is
+    ///   also when the user can answer the dialog.
+    func flushExported(
+        settings: TraySettings = TraySettings(),
+        canPresentUI: Bool = UIApplication.shared.applicationState == .active
+    ) async {
         let ids = exported
         exported = []
         guard settings.removeOnExport else { return }
@@ -313,13 +348,15 @@ final class TrayModel {
             // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
             let origin = item.origin
+            if case .photo = origin, !canPresentUI { exported.insert(id); continue }
+            if case .photoMetadata = origin, !canPresentUI { exported.insert(id); continue }
             await remove(item)
             // The tray copy goes first: whatever happens to the original, the
             // destination already has the file, so neither order can lose it.
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
             guard let origin else { continue }
-            if case .failed(let reason) = await OriginalRemover.remove(origin) {
+            if case .failed(let reason) = await OriginalRemover.remove(origin, named: item.name) {
                 banner = "元のファイルは削除できませんでした（\(reason)）"
             }
         }
