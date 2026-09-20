@@ -2,7 +2,8 @@ import UniformTypeIdentifiers
 import XCTest
 @testable import IslandTray
 
-/// Only `preferredTypeIdentifier` is covered here. The rest of `ingest`
+/// `preferredTypeIdentifier` and `duplicate(of:among:at:)` are covered here.
+/// The rest of `ingest`
 /// drives `loadFileRepresentation` and `TrayStore.shared`, which need a real
 /// drag session and the app's real container respectively -- neither is
 /// available in a test bundle. The type-identifier selection, though, is
@@ -70,6 +71,83 @@ final class DropReceiverTests: XCTestCase {
         XCTAssertEqual(
             DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["a.txt"])),
             "追加できませんでした"
+        )
+    }
+
+
+    // MARK: - duplicate(of:among:at:)
+    //
+    // Dragging a tray card and letting go over the tray hands the item
+    // straight back to us, so this is what stands between a slip of the
+    // finger and a tray full of the same file.
+
+    private var scratch: URL {
+        URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("DropReceiverTests", isDirectory: true)
+    }
+
+    private func file(_ name: String, _ contents: String) throws -> URL {
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        let url = scratch.appendingPathComponent("\(UUID().uuidString)-\(name)")
+        try Data(contents.utf8).write(to: url)
+        return url
+    }
+
+    private func item(name: String, size: Int) -> TrayItem {
+        TrayItem(id: UUID(), name: name, uti: "public.plain-text", size: size, addedAt: Date(), ext: "txt")
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: scratch)
+    }
+
+    func testTheSameBytesAreRecognised() throws {
+        let existing = try file("existing.txt", "hello")
+        let dropped = try file("dropped.txt", "hello")
+        XCTAssertEqual(
+            DropReceiver.duplicate(
+                of: dropped, among: [item(name: "existing.txt", size: 5)], at: { _ in existing }
+            ),
+            "existing.txt"
+        )
+    }
+
+    func testTheSameLengthIsNotEnough() throws {
+        // Both five bytes: a size check alone would call these the same file.
+        let existing = try file("existing.txt", "hello")
+        let dropped = try file("dropped.txt", "world")
+        XCTAssertNil(
+            DropReceiver.duplicate(
+                of: dropped, among: [item(name: "existing.txt", size: 5)], at: { _ in existing }
+            )
+        )
+    }
+
+    func testADifferentLengthIsNotEvenRead() throws {
+        // The item's own recorded size rules it out, so `at:` is never called
+        // -- which is what keeps a drop from reading every video in the tray.
+        let dropped = try file("dropped.txt", "hello")
+        XCTAssertNil(
+            DropReceiver.duplicate(
+                of: dropped,
+                among: [item(name: "existing.txt", size: 9_999)],
+                at: { _ in XCTFail("a size mismatch must not be hashed"); return URL(fileURLWithPath: "/dev/null") }
+            )
+        )
+    }
+
+    func testAnEmptyTrayHasNoDuplicates() throws {
+        let dropped = try file("dropped.txt", "hello")
+        XCTAssertNil(DropReceiver.duplicate(of: dropped, among: [], at: { _ in dropped }))
+    }
+
+    func testTheMatchIsFoundPastNonMatches() throws {
+        let other = try file("other.txt", "world")
+        let existing = try file("existing.txt", "hello")
+        let dropped = try file("dropped.txt", "hello")
+        let items = [item(name: "other.txt", size: 5), item(name: "existing.txt", size: 5)]
+        XCTAssertEqual(
+            DropReceiver.duplicate(of: dropped, among: items, at: { $0.name == "other.txt" ? other : existing }),
+            "existing.txt"
         )
     }
 }

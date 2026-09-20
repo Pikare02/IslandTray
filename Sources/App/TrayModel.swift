@@ -105,8 +105,24 @@ final class TrayModel {
         }.value
     }
 
+    /// Files held back because the tray already has exactly these bytes,
+    /// waiting on the user's answer.
+    ///
+    /// Dragging a tray card and letting go over the tray itself hands the
+    /// item straight back to us, so without this the same file piles up a
+    /// copy per slip.
+    var pendingDuplicates: [DropReceiver.Staged] = []
+
+    var duplicatePrompt: String {
+        guard pendingDuplicates.count == 1 else {
+            return "\(pendingDuplicates.count) 件が、すでにトレイにあるファイルと同じ内容です。追加しますか？"
+        }
+        return "「\(pendingDuplicates[0].existingName)」と同じ内容です。もう一度追加しますか？"
+    }
+
     func ingest(_ providers: [NSItemProvider]) async {
         let result = await DropReceiver.ingest(providers: providers)
+        pendingDuplicates += result.duplicates
         let reloadSucceeded = reload()
 
         switch Self.ingestBanner(reloadSucceeded: reloadSucceeded, result: result) {
@@ -152,6 +168,40 @@ final class TrayModel {
             return .set(nil)
         }
         return .keep
+    }
+
+    /// Adds the held-back files after all.
+    func addPendingDuplicates() async {
+        let staged = pendingDuplicates
+        pendingDuplicates = []
+        var failed: [String] = []
+        var added = 0
+        for item in staged {
+            do {
+                _ = try await DropReceiver.add(staged: item)
+                added += 1
+            } catch {
+                failed.append(item.suggestedName ?? item.existingName)
+            }
+        }
+        let reloadSucceeded = reload()
+        switch Self.ingestBanner(
+            reloadSucceeded: reloadSucceeded,
+            result: DropReceiver.Result(added: added, failed: failed)
+        ) {
+        case .keep:
+            break
+        case .set(let value):
+            banner = value
+        }
+        await syncActivity()
+    }
+
+    /// Throws the held-back files away. Nothing was ever added, so there is
+    /// nothing to reload -- only the staging files to clean up.
+    func discardPendingDuplicates() {
+        pendingDuplicates.forEach(DropReceiver.discard(staged:))
+        pendingDuplicates = []
     }
 
     /// Updates the Live Activity and surfaces any failure rather than

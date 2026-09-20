@@ -27,7 +27,10 @@ final class ShareViewController: UIViewController {
     private func ingest() async {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? [])
             .flatMap { $0.attachments ?? [] }
-        let result = await DropReceiver.ingest(providers: providers)
+        // Duplicates are added rather than reported here: a share sheet has
+        // nowhere to ask, and dropping a share the user asked for would be
+        // worse than a second copy. The app asks; this cannot.
+        let result = await DropReceiver.ingest(providers: providers, allowingDuplicates: true)
         present(message: DropReceiver.shareSheetMessage(for: result))
     }
 
