@@ -71,7 +71,7 @@ struct TrayContentState: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent, atlas
+        case count, recent, atlas, page
     }
 
     let count: Int
@@ -82,13 +82,42 @@ struct TrayContentState: Codable, Hashable {
     /// one per preview, so the strip's own height is the side and
     /// `recent.count` is the rest of what the widget needs to slice it.
     let atlas: Data?
+    /// Which run of `maxPreviews` items `recent` is.
+    ///
+    /// A widget cannot be scrolled or swiped -- it receives no gestures at
+    /// all beyond a tap on a button -- so a tray of more than four is paged
+    /// through with buttons in the expanded island, and this is what they
+    /// move.
+    let page: Int
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
     /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
-    private init(count: Int, recent: [Preview], atlas: Data?) {
+    private init(count: Int, recent: [Preview], atlas: Data?, page: Int = 0) {
         self.count = count
         self.recent = recent
         self.atlas = atlas
+        self.page = page
+    }
+
+    /// Whether there is a run of items before or after this one.
+    var hasPreviousPage: Bool { page > 0 }
+    var hasNextPage: Bool { (page + 1) * Self.maxPreviews < count }
+
+    /// The items one page shows, clamped so a page beyond the end shows the
+    /// last one rather than nothing.
+    ///
+    /// The single place the slicing is defined: the state and the atlas built
+    /// for it have to agree about which items they are describing, and they
+    /// are built in different files.
+    static func items(_ items: [TrayItem], onPage page: Int) -> [TrayItem] {
+        guard !items.isEmpty else { return [] }
+        let start = clampedPage(page, count: items.count) * maxPreviews
+        return Array(items.dropFirst(start).prefix(maxPreviews))
+    }
+
+    static func clampedPage(_ page: Int, count: Int) -> Int {
+        let pages = max(1, (count + maxPreviews - 1) / maxPreviews)
+        return min(max(0, page), pages - 1)
     }
 
     /// Decoding is a real construction path: ActivityKit decodes this type
@@ -110,17 +139,23 @@ struct TrayContentState: Codable, Hashable {
         let decodedCount = try container.decode(Int.self, forKey: .count)
         let decodedRecent = (try? container.decode([Preview].self, forKey: .recent)) ?? []
         let decodedAtlas = try? container.decodeIfPresent(Data.self, forKey: .atlas)
+        let decodedPage = (try? container.decodeIfPresent(Int.self, forKey: .page)) ?? 0
         let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
+        let page = Self.clampedPage(decodedPage, count: decodedCount)
 
-        let full = TrayContentState(count: decodedCount, recent: clampedRecent, atlas: decodedAtlas)
+        let full = TrayContentState(
+            count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page
+        )
         if full.encodedByteCount <= Self.maxEncodedBytes {
             self = full
             return
         }
-        let noAtlas = TrayContentState(count: decodedCount, recent: clampedRecent, atlas: nil)
+        let noAtlas = TrayContentState(
+            count: decodedCount, recent: clampedRecent, atlas: nil, page: page
+        )
         self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
             ? noAtlas
-            : TrayContentState(count: decodedCount, recent: [], atlas: nil)
+            : TrayContentState(count: decodedCount, recent: [], atlas: nil, page: page)
     }
 
     /// A JPEG strip built for one `make(from:atlas:)` call, plus which of
@@ -143,8 +178,9 @@ struct TrayContentState: Codable, Hashable {
     /// - Parameter atlas: a strip with one tile per preview, in the same
     ///   order as `items`, or `nil`. Dropped whole if it does not fit; never
     ///   partially, since a strip cannot be shortened without re-encoding.
-    static func make(from items: [TrayItem], atlas: Atlas? = nil) -> TrayContentState {
-        let previews = items.prefix(maxPreviews).enumerated().map { index, item in
+    static func make(from items: [TrayItem], atlas: Atlas? = nil, page: Int = 0) -> TrayContentState {
+        let page = clampedPage(page, count: items.count)
+        let previews = Self.items(items, onPage: page).enumerated().map { index, item in
             Preview(
                 id: item.id.uuidString,
                 symbol: item.symbolName,
@@ -155,7 +191,9 @@ struct TrayContentState: Codable, Hashable {
                 hasThumbnail: atlas?.filled.indices.contains(index) == true && atlas?.filled[index] == true
             )
         }
-        let withAtlas = TrayContentState(count: items.count, recent: Array(previews), atlas: atlas?.jpeg)
+        let withAtlas = TrayContentState(
+            count: items.count, recent: Array(previews), atlas: atlas?.jpeg, page: page
+        )
         if withAtlas.encodedByteCount <= buildBudget { return withAtlas }
 
         let withoutAtlas = TrayContentState(
@@ -163,7 +201,8 @@ struct TrayContentState: Codable, Hashable {
             recent: previews.map {
                 Preview(id: $0.id, symbol: $0.symbol, name: $0.name, hasThumbnail: false)
             },
-            atlas: nil
+            atlas: nil,
+            page: page
         )
         return withoutAtlas.encodedByteCount <= maxEncodedBytes
             ? withoutAtlas

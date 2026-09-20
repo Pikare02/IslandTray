@@ -26,6 +26,14 @@ actor TrayActivityController {
     /// a newer one's error.
     private(set) var lastError: String?
 
+    /// Which run of items the island is showing.
+    ///
+    /// Actor state rather than something read back off the activity: the
+    /// activity's own state is what this produces, and reading the answer out
+    /// of the thing being written is how two taps in quick succession end up
+    /// moving one page.
+    private var page = 0
+
     /// The activities this controller treats as its own.
     ///
     /// `Activity.activities` is not a list of visible activities: it also
@@ -96,10 +104,7 @@ actor TrayActivityController {
         // previews, and returns something that fits in every case
         // (TrayContentStateTests pins the worst case). A second guard here
         // would be unreachable, exactly as the pre-atlas one was.
-        let state = TrayContentState.make(
-            from: items,
-            atlas: await ThumbnailService.shared.islandAtlas(for: items)
-        )
+        let state = await pagedState(for: items)
 
         // An update that lands nowhere falls through to `start` instead of
         // being dropped: whatever removed the activity (the eight-hour end, a
@@ -169,12 +174,42 @@ actor TrayActivityController {
         // means a failure leaves the working island untouched; the old ones go
         // only once the replacement exists, so the success path still ends with
         // a single activity.
-        let state = TrayContentState.make(
-            from: items,
-            atlas: await ThumbnailService.shared.islandAtlas(for: items)
-        )
+        let state = await pagedState(for: items)
         guard let replacement = start(state) else { return }
         await retireOthers(keeping: replacement)
+    }
+
+    /// Moves the island's strip by `delta` pages and updates what is on
+    /// screen. Called from the buttons in the expanded island.
+    func turnPage(by delta: Int) async {
+        let items: [TrayItem]
+        do {
+            items = try await Task.detached(priority: .userInitiated) {
+                try TrayStore.shared.load()
+            }.value
+        } catch {
+            Self.logger.error("turnPage() aborted: TrayStore.load() threw.")
+            return
+        }
+        // The island is the tray; the clipboard board has its own screen.
+        let tray = items.filter { $0.boardOrTray == .tray }
+        page = TrayContentState.clampedPage(page + delta, count: tray.count)
+        _ = await update(await pagedState(for: tray))
+    }
+
+    /// The state for the page currently being shown, with an atlas built from
+    /// exactly the items on it.
+    ///
+    /// Both halves go through `TrayContentState.items(_:onPage:)` so the
+    /// picture and the labels can never describe different items.
+    private func pagedState(for items: [TrayItem]) async -> TrayContentState {
+        page = TrayContentState.clampedPage(page, count: items.count)
+        let onPage = TrayContentState.items(items, onPage: page)
+        return TrayContentState.make(
+            from: items,
+            atlas: await ThumbnailService.shared.islandAtlas(for: onPage),
+            page: page
+        )
     }
 
     // MARK: - Internals
