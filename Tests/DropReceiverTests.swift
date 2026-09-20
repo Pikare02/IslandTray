@@ -106,7 +106,7 @@ final class DropReceiverTests: XCTestCase {
         XCTAssertEqual(
             DropReceiver.duplicate(
                 of: dropped, among: [item(name: "existing.txt", size: 5)], at: { _ in existing }
-            ),
+            )?.name,
             "existing.txt"
         )
     }
@@ -146,7 +146,9 @@ final class DropReceiverTests: XCTestCase {
         let dropped = try file("dropped.txt", "hello")
         let items = [item(name: "other.txt", size: 5), item(name: "existing.txt", size: 5)]
         XCTAssertEqual(
-            DropReceiver.duplicate(of: dropped, among: items, at: { $0.name == "other.txt" ? other : existing }),
+            DropReceiver.duplicate(
+                of: dropped, among: items, at: { $0.name == "other.txt" ? other : existing }
+            )?.name,
             "existing.txt"
         )
     }

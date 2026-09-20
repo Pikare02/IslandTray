@@ -117,4 +117,47 @@ final class TrayModelExportTests: XCTestCase {
         await model.flushExported(settings: settings(removeOnExport: true))
         XCTAssertEqual(model.items.map(\.id), [item.id])
     }
+
+
+    // MARK: - A card dropped back onto the tray
+
+    private func staged(duplicateOf item: TrayItem) throws -> DropReceiver.Staged {
+        let payload = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("\(UUID().uuidString).txt")
+        try Data("x".utf8).write(to: payload)
+        return DropReceiver.Staged(
+            payload: payload, suggestedName: item.name, uti: "public.plain-text", existing: item
+        )
+    }
+
+    func testDecliningACardThatCameStraightBackKeepsIt() async throws {
+        // Dragging a card and letting go over the tray runs the whole
+        // handover -- our own drop target asks the provider for the bytes,
+        // which is what marks the item as given away. Declining the copy then
+        // left the user with neither: the copy refused and the original
+        // already on its way out.
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: true)
+        try await waitForMark(item.id)
+        model.pendingDuplicates = [try staged(duplicateOf: item)]
+
+        await model.discardPendingDuplicates()
+
+        XCTAssertTrue(model.exported.isEmpty, "it never went anywhere")
+        XCTAssertEqual(model.visible.map(\.id), [item.id])
+        await model.flushExported(settings: settings(removeOnExport: true))
+        XCTAssertEqual(try store.load().map(\.id), [item.id], "and the file is still on disk")
+    }
+
+    func testAcceptingACardThatCameStraightBackAlsoKeepsTheOriginal() async throws {
+        let item = try addItem()
+        model.markExported(item.id, removeOnExport: true)
+        try await waitForMark(item.id)
+        model.pendingDuplicates = [try staged(duplicateOf: item)]
+
+        await model.addPendingDuplicates()
+
+        XCTAssertTrue(model.exported.isEmpty)
+        XCTAssertTrue(model.visible.contains { $0.id == item.id })
+    }
 }

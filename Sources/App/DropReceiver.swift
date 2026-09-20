@@ -1,5 +1,7 @@
+import CoreGraphics
 import CryptoKit
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 /// Turns dropped NSItemProviders into tray items.
@@ -25,8 +27,8 @@ enum DropReceiver {
         let payload: URL
         let suggestedName: String?
         let uti: String
-        /// The display name of the item already in the tray with these bytes.
-        let existingName: String
+        /// The item already in the tray with these bytes.
+        let existing: TrayItem
     }
 
     // MainActor rather than a Sendable dance for NSItemProvider: the array
@@ -56,14 +58,14 @@ enum DropReceiver {
                 let suggestedName = provider.suggestedName
 
                 if !allowingDuplicates,
-                   let existingName = duplicate(of: payload, among: existing) {
+                   let match = duplicate(of: payload, among: existing) {
                     // Not deleted: the payload is what gets added if the user
                     // says to add it anyway.
                     duplicates.append(Staged(
                         payload: payload,
                         suggestedName: suggestedName,
                         uti: typeIdentifier,
-                        existingName: existingName
+                        existing: match
                     ))
                     continue
                 }
@@ -114,7 +116,7 @@ enum DropReceiver {
         try? FileManager.default.removeItem(at: staged.payload)
     }
 
-    /// The display name of the tray item holding exactly these bytes, or nil.
+    /// The tray item holding exactly these bytes, or nil.
     ///
     /// Size first, hash only on a size match: dropping onto a tray of large
     /// videos would otherwise read every one of them on every drop, and two
@@ -129,11 +131,11 @@ enum DropReceiver {
         of payload: URL,
         among items: [TrayItem],
         at itemURL: (TrayItem) -> URL = { $0.fileURL }
-    ) -> String? {
+    ) -> TrayItem? {
         guard let size = try? payload.resourceValues(forKeys: [.fileSizeKey]).fileSize,
               let payloadDigest = digest(of: payload) else { return nil }
         for item in items where item.size == size {
-            if digest(of: itemURL(item)) == payloadDigest { return item.name }
+            if digest(of: itemURL(item)) == payloadDigest { return item }
         }
         return nil
     }
@@ -204,15 +206,82 @@ enum DropReceiver {
     /// stop working because of this.
     @MainActor
     private static func load(from provider: NSItemProvider, typeIdentifier: String) async throws -> Loaded {
-        if let loaded = try? await loadInPlace(from: provider, typeIdentifier: typeIdentifier) {
-            if loaded.origin != nil { return loaded }
-            return Loaded(payload: loaded.payload, origin: await photoOrigin(of: provider))
+        var loaded: Loaded
+        if let inPlace = try? await loadInPlace(from: provider, typeIdentifier: typeIdentifier) {
+            loaded = inPlace
+        } else {
+            loaded = Loaded(
+                payload: try await loadFile(from: provider, typeIdentifier: typeIdentifier),
+                origin: nil
+            )
         }
-        return Loaded(
-            payload: try await loadFile(from: provider, typeIdentifier: typeIdentifier),
-            origin: await photoOrigin(of: provider)
-        )
+        // In order of how much they can be trusted: the in-place file itself,
+        // then a file URL the provider hands over, then the asset the drag
+        // names, then what the photo's own metadata says it is.
+        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: await fileURLOrigin(of: provider)) }
+        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: await photoOrigin(of: provider)) }
+        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: photoMetadataOrigin(of: loaded.payload)) }
+        DropDiagnostics.record(DropDiagnostics.line(
+            name: provider.suggestedName, types: provider.registeredTypeIdentifiers, origin: loaded.origin
+        ))
+        return loaded
     }
+
+    /// The original behind a `public.file-url` representation.
+    ///
+    /// Plenty of providers -- the Files app among them -- hand over the real
+    /// URL of the file under this type without offering an in-place file
+    /// representation at all. Loading it costs nothing (it is a URL, not the
+    /// bytes), and it is the same kind of security-scoped handle, so the
+    /// bookmark is taken exactly the same way.
+    @MainActor
+    private static func fileURLOrigin(of provider: NSItemProvider) async -> TrayItemOrigin? {
+        let fileURLType = "public.file-url"
+        guard provider.registeredTypeIdentifiers.contains(fileURLType) else { return nil }
+        let bookmark: Data? = await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: fileURLType) { item, _ in
+                guard let url = item as? URL ?? (item as? Data).flatMap({
+                    URL(dataRepresentation: $0, relativeTo: nil)
+                }) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                continuation.resume(returning: try? url.bookmarkData())
+            }
+        }
+        return bookmark.map(TrayItemOrigin.file)
+    }
+
+    /// What the dropped image says about itself.
+    ///
+    /// Read from the staged copy, so it needs no library access and no
+    /// cooperation from the source app -- a photo dragged out of Photos
+    /// carries its capture time and its dimensions whether or not the drag
+    /// says which asset it was. `OriginalRemover` turns this back into an
+    /// asset, and refuses if it matches more than one.
+    private static func photoMetadataOrigin(of payload: URL) -> TrayItemOrigin? {
+        guard let source = CGImageSourceCreateWithURL(payload as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
+              let taken = exif[kCGImagePropertyExifDateTimeOriginal] as? String,
+              let date = exifDateFormatter.date(from: taken) else { return nil }
+        return .photoMetadata(creationDate: date, pixelWidth: width, pixelHeight: height)
+    }
+
+    /// EXIF writes "2026:09:20 22:13:45", in the camera's own local time with
+    /// no zone. `PHAsset.creationDate` is the same wall-clock instant read in
+    /// the current zone, which is why this formatter uses the current zone
+    /// rather than UTC.
+    private static let exifDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 
     @MainActor
     private static func loadInPlace(

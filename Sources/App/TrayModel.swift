@@ -117,12 +117,13 @@ final class TrayModel {
         guard pendingDuplicates.count == 1 else {
             return "\(pendingDuplicates.count) 件が、すでにトレイにあるファイルと同じ内容です。追加しますか？"
         }
-        return "「\(pendingDuplicates[0].existingName)」と同じ内容です。もう一度追加しますか？"
+        return "「\(pendingDuplicates[0].existing.name)」と同じ内容です。もう一度追加しますか？"
     }
 
     func ingest(_ providers: [NSItemProvider]) async {
         let result = await DropReceiver.ingest(providers: providers)
         pendingDuplicates += result.duplicates
+        await returnToTray(result.duplicates)
         let reloadSucceeded = reload()
 
         switch Self.ingestBanner(reloadSucceeded: reloadSucceeded, result: result) {
@@ -170,10 +171,30 @@ final class TrayModel {
         return .keep
     }
 
+    /// Puts back items that were marked as handed out but turned out to have
+    /// come straight back to us.
+    ///
+    /// Dropping a tray card onto the tray itself runs the whole handover: our
+    /// own drop target asks the provider for the bytes, which is exactly the
+    /// signal `markExported` listens for, so the item is recorded as given
+    /// away -- and then the copy is declined and the user is left with
+    /// nothing. Bytes that are already in the tray did not go anywhere.
+    ///
+    /// Called both when the duplicate is found and when the user answers:
+    /// `markExported` lands on a later turn of the run loop than the drop, so
+    /// the first call can run before the mark does, and the second is what
+    /// makes it certain.
+    func returnToTray(_ duplicates: [DropReceiver.Staged]) async {
+        let returned = duplicates.map(\.existing.id).filter { exported.remove($0) != nil }
+        guard !returned.isEmpty else { return }
+        await syncActivity()
+    }
+
     /// Adds the held-back files after all.
     func addPendingDuplicates() async {
         let staged = pendingDuplicates
         pendingDuplicates = []
+        await returnToTray(staged)
         var failed: [String] = []
         var added = 0
         for item in staged {
@@ -181,7 +202,7 @@ final class TrayModel {
                 _ = try await DropReceiver.add(staged: item)
                 added += 1
             } catch {
-                failed.append(item.suggestedName ?? item.existingName)
+                failed.append(item.suggestedName ?? item.existing.name)
             }
         }
         let reloadSucceeded = reload()
@@ -198,10 +219,13 @@ final class TrayModel {
     }
 
     /// Throws the held-back files away. Nothing was ever added, so there is
-    /// nothing to reload -- only the staging files to clean up.
-    func discardPendingDuplicates() {
-        pendingDuplicates.forEach(DropReceiver.discard(staged:))
+    /// nothing to reload -- only the staging files to clean up, and the item
+    /// that came back to put back.
+    func discardPendingDuplicates() async {
+        let staged = pendingDuplicates
         pendingDuplicates = []
+        staged.forEach(DropReceiver.discard(staged:))
+        await returnToTray(staged)
     }
 
     /// Updates the Live Activity and surfaces any failure rather than

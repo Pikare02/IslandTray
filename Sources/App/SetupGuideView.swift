@@ -66,6 +66,24 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    if DropDiagnostics.lines.isEmpty {
+                        Text("まだ記録がありません。")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(DropDiagnostics.lines.enumerated()), id: \.offset) { _, line in
+                            Text(line)
+                                .font(.system(.caption2, design: .monospaced))
+                        }
+                        Button("記録を消す", role: .destructive) { DropDiagnostics.clear() }
+                    }
+                } header: {
+                    Text("取り込みの記録")
+                } footer: {
+                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file / photo-id / photo-exif）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
+                }
+
+                Section {
                     LabeledContent("共有コンテナ", value: TrayContainer.isShared ? "有効" : "無効")
                     if !TrayContainer.isShared {
                         Text("有料の Apple Developer アカウントがないため、共有シートからこのアプリを直接選ぶことはできません。他のアプリからは「ファイルに保存」→「IslandTray」フォルダに保存すると、次にアプリを開いたときトレイへ取り込まれます。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
