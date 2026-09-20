@@ -201,3 +201,77 @@ final class TrayContentStateTests: XCTestCase {
         XCTAssertEqual(decoded, state)
     }
 }
+
+/// Paging exists because a widget receives no gestures: the only way past the
+/// first four items is a button that moves this.
+final class TrayContentStatePagingTests: XCTestCase {
+    private func items(_ count: Int) -> [TrayItem] {
+        (0..<count).map {
+            TrayItem(
+                id: UUID(), name: "item-\($0).jpeg", uti: "public.jpeg", size: 1,
+                addedAt: Date(), ext: "jpeg"
+            )
+        }
+    }
+
+    func testThePageDecidesWhichItemsAreShown() {
+        let all = items(9)
+        XCTAssertEqual(
+            TrayContentState.items(all, onPage: 1).map(\.name),
+            ["item-4.jpeg", "item-5.jpeg", "item-6.jpeg", "item-7.jpeg"]
+        )
+    }
+
+    func testTheLastPageIsWhateverIsLeft() {
+        XCTAssertEqual(TrayContentState.items(items(9), onPage: 2).map(\.name), ["item-8.jpeg"])
+    }
+
+    func testAPageBeyondTheEndShowsTheLastOne() {
+        // A page can outlive the items it was counted against: the tray
+        // shrinks while the island is on page three.
+        XCTAssertEqual(TrayContentState.items(items(5), onPage: 99).map(\.name), ["item-4.jpeg"])
+        XCTAssertEqual(TrayContentState.clampedPage(99, count: 5), 1)
+        XCTAssertEqual(TrayContentState.clampedPage(-3, count: 5), 0)
+    }
+
+    func testAnEmptyTrayHasOnePage() {
+        XCTAssertEqual(TrayContentState.items([], onPage: 3), [])
+        XCTAssertEqual(TrayContentState.clampedPage(3, count: 0), 0)
+    }
+
+    func testTheStateSaysWhereItCanGo() {
+        let first = TrayContentState.make(from: items(9), page: 0)
+        XCTAssertFalse(first.hasPreviousPage)
+        XCTAssertTrue(first.hasNextPage)
+
+        let last = TrayContentState.make(from: items(9), page: 2)
+        XCTAssertTrue(last.hasPreviousPage)
+        XCTAssertFalse(last.hasNextPage)
+
+        let short = TrayContentState.make(from: items(3))
+        XCTAssertFalse(short.hasPreviousPage)
+        XCTAssertFalse(short.hasNextPage, "four or fewer needs no buttons at all")
+    }
+
+    func testTheCountIsTheWholeTrayNotThePage() {
+        // The compact island shows this number; it must not fall to 4.
+        XCTAssertEqual(TrayContentState.make(from: items(9), page: 1).count, 9)
+    }
+
+    func testAPageSurvivesTheRoundTrip() throws {
+        let state = TrayContentState.make(from: items(9), page: 2)
+        let decoded = try JSONDecoder().decode(
+            TrayContentState.self, from: JSONEncoder().encode(state)
+        )
+        XCTAssertEqual(decoded.page, 2)
+        XCTAssertEqual(decoded.recent.map(\.name), state.recent.map(\.name))
+    }
+
+    func testAStateFromBeforePagingDecodesOnPageZero() throws {
+        let json = #"{"count": 2, "recent": []}"#
+        let decoded = try JSONDecoder().decode(
+            TrayContentState.self, from: XCTUnwrap(json.data(using: .utf8))
+        )
+        XCTAssertEqual(decoded.page, 0)
+    }
+}

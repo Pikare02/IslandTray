@@ -20,10 +20,18 @@ struct TrayLiveActivity: Widget {
                         .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    // No ScrollView: widget views cannot receive gestures, so the
-                    // full swipeable list lives in the app.
-                    TrayPreviewStrip(previews: context.state.recent, atlas: context.state.atlas, side: 40)
-                        .padding(.top, 2)
+                    // No ScrollView and no swipe: a widget receives no
+                    // gestures at all. A button does run an intent, though,
+                    // which is how a tray of more than four is paged through.
+                    HStack(spacing: 4) {
+                        pageButton(.backward, enabled: context.state.hasPreviousPage)
+                        TrayPreviewStrip(
+                            previews: context.state.recent, atlas: context.state.atlas, side: 40
+                        )
+                        .frame(maxWidth: .infinity)
+                        pageButton(.forward, enabled: context.state.hasNextPage)
+                    }
+                    .padding(.top, 2)
                 }
             } compactLeading: {
                 Image(systemName: "tray.full.fill")
@@ -36,6 +44,25 @@ struct TrayLiveActivity: Widget {
             }
             .widgetURL(TrayIDs.dropURL)
         }
+    }
+
+    private enum Direction {
+        case backward
+        case forward
+    }
+
+    /// Always laid out, only tappable when there is somewhere to go: a button
+    /// that appears and disappears would shift the strip sideways every time
+    /// the end of the tray is reached.
+    private func pageButton(_ direction: Direction, enabled: Bool) -> some View {
+        Button(intent: TrayPageIntent(delta: direction == .forward ? 1 : -1)) {
+            Image(systemName: direction == .forward ? "chevron.right" : "chevron.left")
+                .font(.footnote.bold())
+                .foregroundStyle(.white.opacity(enabled ? 0.8 : 0.15))
+                .frame(width: 18, height: 40)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private func lockScreen(_ state: TrayContentState) -> some View {

@@ -56,6 +56,13 @@ targets:
         buildPhase: resources
       - path: Resources/Localization/ja.lproj
         buildPhase: resources
+      # The island's page buttons construct this intent, so the widget has
+      # to know the type. Its `perform()` only ever runs in the app -- a
+      # LiveActivityIntent is launched into the app's process -- but it still
+      # has to compile here, which is what the two files under it are for.
+      - path: Sources/App/TrayPageIntent.swift
+      - path: Sources/App/TrayActivityController.swift
+      - path: Sources/App/ThumbnailService.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
