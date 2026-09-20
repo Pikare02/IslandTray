@@ -9,7 +9,7 @@ final class ShareViewController: UIViewController {
         // sandbox, which the app can never read. Say so instead of silently
         // losing the item.
         guard TrayContainer.isShared else {
-            present(message: "共有シートからの追加は、有料の Apple Developer アカウントでビルドした場合のみ利用できます。")
+            present(message: "共有シートからこのアプリを直接選べるのは、有料の Apple Developer アカウントでビルドした場合だけです。かわりに「ファイルに保存」から IslandTray フォルダを選んでください。次にアプリを開いたときトレイへ取り込まれます。")
             return
         }
         Task { await ingest() }
