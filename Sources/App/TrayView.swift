@@ -6,6 +6,8 @@ struct TrayView: View {
     @State private var model = TrayModel()
     @State private var isTargeted = false
     @State private var showsSetupGuide = false
+    @State private var isSelecting = false
+    @State private var selection: Set<UUID> = []
 
     var body: some View {
         NavigationStack {
@@ -13,19 +15,28 @@ struct TrayView: View {
                 if model.visible.isEmpty {
                     emptyState
                 } else {
-                    strip
+                    grid
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(dropHighlight)
             .navigationTitle("トレイ")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !model.visible.isEmpty {
+                        Button(isSelecting ? "完了" : "選択") {
+                            isSelecting.toggle()
+                            if !isSelecting { selection = [] }
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showsSetupGuide = true } label: {
                         Image(systemName: "gearshape")
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
             .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
             // The setter ignores dismissal: an alert can only go away through
             // one of its buttons, and each of those clears the list itself.
@@ -77,19 +88,60 @@ struct TrayView: View {
         }
     }
 
-    private var strip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 16) {
-                ForEach(model.visible) { item in
-                    TrayCardView(item: item, model: model) {
-                        Task { await model.remove(item) }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 24)
+    private var grid: some View {
+        TrayGridView(
+            items: model.visible,
+            isSelecting: isSelecting,
+            selection: $selection,
+            model: model,
+            onDelete: { item in Task { await model.remove(item) } }
+        )
+        // Items can leave the tray while the sheet of checkmarks is open --
+        // handed to another app, deleted from a context menu -- and a
+        // selection holding ids that no longer exist would share or delete
+        // nothing while claiming a count.
+        .onChange(of: model.visible.map(\.id)) { _, ids in
+            selection.formIntersection(ids)
         }
-        .scrollClipDisabled()
+    }
+
+    /// What the selection can be done with: the two ways an item leaves.
+    private var selectionBar: some View {
+        HStack {
+            // A custom Transferable needs its own preview, one per item:
+            // ShareLink only defaults that for URL and String.
+            ShareLink(
+                items: selectedItems.map(SharedTrayFile.init(item:)),
+                preview: { SharePreview($0.item.name) }
+            ) {
+                Label("共有", systemImage: "square.and.arrow.up")
+            }
+            .disabled(selection.isEmpty)
+
+            Spacer()
+
+            Text(selection.isEmpty ? "項目を選択" : "\(selection.count) 件")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button(role: .destructive) {
+                let doomed = selectedItems
+                selection = []
+                Task { for item in doomed { await model.remove(item) } }
+            } label: {
+                Label("削除", systemImage: "trash")
+            }
+            .disabled(selection.isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private var selectedItems: [TrayItem] {
+        model.visible.filter { selection.contains($0.id) }
     }
 
     private var emptyState: some View {

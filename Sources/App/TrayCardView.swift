@@ -1,12 +1,13 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
+/// One tray item. Presentation only: the drag, the selection and the layout
+/// all belong to `TrayGridView`, which is where iOS puts them -- a collection
+/// view is the only thing that can add a second item to a drag already in
+/// flight.
 struct TrayCardView: View {
     let item: TrayItem
-    /// Only for `markExported(_:)` -- the drag has to be able to say the item
-    /// left, and the drop happens after this view is long gone from the
-    /// closure's point of view.
-    let model: TrayModel
+    var isSelecting = false
+    var isSelected = false
     let onDelete: () -> Void
 
     // The thumbnail generator takes the scale rather than discovering it: read
@@ -16,87 +17,43 @@ struct TrayCardView: View {
     @Environment(\.displayScale) private var displayScale
     @State private var thumbnail: UIImage?
 
-    private static let cardWidth: CGFloat = 104
-
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(.quaternary)
                 if let thumbnail {
+                    // scaledToFit, not Fill: a tall photo cropped to a square
+                    // tile shows a strip of its middle, which is the least
+                    // recognisable part of it. Fitting keeps the whole image
+                    // inside the tile the grid gives it.
                     Image(uiImage: thumbnail)
                         .resizable()
-                        .scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .scaledToFit()
+                        .padding(5)
                 } else {
                     Image(systemName: item.symbolName)
-                        .font(.system(size: 34))
+                        .font(.system(size: 30))
                         .foregroundStyle(.secondary)
                 }
+                if isSelecting { selectionBadge }
             }
-            .frame(width: Self.cardWidth, height: Self.cardWidth)
+            .aspectRatio(1, contentMode: .fit)
 
             Text(item.name)
-                .font(.caption)
+                .font(.caption2)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(width: Self.cardWidth)
         }
         .task(id: item.id) {
             thumbnail = await ThumbnailService.shared.thumbnail(for: item, scale: displayScale)
         }
-        // onDrag rather than .draggable: this hands other apps the actual file
-        // rather than a link to it.
-        .onDrag {
-            // Take the background time now, while this app is still the one
-            // in front. By the time the receiving app asks for the bytes the
-            // user is in that app and this one is on its way to suspension,
-            // which is too late to ask -- and was why the move only ever
-            // completed once the user came back here.
-            //
-            // `assumeIsolated` rather than a hop: SwiftUI calls this closure
-            // on the main thread, and a hop would put the request back on the
-            // wrong side of that suspension.
-            MainActor.assumeIsolated { model.beginHandover() }
-            let provider = NSItemProvider()
-            // NSItemProvider takes its suggested filename from the URL's last
-            // path component, which is `item.fileURL`'s UUID-based on-disk
-            // name (TrayItem deliberately never builds a path from `name`,
-            // only from the id). Overriding `suggestedName` is what makes
-            // Files/Mail/other drop targets save the file under its real
-            // display name instead of the UUID -- it does not rename anything
-            // on disk.
-            provider.suggestedName = item.name
-            // Registered by hand rather than via NSItemProvider(contentsOf:),
-            // which is otherwise equivalent, because only this form has a
-            // load handler to observe. `.onDrag` reports nothing about how a
-            // drag ended, and a receiver asking for the bytes is the one
-            // signal iOS gives that the drop was accepted -- UIDragInteraction
-            // has didEndWith(operation:), but reaching it means replacing this
-            // whole gesture with a UIKit one and re-solving the tap and
-            // context menu that share it.
-            provider.registerFileRepresentation(
-                forTypeIdentifier: Self.dragTypeIdentifier(for: item),
-                fileOptions: [],
-                visibility: .all
-            ) { completion in
-                // Recorded, never acted on here: the receiving app copies the
-                // file after this returns, and the tray may hold the user's
-                // only copy. TrayModel.flushExported does the removing, once
-                // the app is back in the foreground.
-                model.markExported(item.id)
-                completion(item.fileURL, false, nil)
-                return nil
-            }
-            return provider
-        }
         .contextMenu {
-            // No markExported here, unlike the drag: ShareLink reports
-            // neither success nor cancellation, and its Transferable is
-            // exported when an activity is *picked* -- a user who backs out of
-            // the Files picker after that would lose the file. Sharing
-            // therefore always leaves the item in the tray, whatever
-            // `removeOnExport` says.
+            // No markExported here, unlike the drag: ShareLink reports neither
+            // success nor cancellation, and its Transferable is exported when
+            // an activity is *picked* -- a user who backs out of the Files
+            // picker after that would lose the file. Sharing therefore always
+            // leaves the item in the tray, whatever `removeOnExport` says.
             ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
                 Label("共有", systemImage: "square.and.arrow.up")
             }
@@ -106,15 +63,18 @@ struct TrayCardView: View {
         }
     }
 
-    /// The type the dragged file is offered as.
-    ///
-    /// `item.uti` is what the drop recorded, and is preferred; it can be a
-    /// type this device no longer resolves, in which case the extension is a
-    /// better guess than nothing, and `.data` is what any receiver accepts.
-    private static func dragTypeIdentifier(for item: TrayItem) -> String {
-        UTType(item.uti)?.identifier
-            ?? UTType(filenameExtension: item.ext)?.identifier
-            ?? UTType.data.identifier
+    private var selectionBadge: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, isSelected ? Color.accentColor : Color.black.opacity(0.4))
+                    .padding(6)
+            }
+            Spacer()
+        }
     }
 }
 
@@ -129,7 +89,7 @@ struct TrayCardView: View {
 /// content-type inference from the actual file; `.suggestedFileName` (which
 /// takes a per-instance closure, not a fixed string, since every item needs a
 /// different name) is the only thing added.
-private struct SharedTrayFile: Transferable {
+struct SharedTrayFile: Transferable {
     let item: TrayItem
 
     static var transferRepresentation: some TransferRepresentation {
