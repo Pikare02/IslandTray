@@ -75,7 +75,7 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: true))
 
         XCTAssertTrue(model.items.isEmpty, "the tray is a cut buffer by default")
         XCTAssertTrue(try store.load().isEmpty)
@@ -87,7 +87,7 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(taken.id, removeOnExport: true)
         try await waitForMark(taken.id)
 
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: true))
 
         XCTAssertEqual(model.items.map(\.id), [kept.id])
     }
@@ -97,7 +97,7 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
-        await model.flushExported(settings: settings(removeOnExport: false), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: false))
 
         XCTAssertEqual(model.items.map(\.id), [item.id])
         XCTAssertEqual(try store.load().count, 1)
@@ -111,10 +111,10 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
-        await model.flushExported(settings: settings(removeOnExport: false), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: false))
         XCTAssertTrue(model.exported.isEmpty)
 
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: true))
         XCTAssertEqual(model.items.map(\.id), [item.id])
     }
 
@@ -145,7 +145,7 @@ final class TrayModelExportTests: XCTestCase {
 
         XCTAssertTrue(model.exported.isEmpty, "it never went anywhere")
         XCTAssertEqual(model.visible.map(\.id), [item.id])
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: true))
         XCTAssertEqual(try store.load().map(\.id), [item.id], "and the file is still on disk")
     }
 
@@ -177,7 +177,7 @@ final class TrayModelExportTests: XCTestCase {
 
         XCTAssertEqual(relaunched.exported, [item.id])
         XCTAssertTrue(relaunched.visible.isEmpty)
-        await relaunched.flushExported(settings: settings(removeOnExport: true), canPresentUI: true)
+        await relaunched.flushExported(settings: settings(removeOnExport: true))
         XCTAssertTrue(try store.load().isEmpty, "the move finishes on the next launch")
     }
 
@@ -186,7 +186,7 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
-        await model.flushExported(settings: settings(removeOnExport: false), canPresentUI: true)
+        await model.flushExported(settings: settings(removeOnExport: false))
 
         XCTAssertTrue(
             ExportRegister(defaults: userDefaults).ids.isEmpty,
@@ -195,11 +195,13 @@ final class TrayModelExportTests: XCTestCase {
     }
 
 
-    func testAPhotoIsLeftForWhenTheAppCanShowTheDialog() async throws {
-        // PhotoKit puts its own confirmation in front of a deletion, and
-        // there is nowhere to show it from the background. Running the flush
-        // there anyway would take the tray copy and quietly fail the photo,
-        // with nothing left to retry from.
+    func testAPhotoOriginIsTreatedAsACopy() async throws {
+        // Photos are copies now: a photo arrives from the Photos app
+        // re-encoded, with nothing left in it that says which asset it was.
+        // Items carrying a photo origin are only those written by the builds
+        // that tried, and they must behave exactly like an item with no
+        // origin -- the tray copy goes, the library is not touched, and
+        // nothing is said about it.
         let item = try addItem()
         var withPhotoOrigin = item
         withPhotoOrigin.origin = .photo(localIdentifier: "ABC-123/L0/001")
@@ -207,22 +209,10 @@ final class TrayModelExportTests: XCTestCase {
         model.markExported(item.id, removeOnExport: true)
         try await waitForMark(item.id)
 
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: false)
+        await model.flushExported(settings: settings(removeOnExport: true))
 
-        XCTAssertEqual(model.exported, [item.id], "still waiting, not lost")
-        XCTAssertEqual(try store.load().count, 1, "and the tray copy is still there to retry from")
-    }
-
-    func testAFileIsFinishedWithoutTheAppComingBack() async throws {
-        // The whole point of the background pass: a file needs no dialog, so
-        // the user never has to return for the move to complete.
-        let item = try addItem()
-        model.markExported(item.id, removeOnExport: true)
-        try await waitForMark(item.id)
-
-        await model.flushExported(settings: settings(removeOnExport: true), canPresentUI: false)
-
-        XCTAssertTrue(model.exported.isEmpty)
-        XCTAssertTrue(try store.load().isEmpty)
+        XCTAssertTrue(model.exported.isEmpty, "nothing is left pending for it")
+        XCTAssertNil(model.banner, "and nothing is reported about an original it never had")
+        XCTAssertTrue(try store.load().isEmpty, "the tray copy still goes")
     }
 }

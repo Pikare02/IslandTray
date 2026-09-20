@@ -1,7 +1,5 @@
-import CoreGraphics
 import CryptoKit
 import Foundation
-import ImageIO
 import UniformTypeIdentifiers
 
 /// Turns dropped NSItemProviders into tray items.
@@ -215,12 +213,12 @@ enum DropReceiver {
                 origin: nil
             )
         }
-        // In order of how much they can be trusted: the in-place file itself,
-        // then a file URL the provider hands over, then the asset the drag
-        // names, then what the photo's own metadata says it is.
-        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: await fileURLOrigin(of: provider)) }
-        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: await photoOrigin(of: provider)) }
-        if loaded.origin == nil { loaded = Loaded(payload: loaded.payload, origin: photoMetadataOrigin(of: loaded.payload)) }
+        // The in-place file itself, then a file URL the provider hands over.
+        // Nothing else: a photo arrives re-encoded with nothing in it that
+        // says which asset it was, so photos are copies (see TrayItemOrigin).
+        if loaded.origin == nil {
+            loaded = Loaded(payload: loaded.payload, origin: await fileURLOrigin(of: provider))
+        }
         DropDiagnostics.record(DropDiagnostics.line(
             name: provider.suggestedName, types: provider.registeredTypeIdentifiers, origin: loaded.origin
         ))
@@ -254,35 +252,6 @@ enum DropReceiver {
         return bookmark.map(TrayItemOrigin.file)
     }
 
-    /// What the dropped image says about itself.
-    ///
-    /// Read from the staged copy, so it needs no library access and no
-    /// cooperation from the source app -- a photo dragged out of Photos
-    /// carries its capture time and its dimensions whether or not the drag
-    /// says which asset it was. `OriginalRemover` turns this back into an
-    /// asset, and refuses if it matches more than one.
-    private static func photoMetadataOrigin(of payload: URL) -> TrayItemOrigin? {
-        guard let source = CGImageSourceCreateWithURL(payload as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let width = properties[kCGImagePropertyPixelWidth] as? Int,
-              let height = properties[kCGImagePropertyPixelHeight] as? Int,
-              let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
-              let taken = exif[kCGImagePropertyExifDateTimeOriginal] as? String,
-              let date = exifDateFormatter.date(from: taken) else { return nil }
-        return .photoMetadata(creationDate: date, pixelWidth: width, pixelHeight: height)
-    }
-
-    /// EXIF writes "2026:09:20 22:13:45", in the camera's own local time with
-    /// no zone. `PHAsset.creationDate` is the same wall-clock instant read in
-    /// the current zone, which is why this formatter uses the current zone
-    /// rather than UTC.
-    private static let exifDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
-
     @MainActor
     private static func loadInPlace(
         from provider: NSItemProvider, typeIdentifier: String
@@ -312,24 +281,6 @@ enum DropReceiver {
                 }
             }
         }
-    }
-
-    /// The photo library asset a drag from Photos came from, if it says.
-    ///
-    /// A photo has no file to bookmark -- the provider hands over image bytes,
-    /// not the library. This identifier is the only thing that names the asset
-    /// itself, and a provider that does not offer it leaves the item with no
-    /// origin, which simply means the photo stays where it is.
-    @MainActor
-    private static func photoOrigin(of provider: NSItemProvider) async -> TrayItemOrigin? {
-        let assetType = "com.apple.photos.asset-identifier"
-        guard provider.registeredTypeIdentifiers.contains(assetType) else { return nil }
-        let identifier: String? = await withCheckedContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: assetType) { item, _ in
-                continuation.resume(returning: item as? String)
-            }
-        }
-        return identifier.map(TrayItemOrigin.photo)
     }
 
     /// Copies a file that is about to become invalid into a staging location.

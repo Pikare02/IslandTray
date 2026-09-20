@@ -13,28 +13,30 @@ enum TrayItemOrigin: Codable, Hashable {
     /// drag's in-place access was still open, because that access ends with
     /// the drag and the deletion happens much later.
     case file(bookmark: Data)
-    /// A photo library asset's local identifier, when the drag named one.
+    /// A photo library asset's local identifier. No longer recorded: kept so
+    /// that items written by the builds that did still decode. See
+    /// `photoMetadata`.
     case photo(localIdentifier: String)
-    /// What a photo's own metadata says about it, for the common case where
-    /// the drag hands over pixels and says nothing about which asset they
-    /// came from. Resolved to an asset only at deletion time, which is also
-    /// the only time the photo library is opened at all -- matching at drop
-    /// time would mean asking for library access in the middle of a drag.
+    /// What a photo's own metadata said about it. No longer recorded either,
+    /// and the reason photos are simply copies now.
     ///
-    /// Deletes only on an unambiguous match: two photos taken in the same
-    /// second at the same size resolve to nothing rather than to a guess.
+    /// A photo dragged out of Photos arrives re-encoded: the device reported
+    /// a HEIC library asset arriving as "IMG_9787.jpeg" with a capture time
+    /// 27 hours off, and then as a bare "public.jpeg" with no capture time at
+    /// all. There is nothing left in it that identifies which of a library's
+    /// thousands of same-sized images it was, and deleting the wrong photo is
+    /// not a mistake worth risking for a guess. Kept as a case so items
+    /// written by the builds that recorded it still decode.
     case photoMetadata(creationDate: Date, pixelWidth: Int, pixelHeight: Int)
 
-    /// Whether deleting this needs the app to be in front.
+    /// Whether taking the item out can delete what it came from.
     ///
-    /// PhotoKit puts its own confirmation in front of every deletion, and
-    /// there is nowhere to show it from the background -- so a photo cannot
-    /// be deleted while the user is still in the app they dragged it into,
-    /// however the rest of the move is arranged. A file has no such dialog.
-    var needsUIToDelete: Bool {
+    /// Only a file. A photo origin is legacy data and is treated exactly like
+    /// no origin at all.
+    var deletesOriginal: Bool {
         switch self {
-        case .file: return false
-        case .photo, .photoMetadata: return true
+        case .file: return true
+        case .photo, .photoMetadata: return false
         }
     }
 }
