@@ -76,9 +76,12 @@ final class TrayStore: Sendable {
     // MARK: - Writing
 
     @discardableResult
-    func add(data: Data, suggestedName: String?, uti: String?) throws -> TrayItem {
+    func add(
+        data: Data, suggestedName: String?, uti: String?, board: TrayBoard = .tray
+    ) throws -> TrayItem {
         try prepare()
-        let item = makeItem(suggestedName: suggestedName, uti: uti, size: data.count)
+        var item = makeItem(suggestedName: suggestedName, uti: uti, size: data.count)
+        item.board = board
         let destination = item.fileURL(in: itemsDirectory)
         try data.write(to: destination, options: .atomic)
         try commit(item, payload: destination)
@@ -90,13 +93,18 @@ final class TrayStore: Sendable {
     ///   taking the item out of the tray can delete it there too. Defaulted,
     ///   since most sources have nothing that can be deleted.
     func add(
-        copyingFrom source: URL, suggestedName: String?, uti: String?, origin: TrayItemOrigin? = nil
+        copyingFrom source: URL,
+        suggestedName: String?,
+        uti: String?,
+        origin: TrayItemOrigin? = nil,
+        board: TrayBoard = .tray
     ) throws -> TrayItem {
         try prepare()
         let name = suggestedName ?? source.lastPathComponent
         let size = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         var item = makeItem(suggestedName: name, uti: uti, size: size)
         item.origin = origin
+        item.board = board
         let destination = item.fileURL(in: itemsDirectory)
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)

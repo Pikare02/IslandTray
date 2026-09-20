@@ -110,3 +110,12 @@
 "theme.dark" = "Dark";
 "theme.light" = "Light";
 "theme.system" = "Match the system";
+"clipboard.empty.body" = "Copy something, then run the “Add to Clipboard” shortcut — from the Action button, a back tap, or the share sheet.";
+"clipboard.empty.title" = "The clipboard is empty";
+"clipboard.title" = "Clipboard";
+"layout.grid" = "Grid";
+"layout.list" = "List";
+"layout.title" = "Layout";
+"クリップボードに追加" = "Add to Clipboard";
+"コピーした内容をアプリのクリップボードに保存します。アクションボタンや背面タップから実行できます。" = "Saves what you copied to the app's clipboard. Run it from the Action button or a back tap.";
+"テキスト" = "Text";

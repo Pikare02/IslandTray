@@ -12,14 +12,15 @@ final class TrayShortcutsTests: XCTestCase {
     /// depend on: the refresh action the automation calls, and the add action
     /// a share-sheet shortcut is built from. Losing either silently breaks a
     /// documented setup step rather than the app.
-    func testExposesTheRefreshAndAddShortcuts() {
-        XCTAssertEqual(TrayShortcuts.appShortcuts.count, 2)
+    func testExposesTheRefreshAndTheTwoAddShortcuts() {
+        XCTAssertEqual(TrayShortcuts.appShortcuts.count, 3)
     }
 
     /// The add intent is the whole free-account route back into the share
     /// sheet, and it only works if it takes files and does not open the app.
     func testAddingRunsWithoutOpeningTheApp() {
         XCTAssertFalse(AddToTrayIntent.openAppWhenRun)
+        XCTAssertFalse(AddToClipboardIntent.openAppWhenRun)
     }
 
     // No test reads `AddToTrayIntent().files`: an `@Parameter` that nothing

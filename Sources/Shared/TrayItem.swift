@@ -41,6 +41,17 @@ enum TrayItemOrigin: Codable, Hashable {
     }
 }
 
+/// Which of the app's two boards an item belongs to.
+///
+/// One store holds both. The alternative -- a second `TrayStore` rooted
+/// somewhere else -- would need every path in the app to learn which
+/// container an item came from, starting with `TrayItem.fileURL`, and would
+/// duplicate a file's worth of hard-won guarantees to save a field.
+enum TrayBoard: String, Codable, Hashable, CaseIterable {
+    case tray
+    case clipboard
+}
+
 struct TrayItem: Codable, Hashable, Identifiable {
     var id: UUID
     /// Display name, already sanitized. Never used to build a path.
@@ -50,6 +61,9 @@ struct TrayItem: Codable, Hashable, Identifiable {
     var addedAt: Date
     /// Lowercased extension without the dot. May be empty.
     var ext: String
+    /// Which board this belongs to. Optional so that items written before
+    /// there were two boards decode as what they were: the tray.
+    var board: TrayBoard?
     /// Where the bytes came from, when the source can still be reached and
     /// deleted -- what makes taking an item out a move rather than a copy.
     ///
@@ -58,6 +72,10 @@ struct TrayItem: Codable, Hashable, Identifiable {
     /// `decodeIfPresent` for an Optional), so no schema bump and no rebuild.
     /// `nil` simply means there is nothing to delete, which is most sources.
     var origin: TrayItemOrigin?
+
+    /// The board, with the default an item written before boards existed
+    /// implies.
+    var boardOrTray: TrayBoard { board ?? .tray }
 
     /// Path is built from the UUID only, never from `name`.
     var fileName: String { ext.isEmpty ? id.uuidString : "\(id.uuidString).\(ext)" }
