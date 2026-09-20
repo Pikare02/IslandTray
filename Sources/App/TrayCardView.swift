@@ -1,7 +1,12 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TrayCardView: View {
     let item: TrayItem
+    /// Only for `markExported(_:)` -- the drag has to be able to say the item
+    /// left, and the drop happens after this view is long gone from the
+    /// closure's point of view.
+    let model: TrayModel
     let onDelete: () -> Void
 
     // The thumbnail generator takes the scale rather than discovering it: read
@@ -43,18 +48,45 @@ struct TrayCardView: View {
         // onDrag rather than .draggable: this hands other apps the actual file
         // rather than a link to it.
         .onDrag {
-            // NSItemProvider(contentsOf:) takes its suggested filename from
-            // the URL's last path component, which is `item.fileURL`'s
-            // UUID-based on-disk name (TrayItem deliberately never builds a
-            // path from `name`, only from the id). Overriding `suggestedName`
-            // is what makes Files/Mail/other drop targets save the file under
-            // its real display name instead of the UUID -- it does not
-            // rename anything on disk.
-            let provider = NSItemProvider(contentsOf: item.fileURL) ?? NSItemProvider()
+            let provider = NSItemProvider()
+            // NSItemProvider takes its suggested filename from the URL's last
+            // path component, which is `item.fileURL`'s UUID-based on-disk
+            // name (TrayItem deliberately never builds a path from `name`,
+            // only from the id). Overriding `suggestedName` is what makes
+            // Files/Mail/other drop targets save the file under its real
+            // display name instead of the UUID -- it does not rename anything
+            // on disk.
             provider.suggestedName = item.name
+            // Registered by hand rather than via NSItemProvider(contentsOf:),
+            // which is otherwise equivalent, because only this form has a
+            // load handler to observe. `.onDrag` reports nothing about how a
+            // drag ended, and a receiver asking for the bytes is the one
+            // signal iOS gives that the drop was accepted -- UIDragInteraction
+            // has didEndWith(operation:), but reaching it means replacing this
+            // whole gesture with a UIKit one and re-solving the tap and
+            // context menu that share it.
+            provider.registerFileRepresentation(
+                forTypeIdentifier: Self.dragTypeIdentifier(for: item),
+                fileOptions: [],
+                visibility: .all
+            ) { completion in
+                // Recorded, never acted on here: the receiving app copies the
+                // file after this returns, and the tray may hold the user's
+                // only copy. TrayModel.flushExported does the removing, once
+                // the app is back in the foreground.
+                model.markExported(item.id)
+                completion(item.fileURL, false, nil)
+                return nil
+            }
             return provider
         }
         .contextMenu {
+            // No markExported here, unlike the drag: ShareLink reports
+            // neither success nor cancellation, and its Transferable is
+            // exported when an activity is *picked* -- a user who backs out of
+            // the Files picker after that would lose the file. Sharing
+            // therefore always leaves the item in the tray, whatever
+            // `removeOnExport` says.
             ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
                 Label("共有", systemImage: "square.and.arrow.up")
             }
@@ -62,6 +94,17 @@ struct TrayCardView: View {
                 Label("削除", systemImage: "trash")
             }
         }
+    }
+
+    /// The type the dragged file is offered as.
+    ///
+    /// `item.uti` is what the drop recorded, and is preferred; it can be a
+    /// type this device no longer resolves, in which case the extension is a
+    /// better guess than nothing, and `.data` is what any receiver accepts.
+    private static func dragTypeIdentifier(for item: TrayItem) -> String {
+        UTType(item.uti)?.identifier
+            ?? UTType(filenameExtension: item.ext)?.identifier
+            ?? UTType.data.identifier
     }
 }
 

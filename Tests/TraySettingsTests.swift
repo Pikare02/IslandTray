@@ -36,4 +36,29 @@ final class TraySettingsTests: XCTestCase {
         settings.showActivityWhenEmpty = true
         XCTAssertTrue(settings.showActivityWhenEmpty)
     }
+
+    func testDefaultsToRemovingOnExport() {
+        let settings = TraySettings(defaults: userDefaults)
+        XCTAssertTrue(
+            settings.removeOnExport,
+            "the user asked for the tray to behave as a cut buffer by default"
+        )
+    }
+
+    func testRemoveOnExportRoundTrips() {
+        let settings = TraySettings(defaults: userDefaults)
+        settings.removeOnExport = false
+        XCTAssertFalse(settings.removeOnExport)
+        settings.removeOnExport = true
+        XCTAssertTrue(settings.removeOnExport)
+    }
+
+    func testTheTwoSettingsDoNotShareAKey() {
+        let settings = TraySettings(defaults: userDefaults)
+        settings.showActivityWhenEmpty = false
+        XCTAssertTrue(settings.removeOnExport)
+        settings.removeOnExport = false
+        settings.showActivityWhenEmpty = true
+        XCTAssertFalse(settings.removeOnExport)
+    }
 }
