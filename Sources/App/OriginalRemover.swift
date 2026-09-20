@@ -30,7 +30,7 @@ enum OriginalRemover {
         let outcome = attempt(origin)
         if case .failed(let reason) = outcome {
             logger.error("The original was not deleted.")
-            DropDiagnostics.record("削除できず: \(reason)")
+            DropDiagnostics.record(L.s("diag.export.failed", reason))
         }
         return outcome
     }
@@ -43,7 +43,7 @@ enum OriginalRemover {
             // Only reachable for items added by a build that still recorded
             // these. Nothing is deleted for them, the same as for an item with
             // no origin at all.
-            return .failed("photo: コピー扱い")
+            return .failed(L.s("reason.photoCopy"))
         }
     }
 
@@ -63,12 +63,12 @@ enum OriginalRemover {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
-            return .failed("file: ブックマーク解決不可")
+            return .failed(L.s("reason.bookmarkUnresolved"))
         }
         // A stale bookmark still resolves, but to where the file *was*. Acting
         // on it could delete something that moved into that path since.
         guard !isStale else {
-            return .failed("file: ブックマークが古い")
+            return .failed(L.s("reason.bookmarkStale"))
         }
         // Never the tray's own storage. A file URL handed over by a drag
         // normally points somewhere else entirely, but the tray is reachable
@@ -76,7 +76,7 @@ enum OriginalRemover {
         // TrayStore's own bookkeeping for the same bytes.
         guard !url.resolvingSymlinksInPath().path
             .hasPrefix(TrayContainer.root.resolvingSymlinksInPath().path) else {
-            return .failed("file: トレイ自身の中")
+            return .failed(L.s("reason.insideTray"))
         }
         // Not a guard: `startAccessingSecurityScopedResource` answers false
         // for a URL that needs no scope at all, and refusing there would skip
@@ -102,10 +102,16 @@ enum OriginalRemover {
         // provider never let us near it. Guessing between those is what this
         // avoids.
         if let coordinationError {
-            return .failed("file: 調整不可 \(coordinationError.domain) \(coordinationError.code)\(accessed ? "" : " (scope無)")")
+            return .failed(L.s(
+                "reason.coordination", coordinationError.domain, coordinationError.code,
+                accessed ? "" : L.s("reason.noScope")
+            ))
         }
         if let removalError {
-            return .failed("file: 削除拒否 \(removalError.domain) \(removalError.code)\(accessed ? "" : " (scope無)")")
+            return .failed(L.s(
+                "reason.removal", removalError.domain, removalError.code,
+                accessed ? "" : L.s("reason.noScope")
+            ))
         }
         return .removed
     }

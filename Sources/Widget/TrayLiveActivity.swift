@@ -14,7 +14,7 @@ struct TrayLiveActivity: Widget {
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("トレイ")
+                    Text(L.s("tray.title"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 4)
@@ -43,7 +43,7 @@ struct TrayLiveActivity: Widget {
             Image(systemName: "tray.full.fill")
                 .font(.title3)
             VStack(alignment: .leading, spacing: 6) {
-                Text("トレイに \(state.count) 件")
+                Text(L.s("island.count", state.count))
                     .font(.subheadline.bold())
                 TrayPreviewStrip(previews: state.recent, atlas: state.atlas, side: 32)
             }

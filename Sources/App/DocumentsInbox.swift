@@ -28,10 +28,17 @@ enum DocumentsInbox {
     /// does not exist until it is no longer needed.
     static let markerName = "ここに保存.txt"
 
+    /// Both languages, always. The file is written once and the name never
+    /// changes with the app's language -- a renamed marker would stop being
+    /// skipped by the sweep and would get taken into the tray as a text file.
     private static let markerBody = """
     このフォルダに保存したファイルは、IslandTray を開いたときにトレイへ取り込まれます。
     取り込まれたファイルはこのフォルダから消えます（移動です）。
     このファイル自体は取り込まれません。消しても次回起動時に作り直されます。
+
+    Anything you save in this folder is taken into the tray the next time you
+    open IslandTray, and disappears from here (it is a move, not a copy).
+    This file itself is never taken in; delete it and it comes back.
     """
 
     /// Creates the marker if it is missing. Cheap enough to call on every

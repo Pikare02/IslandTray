@@ -147,7 +147,7 @@ struct TrayGridView: UIViewRepresentable {
                             .foregroundStyle(.secondary)
                         Spacer()
                         if parent.isSelecting {
-                            Button(allSelected ? "すべて解除" : "すべて選択") {
+                            Button(allSelected ? L.s("common.deselectAll") : L.s("common.selectAll")) {
                                 [unowned self] in toggleSection(ids, allSelected: allSelected)
                             }
                             .font(.footnote)
@@ -194,12 +194,12 @@ struct TrayGridView: UIViewRepresentable {
 
         private static func title(for kind: TrayItemKind) -> String {
             switch kind {
-            case .image: return "画像"
-            case .video: return "ビデオ"
-            case .audio: return "オーディオ"
-            case .document: return "書類"
-            case .archive: return "アーカイブ"
-            case .other: return "その他"
+            case .image: return L.s("kind.image")
+            case .video: return L.s("kind.video")
+            case .audio: return L.s("kind.audio")
+            case .document: return L.s("kind.document")
+            case .archive: return L.s("kind.archive")
+            case .other: return L.s("kind.other")
             }
         }
 

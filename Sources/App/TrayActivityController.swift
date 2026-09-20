@@ -78,7 +78,7 @@ actor TrayActivityController {
         // That failure is never silent the way a background restart() is, so
         // logging it too would just be noise.
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            lastError = "ライブアクティビティが許可されていません"
+            lastError = L.s("banner.activityDenied")
             return
         }
         let decision = Self.syncDecision(
@@ -115,7 +115,7 @@ actor TrayActivityController {
 
     func restart() async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            lastError = "ライブアクティビティが許可されていません"
+            lastError = L.s("banner.activityDenied")
             Self.logger.error("restart() aborted: Live Activities are disabled.")
             return
         }
@@ -150,7 +150,7 @@ actor TrayActivityController {
             // back as an empty tray. Ending the island over a transient
             // metadata failure is the one thing that must not happen here, so
             // leave whatever is up alone and report instead.
-            lastError = "トレイを読み込めません: \(error.localizedDescription)"
+            lastError = L.s("banner.loadFailed", error.localizedDescription)
             Self.logger.error("restart() aborted: TrayStore.load() threw.")
             return
         }
@@ -193,7 +193,7 @@ actor TrayActivityController {
             lastError = nil
             return activity.id
         } catch {
-            lastError = "アイランドの表示を開始できません: \(error.localizedDescription)"
+            lastError = L.s("banner.activityFailed", error.localizedDescription)
             // Shared by restart() and sync()'s self-recovery path -- either
             // way, Activity.request refused a request that should have
             // succeeded, and this is worth a durable record regardless of

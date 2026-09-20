@@ -39,6 +39,7 @@ struct TraySettings {
         static let orderingAscending = "orderingAscending"
         static let groupsByKind = "groupsByKind"
         static let language = "language"
+        static let theme = "theme"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -99,5 +100,11 @@ struct TraySettings {
     var language: String? {
         get { defaults.string(forKey: Keys.language) }
         nonmutating set { defaults.set(newValue, forKey: Keys.language) }
+    }
+
+    /// "light", "dark", or nil to follow the device.
+    var theme: String? {
+        get { defaults.string(forKey: Keys.theme) }
+        nonmutating set { defaults.set(newValue, forKey: Keys.theme) }
     }
 }

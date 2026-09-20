@@ -11,10 +11,8 @@ struct SetupGuideView: View {
     /// the old lines on screen until the sheet was closed and reopened.
     @State private var diagnostics = DropDiagnostics.lines
     @State private var removeOnExport = TraySettings().removeOnExport
-    @AppStorage("orderingKey", store: TraySettings.store) private var orderingKey = TrayOrdering.Key.addedAt.rawValue
-    @AppStorage("orderingAscending", store: TraySettings.store) private var orderingAscending = false
-    @AppStorage("groupsByKind", store: TraySettings.store) private var groupsByKind = false
     @AppStorage("language", store: TraySettings.store) private var language = ""
+    @AppStorage("theme", store: TraySettings.store) private var theme = ""
 
     var body: some View {
         NavigationStack {
@@ -23,9 +21,9 @@ struct SetupGuideView: View {
                     // Collapsed: this is a debug record, and left expanded it
                     // filled the first screen of the settings with a dozen
                     // lines before anything a person came here to change.
-                    DisclosureGroup("取り込みの記録") {
+                    DisclosureGroup(L.s("settings.records")) {
                         if diagnostics.isEmpty {
-                            Text("まだ記録がありません。")
+                            Text(L.s("settings.records.empty"))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -33,117 +31,116 @@ struct SetupGuideView: View {
                                 Text(line)
                                     .font(.system(.caption2, design: .monospaced))
                             }
-                            Button("記録を消す", role: .destructive) {
+                            Button(L.s("settings.records.clear"), role: .destructive) {
                                 DropDiagnostics.clear()
                                 diagnostics = []
                             }
                         }
                     }
                 } footer: {
-                    Text("トレイに入れた項目ごとに、元のファイルをたどれたか（file）、たどれなかったか（none）と、相手のアプリが渡してきた種類を並べています。none の項目は、取り出しても元の場所には残ります。")
+                    Text(L.s("settings.records.footer"))
                 }
 
                 Section {
-                    Picker("並び順", selection: $orderingKey) {
-                        Text("名前").tag(TrayOrdering.Key.name.rawValue)
-                        Text("追加日時").tag(TrayOrdering.Key.addedAt.rawValue)
-                        Text("サイズ").tag(TrayOrdering.Key.size.rawValue)
-                    }
-                    Picker("順序", selection: $orderingAscending) {
-                        Text("降順").tag(false)
-                        Text("昇順").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    Toggle("種類ごとにまとめる", isOn: $groupsByKind)
-                } header: {
-                    Text("並べ方")
-                }
-
-                Section {
-                    Picker("言語", selection: $language) {
-                        Text("システムに従う").tag("")
+                    Picker(L.s("settings.language"), selection: $language) {
+                        Text(L.s("settings.language.system")).tag("")
+                        // Each in its own language, the way iOS lists them.
                         Text("日本語").tag("ja")
                         Text("English").tag("en")
                     }
+                    Picker(L.s("settings.theme"), selection: $theme) {
+                        Text(L.s("theme.system")).tag("")
+                        Text(L.s("theme.light")).tag("light")
+                        Text(L.s("theme.dark")).tag("dark")
+                    }
                 } header: {
-                    Text("言語")
+                    Text(L.s("settings.appearance.section"))
                 }
 
                 Section {
-                    Toggle("トレイが空でも表示する", isOn: $showActivityWhenEmpty)
+                    Toggle(L.s("settings.activity.showEmpty"), isOn: $showActivityWhenEmpty)
                         .onChange(of: showActivityWhenEmpty) { _, newValue in
                             TraySettings().showActivityWhenEmpty = newValue
                             Task { await model.syncActivity() }
                         }
                 } header: {
-                    Text("ライブアクティビティ")
+                    Text(L.s("settings.behaviour.section"))
                 } footer: {
-                    Text("オンにすると、アプリがバックグラウンドで生きている間はトレイが空でもアイランドの表示を続けます。オフにすると、トレイが空になった時点で表示を終了します。")
+                    Text(L.s("settings.activity.footer"))
                 }
 
                 Section {
-                    Toggle("取り出したらトレイから削除する", isOn: $removeOnExport)
+                    Toggle(L.s("settings.export.remove"), isOn: $removeOnExport)
                         .onChange(of: removeOnExport) { _, newValue in
                             TraySettings().removeOnExport = newValue
                         }
-                } header: {
-                    Text("取り出し")
                 } footer: {
-                    Text("オンにすると、他のアプリへドラッグして渡した項目はトレイから消えます（切り取り）。オフにすると残ります（コピー）。共有シートから渡した場合は、成功したかどうかを iOS が教えてくれないため、この設定に関わらず残ります。\n\n元のファイルまで削除できるのは、ファイルとして受け取ったものだけです。写真アプリから取り込んだものは、写真が変換されて渡されるため元の写真を特定できず、つねにコピーになります。")
+                    Text(L.s("settings.export.footer"))
                 }
 
                 Section {
-                    Text("ダイナミックアイランドの表示は 8 時間で自動的に消えます。ショートカットのオートメーションで 8 時間ごとに作り直すと、24 時間途切れずに表示できます。")
+                    Text(L.s("settings.shortcut.intro"))
+                        .font(.callout)
+                    step(1, L.s("settings.shortcut.1"))
+                    step(2, L.s("settings.shortcut.2"))
+                    step(3, L.s("settings.shortcut.3"))
+                    step(4, L.s("settings.shortcut.4"))
+                } header: {
+                    Text(L.s("settings.shortcut.header"))
+                }
+
+                Section {
+                    Text(L.s("settings.why.body"))
                         .font(.callout)
                 } header: {
-                    Text("なぜ設定が必要か")
+                    Text(L.s("settings.why.header"))
                 }
 
                 Section {
-                    step(1, "ショートカットアプリを開き、「オートメーション」タブを選びます。")
-                    step(2, "「+」から「時刻」を選びます。")
-                    step(3, "時刻を 07:00 に設定し、「毎日」を選びます。")
-                    step(4, "「すぐに実行」を選びます。確認を求める設定のままだと自動で動きません。")
+                    step(1, L.s("settings.step1"))
+                    step(2, L.s("settings.step2"))
+                    step(3, L.s("settings.step3"))
+                    step(4, L.s("settings.step4"))
                     step(
                         5,
                         // Interpolates the intent's own title rather than a
                         // second hard-typed copy, so this instruction and the
                         // action name Shortcuts actually shows cannot drift
                         // apart.
-                        "アクションで「\(String(localized: RefreshTrayActivityIntent.title))」を選びます。"
+                        L.s("settings.step5", String(localized: RefreshTrayActivityIntent.title))
                     )
-                    step(6, "同じ手順を 15:00 と 23:00 でも繰り返します。")
+                    step(6, L.s("settings.step6"))
                 } header: {
-                    Text("設定手順")
+                    Text(L.s("settings.steps.header"))
                 }
 
                 Section {
-                    Text("アプリを開いたときにも表示は作り直されます。オートメーションが動かなかった場合は、アプリを一度開けば復帰します。")
+                    Text(L.s("settings.reopen"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 Section {
-                    LabeledContent("共有コンテナ", value: TrayContainer.isShared ? "有効" : "無効")
+                    LabeledContent(L.s("settings.status.container"), value: L.s(TrayContainer.isShared ? "common.on" : "common.off"))
                     if !TrayContainer.isShared {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("有料の Apple Developer アカウントがないため、共有シートからこのアプリを直接選ぶことはできません。かわりに「ファイルに保存」を使ってください。")
-                            Text("保存先: 「ファイル」App →「ブラウズ」→「このiPhone内」→「IslandTray」")
-                            Text("そこに保存したファイルは、次にこのアプリを開いたときトレイへ取り込まれ、フォルダからは消えます。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
+                            Text(L.s("settings.free.1"))
+                            Text(L.s("settings.free.2"))
+                            Text(L.s("settings.free.3"))
                         }
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("状態")
+                    Text(L.s("settings.status.header"))
                 }
             }
             .onAppear { diagnostics = DropDiagnostics.lines }
-            .navigationTitle("設定")
+            .navigationTitle(L.s("settings.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完了") { dismiss() }
+                    Button(L.s("common.done")) { dismiss() }
                 }
             }
         }

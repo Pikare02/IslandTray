@@ -11,5 +11,14 @@ struct TrayShortcuts: AppShortcutsProvider {
             shortTitle: "トレイの表示を更新",
             systemImageName: "arrow.clockwise"
         )
+        AppShortcut(
+            intent: AddToTrayIntent(),
+            phrases: [
+                "\(.applicationName) に追加",
+                "\(.applicationName) にファイルを追加"
+            ],
+            shortTitle: "トレイに追加",
+            systemImageName: "tray.and.arrow.down"
+        )
     }
 }

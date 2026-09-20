@@ -35,19 +35,22 @@ struct TrayView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(dropHighlight)
-            .navigationTitle("トレイ")
+            .navigationTitle(L.s("tray.title"))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if !model.visible.isEmpty {
-                        Button(isSelecting ? "完了" : "選択") {
+                        Button(isSelecting ? L.s("common.done") : L.s("common.select")) {
                             isSelecting.toggle()
                             if !isSelecting { selection = [] }
                         }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    if !isSelecting && !model.visible.isEmpty { arrangeMenu }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     if isSelecting {
-                        Button(allSelected ? "すべて解除" : "すべて選択") {
+                        Button(allSelected ? L.s("common.deselectAll") : L.s("common.selectAll")) {
                             selection = allSelected ? [] : Set(model.visible.map(\.id))
                         }
                     } else {
@@ -68,11 +71,11 @@ struct TrayView: View {
             // Clearing it from here too would discard the files the user just
             // asked to keep.
             .alert(
-                "同じファイルがすでにトレイにあります",
+                L.s("dup.title"),
                 isPresented: Binding(get: { !model.pendingDuplicates.isEmpty }, set: { _ in })
             ) {
-                Button("追加しない", role: .cancel) { Task { await model.discardPendingDuplicates() } }
-                Button("追加する") { Task { await model.addPendingDuplicates() } }
+                Button(L.s("dup.keep"), role: .cancel) { Task { await model.discardPendingDuplicates() } }
+                Button(L.s("dup.add")) { Task { await model.addPendingDuplicates() } }
             } message: {
                 Text(model.duplicatePrompt)
             }
@@ -149,13 +152,13 @@ struct TrayView: View {
                 items: selectedItems.map(SharedTrayFile.init(item:)),
                 preview: { SharePreview($0.item.name) }
             ) {
-                Label("共有", systemImage: "square.and.arrow.up")
+                Label(L.s("common.share"), systemImage: "square.and.arrow.up")
             }
             .disabled(selection.isEmpty)
 
             Spacer()
 
-            Text(selection.isEmpty ? "項目を選択" : "\(selection.count) 件")
+            Text(selection.isEmpty ? L.s("select.none") : L.s("select.count", selection.count))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -166,13 +169,33 @@ struct TrayView: View {
                 selection = []
                 Task { for item in doomed { await model.remove(item) } }
             } label: {
-                Label("削除", systemImage: "trash")
+                Label(L.s("common.delete"), systemImage: "trash")
             }
             .disabled(selection.isEmpty)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+
+    /// On the screen it rearranges, not in the settings sheet: this is a
+    /// thing you reach for while looking at the grid, and the settings are for
+    /// what you set once.
+    private var arrangeMenu: some View {
+        Menu {
+            Picker(L.s("settings.sort.order"), selection: $orderingKey) {
+                Text(L.s("settings.sort.name")).tag(TrayOrdering.Key.name.rawValue)
+                Text(L.s("settings.sort.added")).tag(TrayOrdering.Key.addedAt.rawValue)
+                Text(L.s("settings.sort.size")).tag(TrayOrdering.Key.size.rawValue)
+            }
+            Picker(L.s("settings.sort.direction"), selection: $orderingAscending) {
+                Text(L.s("settings.sort.descending")).tag(false)
+                Text(L.s("settings.sort.ascending")).tag(true)
+            }
+            Toggle(L.s("settings.group"), isOn: $groupsByKind)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
     }
 
     private var selectedItems: [TrayItem] {
@@ -185,9 +208,9 @@ struct TrayView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label("トレイは空です", systemImage: "tray")
+            Label(L.s("tray.empty.title"), systemImage: "tray")
         } description: {
-            Text("ファイルや写真をドラッグしてここに落とすと預かります。")
+            Text(L.s("tray.empty.body"))
         }
     }
 
