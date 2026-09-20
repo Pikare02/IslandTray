@@ -54,7 +54,12 @@ struct TrayView: View {
             // user is back here. Deleting at the handoff instead would race
             // that copy, and the tray can hold the only copy.
             if phase == .active {
-                Task { await model.flushExported() }
+                Task {
+                    await model.flushExported()
+                    // Whatever the user sent here through another app's
+                    // "ファイルに保存" while we were away.
+                    await model.importFromFilesFolder()
+                }
             }
         }
     }

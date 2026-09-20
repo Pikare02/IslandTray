@@ -55,6 +55,32 @@ final class TrayModel {
         let migrated = await migrateIfNeeded(from: oldRoot)
         reload()
         if migrated { await syncActivity() }
+        await importFromFilesFolder()
+    }
+
+    /// Takes in anything the user saved into the app's folder in the Files
+    /// app since the last look. Runs on every foreground, so it returns
+    /// without touching anything in the overwhelmingly common case of an
+    /// empty inbox.
+    ///
+    /// Detached for the same reason as the migration and the drop path: this
+    /// copies the user's files, and a large one would otherwise hold up the
+    /// main actor for the whole copy.
+    func importFromFilesFolder() async {
+        let store = self.store
+        let result = await Task.detached(priority: .userInitiated) {
+            DocumentsInbox.sweep(store: store)
+        }.value
+        guard result.added > 0 || !result.failed.isEmpty else { return }
+
+        let reloadSucceeded = reload()
+        switch Self.ingestBanner(reloadSucceeded: reloadSucceeded, result: result) {
+        case .keep:
+            break
+        case .set(let value):
+            banner = value
+        }
+        await syncActivity()
     }
 
     /// Carries the tray over when the app gains an App Group container after

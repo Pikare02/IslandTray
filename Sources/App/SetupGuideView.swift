@@ -68,7 +68,7 @@ struct SetupGuideView: View {
                 Section {
                     LabeledContent("共有コンテナ", value: TrayContainer.isShared ? "有効" : "無効")
                     if !TrayContainer.isShared {
-                        Text("有料の Apple Developer アカウントがないため、共有シートからの追加は利用できません。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
+                        Text("有料の Apple Developer アカウントがないため、共有シートからこのアプリを直接選ぶことはできません。他のアプリからは「ファイルに保存」→「IslandTray」フォルダに保存すると、次にアプリを開いたときトレイへ取り込まれます。アイランド内のサムネイルとファイル名は、この状態でも表示されます。")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
