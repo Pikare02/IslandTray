@@ -37,7 +37,7 @@ final class TrayModel {
             items = try store.load()
             return true
         } catch {
-            banner = "トレイを読み込めません: \(error.localizedDescription)"
+            banner = L.s("banner.loadFailed", error.localizedDescription)
             return false
         }
     }
@@ -129,9 +129,9 @@ final class TrayModel {
 
     var duplicatePrompt: String {
         guard pendingDuplicates.count == 1 else {
-            return "\(pendingDuplicates.count) 件が、すでにトレイにあるファイルと同じ内容です。追加しますか？"
+            return L.s("dup.many", pendingDuplicates.count)
         }
-        return "「\(pendingDuplicates[0].existing.name)」と同じ内容です。もう一度追加しますか？"
+        return L.s("dup.one", pendingDuplicates[0].existing.name)
     }
 
     func ingest(_ providers: [NSItemProvider]) async {
@@ -177,7 +177,7 @@ final class TrayModel {
     static func ingestBanner(reloadSucceeded: Bool, result: DropReceiver.Result) -> BannerUpdate {
         guard reloadSucceeded else { return .keep }
         if !result.failed.isEmpty {
-            return .set("取り込めませんでした: \(result.failed.joined(separator: ", "))")
+            return .set(L.s("banner.ingestFailed", result.failed.joined(separator: ", ")))
         }
         if result.added > 0 {
             return .set(nil)
@@ -334,7 +334,7 @@ final class TrayModel {
             // is finished at the next launch from the register on disk.
             self?.endHandover()
         }
-        DropDiagnostics.record("持ち出し: 背景時間\(handover == .invalid ? "不可" : "確保")")
+        DropDiagnostics.record(L.s(handover == .invalid ? "diag.handover.denied" : "diag.handover.granted"))
     }
 
     private func endHandover() {
@@ -353,9 +353,9 @@ final class TrayModel {
         // question -- iOS can refuse the time, suspend us before the wait is
         // over, or kill the app outright -- and none of that is visible from
         // here or from a test.
-        DropDiagnostics.record("背景処理: \(Int(grace))秒待機")
+        DropDiagnostics.record(L.s("diag.background.wait", Int(grace)))
         try? await Task.sleep(for: .seconds(grace))
-        DropDiagnostics.record("背景処理: 実行 state=\(Self.stateName(UIApplication.shared.applicationState))")
+        DropDiagnostics.record(L.s("diag.background.run", Self.stateName(UIApplication.shared.applicationState)))
         await flushExported()
         endHandover()
     }
@@ -392,14 +392,14 @@ final class TrayModel {
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
             guard let origin, origin.deletesOriginal else {
-                DropDiagnostics.record("取り出し: \(item.name) 元なし(コピー扱い)")
+                DropDiagnostics.record(L.s("diag.export.copy", item.name))
                 continue
             }
             switch OriginalRemover.remove(origin) {
             case .removed:
-                DropDiagnostics.record("取り出し: \(item.name) 元も削除")
+                DropDiagnostics.record(L.s("diag.export.deleted", item.name))
             case .failed(let reason):
-                banner = "元のファイルは削除できませんでした（\(reason)）"
+                banner = L.s("banner.originalFailed", reason)
             }
         }
     }
@@ -426,14 +426,14 @@ final class TrayModel {
     static func removalBanner(for outcome: Result<TrayRemovalResult, Error>) -> String? {
         switch outcome {
         case .success(let result):
-            return result.failed.isEmpty ? nil : "一部のファイルを削除できませんでした"
+            return result.failed.isEmpty ? nil : L.s("banner.removePartial")
         case .failure(let error as TrayStoreError):
             if case .incompleteRemoval(let result, _) = error {
-                return "\(result.removed.count) 件を削除しましたが、\(result.failed.count) 件は削除できませんでした"
+                return L.s("banner.removeCounts", result.removed.count, result.failed.count)
             }
-            return "削除に失敗しました"
+            return L.s("banner.removeFailed")
         case .failure:
-            return "削除に失敗しました"
+            return L.s("banner.removeFailed")
         }
     }
 }

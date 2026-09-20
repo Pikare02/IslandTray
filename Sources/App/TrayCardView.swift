@@ -55,10 +55,10 @@ struct TrayCardView: View {
             // picker after that would lose the file. Sharing therefore always
             // leaves the item in the tray, whatever `removeOnExport` says.
             ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
-                Label("共有", systemImage: "square.and.arrow.up")
+                Label(L.s("common.share"), systemImage: "square.and.arrow.up")
             }
             Button(role: .destructive, action: onDelete) {
-                Label("削除", systemImage: "trash")
+                Label(L.s("common.delete"), systemImage: "trash")
             }
         }
     }

@@ -29,6 +29,10 @@ targets:
       - Sources/App
       - path: Resources/App/Assets.xcassets
         buildPhase: resources
+      - path: Resources/Localization/en.lproj
+        buildPhase: resources
+      - path: Resources/Localization/ja.lproj
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray
@@ -48,6 +52,10 @@ targets:
     sources:
       - Sources/Shared
       - Sources/Widget
+      - path: Resources/Localization/en.lproj
+        buildPhase: resources
+      - path: Resources/Localization/ja.lproj
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
@@ -69,6 +77,10 @@ targets:
       # Compiled in rather than copied, so the two can never diverge. The
       # rest of Sources/App is not pulled in: this is a single file.
       - path: Sources/App/DropReceiver.swift
+      - path: Resources/Localization/en.lproj
+        buildPhase: resources
+      - path: Resources/Localization/ja.lproj
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.share

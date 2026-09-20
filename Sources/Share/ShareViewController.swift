@@ -9,7 +9,7 @@ final class ShareViewController: UIViewController {
         // sandbox, which the app can never read. Say so instead of silently
         // losing the item.
         guard TrayContainer.isShared else {
-            present(message: "共有シートからこのアプリを直接選べるのは、有料の Apple Developer アカウントでビルドした場合だけです。かわりに「ファイルに保存」→「このiPhone内」→「IslandTray」に保存してください。次にアプリを開いたときトレイへ取り込まれます。")
+            present(message: L.s("share.freeOnly"))
             return
         }
         Task { await ingest() }
@@ -57,7 +57,7 @@ private struct ShareResultView: View {
             Text(message)
                 .multilineTextAlignment(.center)
                 .font(.callout)
-            Button("閉じる", action: onDone)
+            Button(L.s("common.close"), action: onDone)
                 .buttonStyle(.borderedProminent)
         }
         .padding(28)

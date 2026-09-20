@@ -164,10 +164,9 @@ enum DropReceiver {
     /// `incompleteRemoval` and `ingestBanner` follow. Counts, not names: the
     /// sheet is a few lines tall and a long share can fail a dozen items.
     static func shareSheetMessage(for result: Result) -> String {
-        guard result.added > 0 else { return "追加できませんでした" }
-        let landed = "\(result.added) 件をトレイに追加しました"
-        guard !result.failed.isEmpty else { return landed }
-        return landed + "（\(result.failed.count) 件は追加できませんでした）"
+        guard result.added > 0 else { return L.s("share.result.none") }
+        guard !result.failed.isEmpty else { return L.s("share.result.added", result.added) }
+        return L.s("share.result.partial", result.added, result.failed.count)
     }
 
     /// Prefer the most specific concrete type the provider offers, ignoring
