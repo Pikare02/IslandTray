@@ -57,9 +57,15 @@ enum TrayDragProvider {
     /// `item.uti` is what the drop recorded, and is preferred; it can be a
     /// type this device no longer resolves, in which case the extension is a
     /// better guess than nothing, and `.data` is what any receiver accepts.
+    ///
+    /// A dynamic type (`dyn.…`, what an undeclared extension such as `.ipa`
+    /// resolves to) is offered as `.data` instead: Files refuses a drag that
+    /// only offers a dynamic type, while `suggestedName` still carries the
+    /// real extension.
     static func typeIdentifier(for item: TrayItem) -> String {
-        UTType(item.uti)?.identifier
-            ?? UTType(filenameExtension: item.ext)?.identifier
-            ?? UTType.data.identifier
+        guard let type = UTType(item.uti) ?? UTType(filenameExtension: item.ext), !type.isDynamic else {
+            return UTType.data.identifier
+        }
+        return type.identifier
     }
 }

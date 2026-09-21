@@ -7,6 +7,13 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.1.2] — 2026-09-21
+
+### 修正
+- iOS が知らない種類のファイル（`.ipa` など）を、ファイル App へドラッグで
+  渡せるようにしました。一時的な種類として渡していたためファイル App に拒否され、
+  「+」が表示されていませんでした。
+
 ## [1.1.1] — 2026-09-21
 
 ### アプリ
@@ -56,6 +63,7 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.1.2]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.0.0
