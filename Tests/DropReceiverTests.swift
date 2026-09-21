@@ -143,6 +143,16 @@ final class DropReceiverTests: XCTestCase {
         )
     }
 
+    /// A folder's handle reads nothing, so hashing it would make every folder
+    /// the "same" as every other.
+    func testAFolderIsNeverADuplicate() throws {
+        let folder = scratch.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let size = try XCTUnwrap(folder.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+        let other = TrayItem(id: UUID(), name: "other", uti: "public.folder", size: size, addedAt: Date(), ext: "")
+        XCTAssertNil(DropReceiver.duplicate(of: folder, among: [other], at: { _ in folder }))
+    }
+
     func testAnEmptyTrayHasNoDuplicates() throws {
         let dropped = try file("dropped.txt", "hello")
         XCTAssertNil(DropReceiver.duplicate(of: dropped, among: [], at: { _ in dropped }))

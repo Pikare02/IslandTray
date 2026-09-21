@@ -76,11 +76,13 @@ enum TrayItemKind: String, CaseIterable {
     case audio
     case document
     case archive
+    case folder
     case other
 
     init(uti: String) {
         guard let type = UTType(uti) else { self = .other; return }
-        if type.conforms(to: .image) { self = .image }
+        if type.conforms(to: .folder) { self = .folder }
+        else if type.conforms(to: .image) { self = .image }
         else if type.conforms(to: .movie) { self = .video }
         else if type.conforms(to: .audio) { self = .audio }
         else if type.conforms(to: .archive) { self = .archive }

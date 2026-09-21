@@ -64,18 +64,18 @@ enum DocumentsInbox {
         defer { ensureVisible(in: directory) }
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: directory,
-            includingPropertiesForKeys: [.contentTypeKey, .isRegularFileKey],
+            includingPropertiesForKeys: [.contentTypeKey, .isDirectoryKey],
             options: [.skipsHiddenFiles]
         )) ?? []
 
         var added = 0
         var failed: [String] = []
         for url in contents {
-            let values = try? url.resourceValues(forKeys: [.contentTypeKey, .isRegularFileKey])
-            // Folders are left where they are rather than walked: the user put
-            // a folder in their own Files space, and taking it apart is not
-            // what "the tray took your file" should mean.
-            guard values?.isRegularFile == true else { continue }
+            let values = try? url.resourceValues(forKeys: [.contentTypeKey, .isDirectoryKey])
+            // A folder is taken in whole, as one item, never walked into its
+            // files. Except "Inbox": iOS owns that one, for files other apps
+            // hand over with "Open In".
+            if values?.isDirectory == true, url.lastPathComponent == "Inbox" { continue }
             guard url.lastPathComponent != markerName else { continue }
             do {
                 _ = try store.add(

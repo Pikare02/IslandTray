@@ -42,6 +42,7 @@ Dynamic Island がその取っ手になります。作業中に放り込んで�
 
 | バージョン | 主な変更 |
 |---|---|
+| [1.3.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0) | フォルダをそのままトレイに入れ、フォルダのまま取り出せるように |
 | [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | クリップボードからコピー（名前をタップ・右スワイプ・長押し）。共有シートのショートカットで追加するとアイランドがすぐ更新 |
 | [1.1.5](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5) | 2 つのショートカットを復旧（1.1.4 に含まれていなかった） |
 | [1.1.4](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4) | トレイからの削除と元ファイルの削除を別々の設定に。取り出しは常にコピー |

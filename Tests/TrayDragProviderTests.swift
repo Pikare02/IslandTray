@@ -11,6 +11,10 @@ final class TrayDragProviderTests: XCTestCase {
         XCTAssertEqual(TrayDragProvider.typeIdentifier(for: item(uti: "unknown.type", ext: "zip")), "public.zip-archive")
     }
 
+    func testAFolderIsOfferedAsAFolder() {
+        XCTAssertEqual(TrayDragProvider.typeIdentifier(for: item(uti: "public.folder", ext: "")), "public.folder")
+    }
+
     /// Files shows no "+" for a drag that only offers a dyn.* type.
     func testUndeclaredExtensionIsOfferedAsData() {
         XCTAssertEqual(TrayDragProvider.typeIdentifier(for: item(uti: "com.apple.itunes.ipa", ext: "ipa")), "public.data")

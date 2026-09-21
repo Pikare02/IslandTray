@@ -96,6 +96,7 @@ struct TrayItem: Codable, Hashable, Identifiable {
 
     static func symbolName(forUTI identifier: String) -> String {
         guard let type = UTType(identifier) else { return "doc" }
+        if type.conforms(to: .folder) { return "folder" }
         if type.conforms(to: .image) { return "photo" }
         if type.conforms(to: .movie) { return "film" }
         if type.conforms(to: .audio) { return "waveform" }
