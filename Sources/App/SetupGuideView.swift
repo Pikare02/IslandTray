@@ -11,6 +11,7 @@ struct SetupGuideView: View {
     /// the old lines on screen until the sheet was closed and reopened.
     @State private var diagnostics = DropDiagnostics.lines
     @State private var removeOnExport = TraySettings().removeOnExport
+    @State private var deleteOriginalOnExport = TraySettings().deleteOriginalOnExport
     @State private var checksForUpdates = TraySettings().checksForUpdates
     /// nil until checked; "" when up to date; otherwise the newer version.
     @State private var newerVersion: String?
@@ -83,6 +84,10 @@ struct SetupGuideView: View {
                     Toggle(L.s("settings.export.remove"), isOn: $removeOnExport)
                         .onChange(of: removeOnExport) { _, newValue in
                             TraySettings().removeOnExport = newValue
+                        }
+                    Toggle(L.s("settings.export.deleteOriginal"), isOn: $deleteOriginalOnExport)
+                        .onChange(of: deleteOriginalOnExport) { _, newValue in
+                            TraySettings().deleteOriginalOnExport = newValue
                         }
                 } footer: {
                     Text(L.s("settings.export.footer"))

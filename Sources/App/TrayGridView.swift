@@ -326,6 +326,12 @@ struct TrayGridView: UIViewRepresentable {
             return [dragItem(for: item)]
         }
 
+        /// Always a copy: offered a move, Files shows no "+" and treats the
+        /// tray's file as something it may take away.
+        func collectionView(_ view: UICollectionView, dragSessionAllowsMoveOperation session: UIDragSession) -> Bool {
+            false
+        }
+
         private func dragItem(for item: TrayItem) -> UIDragItem {
             let drag = UIDragItem(itemProvider: TrayDragProvider.provider(for: item, model: parent.model))
             // Identifies the item to `itemsForAddingTo` above; never read as

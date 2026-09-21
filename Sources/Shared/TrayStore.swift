@@ -124,6 +124,14 @@ final class TrayStore: Sendable {
         try sweep { _ in true }
     }
 
+    /// Forgets where `id` came from, once that original has been deleted, so
+    /// a later hand-out does not try to delete it again.
+    func clearOrigin(id: UUID) throws {
+        try mutate { items in
+            if let index = items.firstIndex(where: { $0.id == id }) { items[index].origin = nil }
+        }
+    }
+
     // MARK: - Migration
 
     /// Moves items from a previous container into this one.

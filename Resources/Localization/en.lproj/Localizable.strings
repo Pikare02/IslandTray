@@ -47,7 +47,7 @@
 "settings.activity.footer" = "On: the island stays up while the app is alive in the background, even with nothing in the tray. Off: it ends as soon as the tray is empty.";
 "settings.activity.section" = "Live Activity";
 "settings.activity.showEmpty" = "Show even when the tray is empty";
-"settings.export.footer" = "On: an item dragged into another app leaves the tray (a cut). Off: it stays (a copy). An item passed through the share sheet always stays, because iOS does not say whether it succeeded.\n\nOnly things received as files can have their original deleted too. Photos taken from the Photos app are always copies: the photo is converted on its way here, and the original cannot be identified.";
+"settings.export.footer" = "Remove from the tray: an item dragged into another app leaves the tray (a cut); off, it stays (a copy). An item passed through the share sheet always stays, because iOS does not say whether it succeeded.\n\nAlso delete the original: the file an item was taken in from is deleted once the item is handed to another app. Only things received as files have an original that can be deleted; photos from the Photos app are always copies, because they are converted on the way here.";
 "settings.export.remove" = "Remove from the tray once taken";
 "settings.export.section" = "Taking items out";
 "settings.free.1" = "Without a paid Apple Developer account this app cannot be chosen directly from the share sheet. Use “Save to Files” instead.";
@@ -161,3 +161,4 @@
 "update.open" = "Open Install Page";
 "update.later" = "Later";
 "update.skip" = "Don’t Show Again for This Version";
+"settings.export.deleteOriginal" = "Also delete the original file";
