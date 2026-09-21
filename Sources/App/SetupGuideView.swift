@@ -84,6 +84,15 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    ShortcutLink("ClipboardToTray", title: L.s("settings.shortcut.install.clip"))
+                    ShortcutLink("ShareToTray", title: L.s("settings.shortcut.install.share"))
+                } header: {
+                    Text(L.s("settings.setup.section"))
+                } footer: {
+                    Text(L.s("settings.shortcut.install.note"))
+                }
+
+                Section {
                     Text(L.s("settings.shortcut.intro"))
                         .font(.callout)
                     step(1, L.s("settings.shortcut.1"))

@@ -33,6 +33,8 @@ targets:
         buildPhase: resources
       - path: Resources/Localization/ja.lproj
         buildPhase: resources
+      - path: Resources/Shortcuts
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray

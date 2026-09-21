@@ -144,3 +144,6 @@
 "コピーした内容をアプリのクリップボードに保存します。「クリップボードを取得」の出力をつなげてください。" = "Saves what you copied to the app's clipboard. Connect the output of “Get Clipboard” to it.";
 "内容" = "Content";
 "clipboard.connectVariable" = "Nothing to save. Connect the output of “Get Clipboard” to this action's Content field.";
+"settings.shortcut.install.clip" = "Add the clipboard shortcut";
+"settings.shortcut.install.note" = "Each opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. The clipboard one is worth assigning to the Action button or a back tap, so copying and keeping is one press. The share sheet one appears by itself in the share sheet of any app.";
+"settings.shortcut.install.share" = "Add the share sheet shortcut";
