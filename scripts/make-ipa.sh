@@ -120,6 +120,12 @@ echo "$IPA_PLIST" | grep -qE "\"NSSupportsLiveActivities\" => (1|true)" \
   || { echo "$OUT's Info.plist is missing NSSupportsLiveActivities" >&2; exit 1; }
 unzip -p "$OUT" Payload/IslandTray.app/Info.plist | url_schemes - | grep -q '"islandtray"' \
   || { echo "$OUT's Info.plist is missing the islandtray URL scheme (CFBundleURLSchemes)" >&2; exit 1; }
+# The settings screen installs these; a build without them (v1.1.4 shipped
+# that way) leaves both install buttons dead.
+for SC in ClipboardToTray ShareToTray; do
+  echo "$IPA_LIST" | grep -q "Payload/IslandTray.app/$SC.shortcut" \
+    || { echo "$OUT is missing Payload/IslandTray.app/$SC.shortcut" >&2; exit 1; }
+done
 
-echo "verified: PlugIns/{IslandTrayWidget,IslandTrayShare}.appex, Info.plist keys, $CONFIG entitlements"
+echo "verified: PlugIns/{IslandTrayWidget,IslandTrayShare}.appex, shortcuts, Info.plist keys, $CONFIG entitlements"
 echo "wrote $OUT ($(du -h "$OUT" | cut -f1))"
