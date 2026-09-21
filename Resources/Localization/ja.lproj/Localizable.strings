@@ -148,3 +148,15 @@
 "settings.shortcut.install.clip" = "クリップボード用ショートカットを追加";
 "settings.shortcut.install.note" = "できあがったショートカットを開きます。共有シートで「ショートカット」を選び、追加してください。クリップボード用はアクションボタンや背面タップに割り当てると、コピーして残すまでが 1 操作になります。共有シート用は、追加するだけでどのアプリの共有シートにも出てきます。";
 "settings.shortcut.install.share" = "共有シート用ショートカットを追加";
+"settings.update.section" = "アップデート";
+"settings.update.current" = "バージョン";
+"settings.update.auto" = "アップデートを自動で確認";
+"settings.update.check" = "アップデートを確認";
+"settings.update.latest" = "最新です";
+"settings.update.failed" = "確認できませんでした";
+"settings.update.install" = "インストールページからバージョン %@ を入手";
+"settings.update.footer" = "オンにすると、起動するたびに GitHub で新しいリリースを確認し、インストールページを案内します。サイドロードしたアプリは自分自身を置き換えられないため、新しい .ipa は今と同じ方法でインストールしてください。";
+"update.title" = "アップデートがあります";
+"update.message" = "バージョン %1$@ が公開されています（現在 %2$@）。インストールページから .ipa をダウンロードしてください。";
+"update.open" = "インストールページを開く";
+"update.later" = "あとで";

@@ -40,6 +40,7 @@ struct TraySettings {
         static let groupsByKind = "groupsByKind"
         static let language = "language"
         static let theme = "theme"
+        static let checksForUpdates = "checksForUpdates"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -59,13 +60,14 @@ struct TraySettings {
 
     /// Whether handing an item to another app takes it out of the tray --
     /// the tray as a cut buffer rather than a copy buffer. Defaults to
-    /// `true`, which is what the user asked for.
+    /// `false`: the user asked for a copy by default, since a cut can also
+    /// delete the original file.
     ///
     /// Only the app process ever reads this; the widget has no say in what
     /// leaves the tray. It lives here anyway because `TraySettings` is the
     /// one place a setting is defined, not because the widget needs it.
     var removeOnExport: Bool {
-        get { defaults.object(forKey: Keys.removeOnExport) as? Bool ?? true }
+        get { defaults.object(forKey: Keys.removeOnExport) as? Bool ?? false }
         nonmutating set { defaults.set(newValue, forKey: Keys.removeOnExport) }
     }
 
@@ -106,5 +108,12 @@ struct TraySettings {
     var theme: String? {
         get { defaults.string(forKey: Keys.theme) }
         nonmutating set { defaults.set(newValue, forKey: Keys.theme) }
+    }
+
+    /// Whether the app asks GitHub for a newer release each time it opens.
+    /// Defaults to `true`. Only the app reads it.
+    var checksForUpdates: Bool {
+        get { defaults.object(forKey: Keys.checksForUpdates) as? Bool ?? true }
+        nonmutating set { defaults.set(newValue, forKey: Keys.checksForUpdates) }
     }
 }
