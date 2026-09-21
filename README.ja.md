@@ -68,5 +68,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme IslandTray \
 
 ## ドキュメント
 
+- [変更履歴](CHANGELOG.ja.md)
 - [インストールと .ipa のビルド](docs/INSTALL.ja.md)
 - [ショートカット：共有シート、クリップボード、アイランドを出し続ける方法](docs/SHORTCUTS.ja.md)
