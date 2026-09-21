@@ -238,6 +238,7 @@ struct TrayGridView: UIViewRepresentable {
             case .audio: return L.s("kind.audio")
             case .document: return L.s("kind.document")
             case .archive: return L.s("kind.archive")
+            case .folder: return L.s("kind.folder")
             case .other: return L.s("kind.other")
             }
         }

@@ -130,7 +130,10 @@ enum DropReceiver {
         among items: [TrayItem],
         at itemURL: (TrayItem) -> URL = { $0.fileURL }
     ) -> TrayItem? {
-        guard let size = try? payload.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+        // Not for a folder: its handle reads nothing, so every folder would
+        // hash the same as every other and be offered as a duplicate.
+        guard (try? payload.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory != true,
+              let size = try? payload.resourceValues(forKeys: [.fileSizeKey]).fileSize,
               let payloadDigest = digest(of: payload) else { return nil }
         for item in items where item.size == size {
             if digest(of: itemURL(item)) == payloadDigest { return item }

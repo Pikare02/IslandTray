@@ -34,6 +34,7 @@
 "intent.refresh.title" = "トレイの表示を更新";
 "island.count" = "トレイに %d 件";
 "kind.archive" = "アーカイブ";
+"kind.folder" = "フォルダ";
 "kind.audio" = "オーディオ";
 "kind.document" = "書類";
 "kind.image" = "画像";

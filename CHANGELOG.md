@@ -8,6 +8,14 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.3.0] — 2026-09-22
+
+### Tray
+- Folders can be put in the tray and taken out again as folders: drag one in
+  from Files, or save it to *On My iPhone → IslandTray*. A folder is one item
+  with a folder icon, its own group and filter, and the total size of what is
+  inside; dragging it out hands over the whole folder.
+
 ## [1.2.0] — 2026-09-21
 
 ### Clipboard
@@ -104,6 +112,7 @@ The first release.
 - Unsigned `.ipa` builds for TrollStore (`Release`) and AltStore / SideStore
   (`Free-Release`).
 
+[1.3.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4

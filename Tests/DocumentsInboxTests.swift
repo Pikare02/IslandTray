@@ -71,14 +71,24 @@ final class DocumentsInboxTests: XCTestCase {
         XCTAssertEqual(try store.load().count, 3)
     }
 
-    func testAFolderIsLeftWhereTheUserPutIt() throws {
+    func testAFolderIsTakenInWhole() throws {
         let folder = inbox.appendingPathComponent("photos", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try write("note.txt")
+        try Data(count: 3).write(to: folder.appendingPathComponent("a.jpg"))
+        try Data(count: 4).write(to: folder.appendingPathComponent("b.jpg"))
 
-        let result = sweep()
+        XCTAssertEqual(sweep().added, 1, "one item for the folder, not one per file")
+        let item = try XCTUnwrap(try store.load().first)
+        XCTAssertEqual(item.name, "photos")
+        XCTAssertEqual(item.uti, "public.folder")
+        XCTAssertEqual(item.size, 7, "the size is what is inside")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    }
 
-        XCTAssertEqual(result.added, 1, "the folder must not count as an import")
+    func testTheSystemInboxFolderIsLeftAlone() throws {
+        let folder = inbox.appendingPathComponent("Inbox", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        XCTAssertEqual(sweep().added, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path))
     }
 

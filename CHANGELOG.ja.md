@@ -7,6 +7,14 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.3.0] — 2026-09-22
+
+### トレイ
+- フォルダをそのままトレイに入れ、フォルダのまま取り出せるようになりました。ファイル App から
+  ドラッグするか、「このiPhone内 → IslandTray」に保存してください。フォルダは 1 つの項目として、
+  フォルダのアイコン・専用のグループとフィルタ・中身の合計サイズで表示され、ドラッグで取り出すと
+  フォルダごと渡せます。
+
 ## [1.2.0] — 2026-09-21
 
 ### クリップボード
@@ -97,6 +105,7 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.3.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4

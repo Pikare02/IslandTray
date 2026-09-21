@@ -101,7 +101,7 @@ final class TrayStore: Sendable {
     ) throws -> TrayItem {
         try prepare()
         let name = suggestedName ?? source.lastPathComponent
-        let size = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let size = Self.byteCount(of: source)
         var item = makeItem(suggestedName: name, uti: uti, size: size)
         item.origin = origin
         item.board = board
@@ -489,13 +489,13 @@ final class TrayStore: Sendable {
         return urls.compactMap { url in
             let stem = url.deletingPathExtension().lastPathComponent
             guard let id = UUID(uuidString: stem) else { return nil }
-            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .creationDateKey])
+            let values = try? url.resourceValues(forKeys: [.creationDateKey, .isDirectoryKey])
             let ext = url.pathExtension.lowercased()
             return TrayItem(
                 id: id,
                 name: Self.recoveredName(id: id, ext: ext),
-                uti: utiIdentifier(forExtension: ext),
-                size: values?.fileSize ?? 0,
+                uti: values?.isDirectory == true ? UTType.folder.identifier : utiIdentifier(forExtension: ext),
+                size: Self.byteCount(of: url),
                 addedAt: values?.creationDate ?? Date(),
                 ext: ext
             )
@@ -548,6 +548,19 @@ final class TrayStore: Sendable {
             .sorted {
                 $0.addedAt == $1.addedAt ? $0.id.uuidString < $1.id.uuidString : $0.addedAt > $1.addedAt
             }
+    }
+
+    /// A file's size, or for a folder the total of every file inside it --
+    /// what a person means by "how big is this folder".
+    static func byteCount(of url: URL) -> Int {
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+        guard values?.isDirectory == true else { return values?.fileSize ?? 0 }
+        let files = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey])
+        var total = 0
+        while let file = files?.nextObject() as? URL {
+            total += (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        }
+        return total
     }
 
     private func utiIdentifier(forExtension ext: String) -> String {
