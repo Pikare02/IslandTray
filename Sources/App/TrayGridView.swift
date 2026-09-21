@@ -25,7 +25,9 @@ struct TrayGridView: UIViewRepresentable {
     func makeUIView(context: Context) -> UICollectionView {
         let view = UICollectionView(
             frame: .zero,
-            collectionViewLayout: Self.collectionLayout(headers: ordering.groupsByKind, layout: layout)
+            collectionViewLayout: Self.collectionLayout(
+                headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions
+            )
         )
         view.backgroundColor = .clear
         view.alwaysBounceVertical = true
@@ -55,7 +57,10 @@ struct TrayGridView: UIViewRepresentable {
             context.coordinator.headers = ordering.groupsByKind
             context.coordinator.layout = layout
             view.setCollectionViewLayout(
-                Self.collectionLayout(headers: ordering.groupsByKind, layout: layout), animated: false
+                Self.collectionLayout(
+                    headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions
+                ),
+                animated: false
             )
         }
         context.coordinator.apply(ordering.arrange(items))
@@ -64,7 +69,9 @@ struct TrayGridView: UIViewRepresentable {
     /// As many square tiles per row as fit at roughly 110pt, never fewer than
     /// two, with room under each for one line of filename.
     private static func collectionLayout(
-        headers: Bool, layout: TrayLayout
+        headers: Bool,
+        layout: TrayLayout,
+        swipe: @escaping UICollectionLayoutListConfiguration.SwipeActionsConfigurationProvider
     ) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, environment in
             if layout == .list {
@@ -74,6 +81,10 @@ struct TrayGridView: UIViewRepresentable {
                 var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
                 configuration.headerMode = headers ? .supplementary : .none
                 configuration.backgroundColor = .clear
+                // Swipe left for Delete; keep going and the system fills the
+                // row red, taps the haptic and deletes -- a full swipe performs
+                // the first action by default.
+                configuration.trailingSwipeActionsConfigurationProvider = swipe
                 return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
             }
             let spacing: CGFloat = 12
@@ -138,12 +149,16 @@ struct TrayGridView: UIViewRepresentable {
         /// Built once, in `attach(to:)`, and never inside the cell provider:
         /// UIKit traps a registration first created in there, because one made
         /// per dequeue defeats reuse and strands every cell it makes.
-        private var registration: UICollectionView.CellRegistration<UICollectionViewCell, UUID>!
+        private var registration: UICollectionView.CellRegistration<UICollectionViewListCell, UUID>!
 
         func attach(to view: UICollectionView) {
             registration = UICollectionView
-                .CellRegistration<UICollectionViewCell, UUID> { [unowned self] cell, _, id in
+                // A list cell, because only a list cell can be swiped. Its
+                // default background is cleared so the cards and rows look as
+                // they did as plain cells.
+                .CellRegistration<UICollectionViewListCell, UUID> { [unowned self] cell, _, id in
                     guard let item = shown[id] else { return }
+                    cell.backgroundConfiguration = .clear()
                     cell.contentConfiguration = UIHostingConfiguration {
                         TrayItemView(
                             item: item,
@@ -222,6 +237,22 @@ struct TrayGridView: UIViewRepresentable {
             case .archive: return L.s("kind.archive")
             case .other: return L.s("kind.other")
             }
+        }
+
+        // MARK: - Swipe to delete
+
+        /// Nil while selecting: a swipe there would fight the checkmarks.
+        func swipeActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard !parent.isSelecting,
+                  let id = dataSource.itemIdentifier(for: indexPath),
+                  let item = shown[id] else { return nil }
+            let delete = UIContextualAction(style: .destructive, title: L.s("common.delete")) {
+                [unowned self] _, _, done in
+                parent.onDelete(item)
+                done(true)
+            }
+            delete.image = UIImage(systemName: "trash")
+            return UISwipeActionsConfiguration(actions: [delete])
         }
 
         // MARK: - Selection
