@@ -4,6 +4,11 @@
 
 <h1 align="center">IslandTray</h1>
 
+<p align="center">
+  <a href="https://pikare02.github.io/IslandTray/"><img src="https://img.shields.io/badge/iPhone_%E3%81%AB%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB-1d6f86?style=for-the-badge&logo=apple&logoColor=white" alt="iPhone にインストール"></a>
+  <a href="https://github.com/Pikare02/IslandTray/releases/latest"><img src="https://img.shields.io/github/v/release/Pikare02/IslandTray?style=for-the-badge&color=13161c" alt="Latest release"></a>
+</p>
+
 [English](README.md) · **日本語**
 
 ファイル・写真・コピーしたテキストを一時的に置いておける、iPhone / iPad 用のトレイです。
