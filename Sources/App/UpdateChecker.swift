@@ -6,7 +6,7 @@ import Foundation
 /// handed to the install page, where the .ipa is downloaded and installed
 /// with whatever tool installed this one.
 enum UpdateChecker {
-    static let installPage = URL(string: "https://claude.ai/artifact/PbWQxkvhSJ1UKLKDQNuh9u")!
+    static let installPage = URL(string: "https://pikare02.github.io/IslandTray/")!
     private static let latestRelease = URL(string: "https://api.github.com/repos/Pikare02/IslandTray/releases/latest")!
 
     static var currentVersion: String {

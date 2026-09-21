@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IslandTray Install</title>
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+  body { margin: 0; }
+  :root {
+    --ground: #eef1f5;
+    --surface: #ffffff;
+    --ink: #13161c;
+    --muted: #5d6573;
+    --line: #d9dee6;
+    --accent: #1d6f86;
+    --accent-ink: #ffffff;
+    --island: #050507;
+    --island-ink: #f4f6f8;
+    --soft: #e2eef1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1216;
+      --surface: #181c22;
+      --ink: #eef1f5;
+      --muted: #9aa3b0;
+      --line: #2a3039;
+      --accent: #4fb3c9;
+      --accent-ink: #06222a;
+      --island: #000000;
+      --island-ink: #f4f6f8;
+      --soft: #16292f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f1216;
+    --surface: #181c22;
+    --ink: #eef1f5;
+    --muted: #9aa3b0;
+    --line: #2a3039;
+    --accent: #4fb3c9;
+    --accent-ink: #06222a;
+    --island: #000000;
+    --island-ink: #f4f6f8;
+    --soft: #16292f;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.6 "Manrope", -apple-system, "Hiragino Sans", "Apple SD Gothic Neo", sans-serif;
+  }
+  .wrap {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 16px;
+    padding-block: 28px 56px;
+    display: grid;
+    gap: 36px;
+  }
+  h1, h2 { font-family: "Sora", "Manrope", sans-serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: 30px; line-height: 1.2; font-weight: 700; }
+  h2 { font-size: 18px; font-weight: 700; }
+  p { margin: 0; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px; }
+  .muted { color: var(--muted); }
+
+  /* Hero: the island itself, holding the version. */
+  .hero { display: grid; gap: 18px; justify-items: center; text-align: center; }
+  .island {
+    background: var(--island);
+    color: var(--island-ink);
+    border-radius: 999px;
+    padding: 10px 14px 10px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+  }
+  .island .dot {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #1f2a33; display: grid; place-items: center;
+  }
+  .island .count {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 14px; letter-spacing: .02em;
+  }
+  .island .pill {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    background: #2a3440; color: #bfe6ef; border-radius: 999px; padding: 3px 8px;
+  }
+  .hero p { max-width: 42ch; }
+
+  /* Downloads */
+  .downloads { display: grid; gap: 12px; }
+  .dl {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+  }
+  .dl.primary { border-color: var(--accent); }
+  .dl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .btn {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0 4px;
+    padding: 10px 14px; text-align: center;
+    min-height: 48px; border-radius: 12px;
+    font-weight: 700; text-decoration: none;
+    background: var(--soft); color: var(--ink);
+  }
+  .primary .btn { background: var(--accent); color: var(--accent-ink); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; font-size: 14px; font-weight: 700; }
+  .quick a { color: var(--accent); text-decoration: none; padding: 4px 2px; }
+  .quick a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .note {
+    font-size: 14px; color: var(--muted);
+    border-left: 3px solid var(--line); padding-left: 12px;
+  }
+
+  /* Steps: a real sequence, so numbered. */
+  section { display: grid; gap: 14px; }
+  ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 14px; }
+  ol li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; gap: 12px; }
+  ol li::before {
+    content: counter(s);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--ink); color: var(--ground);
+    display: grid; place-items: center;
+    font: 700 13px/1 "Sora", sans-serif;
+  }
+  ul.changes { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; }
+  footer a, section a { color: var(--accent); }
+
+  /* Language: English by default, Japanese on request. */
+  .wrap:not(.ja) .ja, .wrap.ja .en { display: none; }
+  .lang {
+    justify-self: end;
+    display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px;
+    background: var(--surface);
+  }
+  .lang button {
+    font: 700 13px/1 "Manrope", sans-serif; color: var(--muted);
+    background: none; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer;
+  }
+  .lang button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+  .lang button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+
+</head>
+<body>
+<div class="wrap" id="page">
+  <div class="lang" role="group" aria-label="Language / 言語">
+    <button type="button" id="lang-en" data-lang="en" aria-pressed="true">English</button>
+    <button type="button" id="lang-ja" data-lang="ja" aria-pressed="false">日本語</button>
+  </div>
+
+  <header class="hero">
+    <div class="island" aria-hidden="true">
+      <span class="dot">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#bfe6ef" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/></svg>
+      </span>
+      <span class="count">v1.1.3</span>
+      <span class="pill">latest</span>
+    </div>
+    <h1><span class="en">Install IslandTray</span><span class="ja" lang="ja">IslandTray をインストール</span></h1>
+    <p class="muted">
+      <span class="en">Open this page in Safari on your iPhone and get the file for the sideloading tool you use. Released 2026-09-21 · iOS 17 or later</span>
+      <span class="ja" lang="ja">iPhone の Safari でこのページを開き、使っているサイドロードツールに合ったファイルを入手してください。2026-09-21 リリース · iOS 17 以降</span>
+    </p>
+  </header>
+
+  <div class="downloads">
+    <div class="dl primary">
+      <div class="dl-head">
+        <h2>AltStore / SideStore</h2>
+        <span class="tag"><span class="en">Free account</span><span class="ja" lang="ja">無料アカウント</span></span>
+      </div>
+      <p class="muted">
+        <span class="en">For tools that sign with a free Apple ID. Works without an App Group; the share sheet is reached through a shortcut you install from inside the app.</span>
+        <span class="ja" lang="ja">無料の Apple ID で署名するツール向け。App Group なしで動作し、共有シートはアプリ内からインストールするショートカットで使います。</span>
+      </p>
+      <a class="btn" href="https://github.com/Pikare02/IslandTray/releases/download/v1.1.3/IslandTray-1.1.3-AltStore.ipa" target="_blank" rel="noopener">
+        <span class="en">Download</span><span class="ja" lang="ja">ダウンロード</span> <span class="mono">IslandTray-1.1.3-AltStore.ipa</span>
+      </a>
+      <div class="quick">
+        <a href="altstore://install?url=https%3A%2F%2Fgithub.com%2FPikare02%2FIslandTray%2Freleases%2Fdownload%2Fv1.1.3%2FIslandTray-1.1.3-AltStore.ipa"><span class="en">Open in AltStore</span><span class="ja" lang="ja">AltStore で開く</span></a>
+        <a href="sidestore://install?url=https%3A%2F%2Fgithub.com%2FPikare02%2FIslandTray%2Freleases%2Fdownload%2Fv1.1.3%2FIslandTray-1.1.3-AltStore.ipa"><span class="en">Open in SideStore</span><span class="ja" lang="ja">SideStore で開く</span></a>
+      </div>
+    </div>
+    <div class="dl">
+      <div class="dl-head">
+        <h2>TrollStore</h2>
+        <span class="tag"><span class="en">With App Group</span><span class="ja" lang="ja">App Group あり</span></span>
+      </div>
+      <p class="muted">
+        <span class="en">For tools that can grant entitlements as they are. The share extension works too.</span>
+        <span class="ja" lang="ja">エンタイトルメントをそのまま付与できるツール向け。共有拡張も動作します。</span>
+      </p>
+      <a class="btn" href="https://github.com/Pikare02/IslandTray/releases/download/v1.1.3/IslandTray-1.1.3-TrollStore.ipa" target="_blank" rel="noopener">
+        <span class="en">Download</span><span class="ja" lang="ja">ダウンロード</span> <span class="mono">IslandTray-1.1.3-TrollStore.ipa</span>
+      </a>
+      <div class="quick">
+        <a href="apple-magnifier://install?url=https%3A%2F%2Fgithub.com%2FPikare02%2FIslandTray%2Freleases%2Fdownload%2Fv1.1.3%2FIslandTray-1.1.3-TrollStore.ipa"><span class="en">Open in TrollStore</span><span class="ja" lang="ja">TrollStore で開く</span></a>
+      </div>
+    </div>
+    <p class="note">
+      <span class="en">“Open in …” hands the file straight to the tool when it is installed, with no download step. If nothing happens, use the Download button and the steps below.</span>
+      <span class="ja" lang="ja">「… で開く」は、ツールがインストールされていればファイルを直接渡します（ダウンロード不要）。何も起きない場合は、ダウンロードボタンと下の手順を使ってください。</span>
+    </p>
+  </div>
+
+  <section>
+    <h2><span class="en">How to install</span><span class="ja" lang="ja">インストール手順</span></h2>
+    <ol>
+      <li><p>
+        <span class="en">Download the <span class="mono">.ipa</span> with a button above. Allow the download when Safari asks; the file is saved to <strong>Files → Downloads</strong>.</span>
+        <span class="ja" lang="ja">上のボタンで <span class="mono">.ipa</span> をダウンロードします。Safari が確認を出したら許可してください。ファイルは <strong>ファイル → ダウンロード</strong> に保存されます。</span>
+      </p></li>
+      <li><p>
+        <span class="en">In the downloads list or the Files app, touch and hold the file, tap <strong>Share</strong> and choose <strong>AltStore</strong> (or SideStore / TrollStore). You can also pick the file with the <strong>+</strong> button inside the tool.</span>
+        <span class="ja" lang="ja">ダウンロード一覧かファイル App でファイルを長押しし、<strong>共有</strong> → <strong>AltStore</strong>（または SideStore / TrollStore）を選びます。ツール内の <strong>+</strong> ボタンからファイルを選んでもかまいません。</span>
+      </p></li>
+      <li><p>
+        <span class="en">Once installed, open IslandTray and install both shortcuts from <strong>Settings → Setup</strong>. If you used ShareToTray from an earlier build, delete it first and install it again.</span>
+        <span class="ja" lang="ja">インストールしたら IslandTray を開き、<strong>設定 → セットアップ</strong> から 2 つのショートカットをインストールします。以前のビルドの ShareToTray を使っていた場合は、先に削除してから入れ直してください。</span>
+      </p></li>
+      <li><p>
+        <span class="en">On AltStore / SideStore, a free-account signature expires every 7 days. Refresh the app in the tool regularly.</span>
+        <span class="ja" lang="ja">AltStore / SideStore では、無料アカウントの署名は 7 日ごとに期限が切れます。ツールで定期的に更新してください。</span>
+      </p></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="en">What’s new in 1.1.3</span><span class="ja" lang="ja">1.1.3 の新機能</span></h2>
+    <ul class="changes en">
+      <li>This page now lives on GitHub Pages; the app’s update popup opens it here</li>
+      <li>Files of a type iOS does not know, such as an <span class="mono">.ipa</span>, can be dragged into the Files app</li>
+      <li>The update popup on launch can skip a version: “Don’t Show Again for This Version”</li>
+      <li>Checks for a newer release when the app opens and brings you back to this page; turn it off or check by hand in Settings → Updates</li>
+      <li>“Remove from the tray once taken” is now off by default (copy, not cut); an existing choice is kept</li>
+    </ul>
+    <ul class="changes ja" lang="ja">
+      <li>このページを GitHub Pages に移転。アプリのアップデート通知からもここを開きます</li>
+      <li><span class="mono">.ipa</span> など iOS が知らない種類のファイルも、ファイル App へドラッグで渡せるように</li>
+      <li>起動時のアップデート通知に「このバージョンは今後表示しない」を追加</li>
+      <li>起動時に新しいリリースを確認し、このページへ案内します。設定 →「アップデート」でオフにしたり手動で確認したりできます</li>
+      <li>「取り出したらトレイから削除する」の初期値をオフ（切り取りではなくコピー）に変更。設定済みの値はそのまま</li>
+    </ul>
+    <p><a href="https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3" target="_blank" rel="noopener"><span class="en">Full release notes on GitHub</span><span class="ja" lang="ja">GitHub のリリースノートをすべて見る</span></a></p>
+  </section>
+
+  <footer>
+    <p><a href="https://github.com/Pikare02/IslandTray" target="_blank" rel="noopener">github.com/Pikare02/IslandTray</a> · <span class="en">source code and all releases</span><span class="ja" lang="ja">ソースコードとすべてのリリース</span></p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var page = document.getElementById("page");
+    var buttons = page.querySelectorAll(".lang button");
+    function set(lang) {
+      page.classList.toggle("ja", lang === "ja");
+      document.documentElement.lang = lang;
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.lang === lang)); });
+      try { localStorage.setItem("lang", lang); } catch (e) {}
+    }
+    var saved = null;
+    try { saved = localStorage.getItem("lang"); } catch (e) {}
+    set(saved === "ja" ? "ja" : "en");
+    buttons.forEach(function (b) { b.addEventListener("click", function () { set(b.dataset.lang); }); });
+  })();
+</script>
+
+</body></html>

@@ -73,5 +73,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme IslandTray \
 ## ドキュメント
 
 - [変更履歴](CHANGELOG.ja.md)
+- [インストールページ（iPhone で最新の .ipa を入手）](https://pikare02.github.io/IslandTray/)
 - [インストールと .ipa のビルド](docs/INSTALL.ja.md)
 - [ショートカット：共有シート、クリップボード、アイランドを出し続ける方法](docs/SHORTCUTS.ja.md)

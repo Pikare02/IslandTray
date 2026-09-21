@@ -75,5 +75,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme IslandTray \
 ## Documentation
 
 - [Changelog](CHANGELOG.md)
+- [Install page (download the latest .ipa on your iPhone)](https://pikare02.github.io/IslandTray/)
 - [Installing and building the .ipa](docs/INSTALL.md)
 - [Shortcuts: share sheet, clipboard and keeping the island up](docs/SHORTCUTS.md)
