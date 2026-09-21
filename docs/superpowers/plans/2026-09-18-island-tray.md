@@ -22,7 +22,6 @@
 - 新しい依存ライブラリを追加しない。XcodeGen はプロジェクト生成用のビルドツールであり、アプリの依存ではない。
 - バンドル ID のプレフィックスは `com.pikare`。無料アカウントは 1 週間あたりの App ID 作成数に制限があるため、**バンドル ID を後から変更しない**。
 - 項目のコンテナ内パスは必ず UUID から組み立てる。元のファイル名をパスに使わない。
-- git コミットメッセージの末尾に `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` を付ける。
 
 ## ファイル構成
 
@@ -615,8 +614,6 @@ xcodebuild -project IslandTray.xcodeproj -target IslandTray -configuration Debug
 git add -A
 git commit -m "$(cat <<'EOF'
 feat: scaffold IslandTray project with paid/free build configurations
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -763,8 +760,6 @@ Step 1 のボタンの `Activity.request` を次に差し替えて再実行し�
 git add -A
 git commit -m "$(cat <<'EOF'
 chore: record Phase 0 device spike results
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -920,8 +915,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 git add Sources/Shared/FilenameSanitizer.swift Tests/FilenameSanitizerTests.swift
 git commit -m "$(cat <<'EOF'
 feat: sanitize untrusted filenames from drops and share sheet
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -997,8 +990,6 @@ xcodebuild build -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -conf
 git add Sources/Shared/TrayContainer.swift
 git commit -m "$(cat <<'EOF'
 feat: resolve tray container with App Group fallback
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -1417,8 +1408,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 git add Sources/Shared/TrayItem.swift Sources/Shared/TrayStore.swift Tests/TrayStoreTests.swift
 git commit -m "$(cat <<'EOF'
 feat: add tray item model and file-coordinated store
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -1564,8 +1553,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 git add Sources/Shared/TrayContentState.swift Tests/TrayContentStateTests.swift
 git commit -m "$(cat <<'EOF'
 feat: build Live Activity content state within the 4KB limit
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -1667,8 +1654,6 @@ xcodebuild build -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -conf
 git add Sources/App/ThumbnailService.swift
 git commit -m "$(cat <<'EOF'
 feat: generate Files-style thumbnails with QLThumbnailGenerator
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -1892,8 +1877,6 @@ struct TrayLiveActivity: Widget {
 git add Sources/App/TrayActivityController.swift Sources/Widget/TrayPreviewStrip.swift Sources/Widget/TrayLiveActivity.swift
 git commit -m "$(cat <<'EOF'
 feat: drive Live Activity and render Dynamic Island presentations
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -2327,8 +2310,6 @@ xcodebuild build -project IslandTray.xcodeproj -scheme "IslandTray" -configurati
 git add Sources/App/DropReceiver.swift Sources/App/TrayModel.swift Sources/App/TrayCardView.swift Sources/App/SetupGuideView.swift Sources/App/TrayView.swift Sources/App/IslandTrayApp.swift
 git commit -m "$(cat <<'EOF'
 feat: add tray screen with drop target and horizontal card strip
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -2431,8 +2412,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme "IslandTray (Free)" -desti
 git add Sources/App/RefreshTrayActivityIntent.swift Sources/App/TrayShortcuts.swift
 git commit -m "$(cat <<'EOF'
 feat: keep the Live Activity alive via a Shortcuts-exposed intent
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -2690,8 +2669,6 @@ xcodebuild build -project IslandTray.xcodeproj -scheme "IslandTray" -configurati
 git add -A
 git commit -m "$(cat <<'EOF'
 feat: add share extension and container migration
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
@@ -2822,8 +2799,6 @@ build/
 git add scripts/make-ipa.sh .gitignore
 git commit -m "$(cat <<'EOF'
 feat: package unsigned ipa for sideloading
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
 )"
 ```
