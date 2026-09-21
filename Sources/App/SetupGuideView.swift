@@ -95,6 +95,14 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    step(1, L.s("settings.shortcut.clip.1"))
+                    step(2, L.s("settings.shortcut.clip.2"))
+                    step(3, L.s("settings.shortcut.clip.3"))
+                } header: {
+                    Text(L.s("settings.shortcut.clip.header"))
+                }
+
+                Section {
                     Text(L.s("settings.why.body"))
                         .font(.callout)
                 } header: {

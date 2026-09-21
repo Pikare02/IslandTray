@@ -137,3 +137,9 @@
 "settings.accent.custom" = "Pick a colour";
 "settings.accent.default" = "Default";
 "settings.accent.recent" = "Recent";
+"settings.shortcut.clip.1" = "In Shortcuts, create a shortcut with “Get Clipboard” followed by “Add to Clipboard”.";
+"settings.shortcut.clip.2" = "Tap the Content field of “Add to Clipboard” and choose the Clipboard variable above it.";
+"settings.shortcut.clip.3" = "Assign that shortcut to the Action button or a back tap.";
+"settings.shortcut.clip.header" = "Saving what you copy";
+"コピーした内容をアプリのクリップボードに保存します。「クリップボードを取得」の出力をつなげてください。" = "Saves what you copied to the app's clipboard. Connect the output of “Get Clipboard” to it.";
+"内容" = "Content";

@@ -1,4 +1,5 @@
 import AppIntents
+import UniformTypeIdentifiers
 
 /// Puts what is on the system clipboard onto the app's clipboard board.
 ///
@@ -6,55 +7,28 @@ import AppIntents
 /// button, a back tap, or the share sheet: copy something, run the shortcut,
 /// and it is kept here instead of being overwritten by the next copy.
 ///
-/// The text and the files are separate parameters because the clipboard's own
-/// contents are: Shortcuts' "Get Clipboard" gives text for text and a file for
-/// anything else, and a shortcut can pass whichever it got.
+/// One parameter, not one for text and one for files. The clipboard holds
+/// either, "Get Clipboard" hands over whichever it found, and a shortcut with
+/// two slots makes the person decide every time which one today's copy goes
+/// in. Shortcuts converts text to a file on its way into this, and text is
+/// recognised again on arrival by its type.
 struct AddToClipboardIntent: AppIntent {
     static let title: LocalizedStringResource = "クリップボードに追加"
     static let description = IntentDescription(
-        "コピーした内容をアプリのクリップボードに保存します。アクションボタンや背面タップから実行できます。"
+        "コピーした内容をアプリのクリップボードに保存します。「クリップボードを取得」の出力をつなげてください。"
     )
     static let openAppWhenRun: Bool = false
 
-    @Parameter(title: "テキスト")
-    var text: String?
-
-    @Parameter(title: "ファイル", supportedTypeIdentifiers: ["public.item"])
-    var files: [IntentFile]?
+    @Parameter(title: "内容", supportedTypeIdentifiers: ["public.item"])
+    var content: [IntentFile]
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         var added = 0
         var failed: [String] = []
 
-        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        for file in content {
             do {
-                _ = try TrayStore.shared.add(
-                    data: Data(text.utf8),
-                    // The first line, so the card reads as what was copied
-                    // rather than as "clipboard.txt" over and over.
-                    suggestedName: Self.name(for: text),
-                    uti: "public.utf8-plain-text",
-                    board: .clipboard
-                )
-                added += 1
-            } catch {
-                failed.append(Self.name(for: text))
-            }
-        }
-
-        for file in files ?? [] {
-            do {
-                if let url = file.fileURL {
-                    _ = try TrayStore.shared.add(
-                        copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier,
-                        board: .clipboard
-                    )
-                } else {
-                    _ = try TrayStore.shared.add(
-                        data: file.data, suggestedName: file.filename, uti: file.type?.identifier,
-                        board: .clipboard
-                    )
-                }
+                try add(file)
                 added += 1
             } catch {
                 failed.append(file.filename)
@@ -65,11 +39,48 @@ struct AddToClipboardIntent: AppIntent {
         return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
     }
 
+    private func add(_ file: IntentFile) throws {
+        // Text arrives as a file whose name is whatever Shortcuts made up.
+        // Naming it after what it says is the difference between a readable
+        // board and a column of "Text.txt".
+        if let text = Self.text(in: file) {
+            _ = try TrayStore.shared.add(
+                data: Data(text.utf8),
+                suggestedName: Self.name(for: text),
+                uti: UTType.utf8PlainText.identifier,
+                board: .clipboard
+            )
+            return
+        }
+        // The URL when there is one: it is already a file on disk, and `data`
+        // would read a video into memory to write it straight back out.
+        if let url = file.fileURL {
+            _ = try TrayStore.shared.add(
+                copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier,
+                board: .clipboard
+            )
+        } else {
+            _ = try TrayStore.shared.add(
+                data: file.data, suggestedName: file.filename, uti: file.type?.identifier,
+                board: .clipboard
+            )
+        }
+    }
+
+    /// The file's contents when it is text, and nil when it is anything else.
+    ///
+    /// By declared type first, and only then by whether the bytes happen to
+    /// decode: a JPEG that decodes as UTF-8 by accident is not text, and a
+    /// text file with no type is.
+    static func text(in file: IntentFile) -> String? {
+        if let type = file.type, !type.conforms(to: .text) { return nil }
+        guard let text = String(data: file.data, encoding: .utf8),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
+    }
+
     /// A filename made of the text's first line, short enough to read on a
     /// card and safe enough to hand to the sanitizer.
-    ///
-    /// Internal so a test can pin it: this is the only place the app turns
-    /// arbitrary pasted text into something with a name.
     static func name(for text: String) -> String {
         let firstLine = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
