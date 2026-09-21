@@ -78,10 +78,17 @@ extension TrayStore {
         if let url = file.fileURL {
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-            if (try? add(
+            let copy = { try self.add(
                 copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier,
                 board: board
-            )) != nil { return }
+            ) }
+            // A folder has no bytes to fall back on: `data` would store an
+            // empty file under the folder's name.
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                _ = try copy()
+                return
+            }
+            if (try? copy()) != nil { return }
         }
         _ = try add(data: file.data, suggestedName: file.filename, uti: file.type?.identifier, board: board)
     }

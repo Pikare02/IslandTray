@@ -30,6 +30,23 @@ final class TrayStoreTests: XCTestCase {
         XCTAssertEqual(loaded[0].ext, "txt")
     }
 
+    /// Shortcuts can hand a folder over with no type at all.
+    func testAFolderIsStoredWholeAndKnownAsAFolder() throws {
+        let source = root.deletingLastPathComponent()
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("Trip", isDirectory: true)
+        try FileManager.default.createDirectory(at: source.appendingPathComponent("sub"), withIntermediateDirectories: true)
+        try Data(count: 5).write(to: source.appendingPathComponent("sub/a.bin"))
+
+        let item = try store.add(copyingFrom: source, suggestedName: nil, uti: nil)
+
+        XCTAssertEqual(item.name, "Trip")
+        XCTAssertEqual(item.uti, "public.folder")
+        XCTAssertEqual(item.size, 5)
+        let stored = item.fileURL(in: root.appendingPathComponent("Items"))
+        XCTAssertEqual(try Data(contentsOf: stored.appendingPathComponent("sub/a.bin")).count, 5)
+    }
+
     func testStoredBytesMatch() throws {
         let payload = Data("island".utf8)
         let item = try store.add(data: payload, suggestedName: "b.bin", uti: "public.data")

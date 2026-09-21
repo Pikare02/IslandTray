@@ -7,6 +7,16 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.3.1] — 2026-09-22
+
+### 修正
+- フォルダ: ファイル App からのコピーを協調読み込みにし、フォルダの中身をファイル App に
+  用意させるように。URL だけを渡してくるフォルダも取り込めます。それでも失敗したドロップは、
+  設定の診断欄に理由が表示されます。
+
+### 共有シート
+- 共有シートのショートカットでフォルダも送れるように。
+
 ## [1.3.0] — 2026-09-22
 
 ### トレイ
@@ -105,6 +115,7 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.3.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5

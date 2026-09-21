@@ -8,6 +8,17 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.3.1] — 2026-09-22
+
+### Fixed
+- Folders: the copy out of Files is a coordinated read, so the Files app
+  materialises the folder's contents for it, and a folder whose provider only
+  hands over its URL is taken in too. A drop that still fails says why in
+  Settings → diagnostics.
+
+### Share sheet
+- The share-sheet shortcut accepts folders.
+
 ## [1.3.0] — 2026-09-22
 
 ### Tray
@@ -112,6 +123,7 @@ The first release.
 - Unsigned `.ipa` builds for TrollStore (`Release`) and AltStore / SideStore
   (`Free-Release`).
 
+[1.3.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.1
 [1.3.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5

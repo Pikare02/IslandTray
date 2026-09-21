@@ -29,6 +29,8 @@ OUT = Path("Resources/Shortcuts")
 # of the sheet rather than appearing and failing.
 SHARE_INPUTS = [
     "WFGenericFileContentItem",
+    # A folder from Files. Without it the shortcut is not offered for one.
+    "WFFolderContentItem",
     "WFImageContentItem",
     "WFAVAssetContentItem",
     "WFPDFContentItem",
