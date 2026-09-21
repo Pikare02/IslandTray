@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// One item, as a card in a grid or a row in a list. Presentation only: the
 /// drag, the selection and the layout all belong to `TrayGridView`, which is
@@ -37,6 +38,11 @@ struct TrayItemView: View {
                 // whatever `removeOnExport` says.
                 ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
                     Label(L.s("common.share"), systemImage: "square.and.arrow.up")
+                }
+                if UTType(item.uti)?.conforms(to: .text) == true {
+                    Button { RichText.copy(item) } label: {
+                        Label(L.s("common.copy"), systemImage: "doc.on.doc")
+                    }
                 }
                 Button(role: .destructive, action: onDelete) {
                     Label(L.s("common.delete"), systemImage: "trash")

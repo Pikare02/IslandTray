@@ -242,6 +242,17 @@ final class TrayModel {
         await returnToTray(staged)
     }
 
+    /// Picks up whatever was written while this screen was not looking.
+    ///
+    /// A shortcut's intent runs inside this process but outside this view's
+    /// world: it adds to the store directly, and nothing told the model. The
+    /// item was there all along -- on disk, in the island's count -- and
+    /// simply never appeared on the screen the user then opened.
+    func refresh() async {
+        guard reload() else { return }
+        await syncActivity()
+    }
+
     /// Updates the Live Activity and surfaces any failure rather than
     /// swallowing it — the spec requires the reason to be visible.
     func syncActivity() async {

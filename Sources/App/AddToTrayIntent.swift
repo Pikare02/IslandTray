@@ -31,30 +31,55 @@ struct AddToTrayIntent: AppIntent {
         var failed: [String] = []
         for file in files {
             do {
-                // The URL when there is one: it is already a file on disk, and
-                // `data` would read a video into memory to write it straight
-                // back out again.
-                if let url = file.fileURL {
-                    _ = try TrayStore.shared.add(
-                        copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier
-                    )
-                } else {
-                    _ = try TrayStore.shared.add(
-                        data: file.data, suggestedName: file.filename, uti: file.type?.identifier
-                    )
-                }
+                try TrayStore.shared.add(file, board: .tray)
                 added += 1
             } catch {
                 failed.append(file.filename)
             }
         }
         // The island is what the user sees from wherever they ran this, so it
-        // has to be told. `restart()` rather than `sync()`: this process may
-        // have just been launched for the intent and have no activity of its
-        // own yet.
-        await TrayActivityController.shared.restart()
+        // has to be told.
+        await TrayStore.didChangeFromIntent()
 
         let result = DropReceiver.Result(added: added, failed: failed)
         return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
+    }
+}
+
+extension TrayStore {
+    /// Posted after a shortcut wrote to the store. The intent runs in this
+    /// process, so an open screen hears it and shows the item now instead of
+    /// the next time the app comes to the front.
+    static let didChangeFromIntentNotification = Notification.Name("TrayStore.didChangeFromIntent")
+
+    /// The island and any open screen, after a shortcut wrote to the store.
+    /// `restart()` rather than `sync()`: this process may have just been
+    /// launched for the intent and have no activity of its own yet. Main
+    /// actor so the notification arrives where SwiftUI can take it.
+    @MainActor
+    static func didChangeFromIntent() async {
+        await TrayActivityController.shared.restart()
+        NotificationCenter.default.post(name: didChangeFromIntentNotification, object: nil)
+    }
+
+    /// Stores a file handed over by Shortcuts.
+    ///
+    /// The URL when there is one: it is already a file on disk, and `data`
+    /// would read a video into memory to write it straight back out. That URL
+    /// is security-scoped -- a copied photo or a file from Files lives outside
+    /// this sandbox -- so it is only readable inside an access; without one the
+    /// copy fails and the item is reported as not added. `data` is the fallback
+    /// for any URL that still cannot be copied, since IntentFile handles the
+    /// access itself when it reads.
+    func add(_ file: IntentFile, board: TrayBoard) throws {
+        if let url = file.fileURL {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            if (try? add(
+                copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier,
+                board: board
+            )) != nil { return }
+        }
+        _ = try add(data: file.data, suggestedName: file.filename, uti: file.type?.identifier, board: board)
     }
 }

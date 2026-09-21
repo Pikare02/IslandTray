@@ -9,6 +9,7 @@
 "banner.removeFailed" = "削除に失敗しました";
 "banner.removePartial" = "一部のファイルを削除できませんでした";
 "common.close" = "閉じる";
+"common.copy" = "コピー";
 "common.delete" = "削除";
 "common.deselectAll" = "すべて解除";
 "common.done" = "完了";

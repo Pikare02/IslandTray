@@ -52,6 +52,12 @@ struct TrayView: View {
             // and the condition are `start()`'s, where a test can reach them.
             await model.start()
         }
+        // A shortcut run while this screen is up -- the Action button, a back
+        // tap -- never takes the app out of the foreground, so the scene-phase
+        // reload below would not see its item until the next visit.
+        .onReceive(NotificationCenter.default.publisher(for: TrayStore.didChangeFromIntentNotification)) { _ in
+            model.reload()
+        }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
             // tray now: the receiving app has finished copying by the time the
@@ -62,6 +68,10 @@ struct TrayView: View {
                 // the app can leave the highlight behind it.
                 isTargeted = false
                 Task {
+                    // First: everything below works from `items`, and an
+                    // intent may have changed what is on disk since this view
+                    // last read it.
+                    await model.refresh()
                     await model.flushExported()
                     // Whatever the user sent here through another app's
                     // "ファイルに保存" while we were away.
@@ -171,6 +181,9 @@ struct BoardView: View {
                     if !isSelecting { FilterMenu(filter: $filter) }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    if !isSelecting && !items.isEmpty { layoutToggle }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     if !isSelecting && !items.isEmpty { arrangeMenu }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -272,14 +285,20 @@ struct BoardView: View {
                 Text(L.s("settings.sort.ascending")).tag(true)
             }
             Toggle(L.s("settings.group"), isOn: $groupsByKind)
-            Divider()
-            Picker(L.s("layout.title"), selection: $layoutRaw) {
-                Text(L.s("layout.list")).tag(TrayLayout.list.rawValue)
-                Text(L.s("layout.grid")).tag(TrayLayout.grid.rawValue)
-            }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
         }
+    }
+
+    /// A button of its own rather than a row in the sort menu, where it was
+    /// out of sight. The icon is the layout a tap switches to.
+    private var layoutToggle: some View {
+        Button {
+            layoutRaw = (layout == .grid ? TrayLayout.list : .grid).rawValue
+        } label: {
+            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
+        }
+        .accessibilityLabel(L.s(layout == .grid ? "layout.list" : "layout.grid"))
     }
 
     private var selectedItems: [TrayItem] {
