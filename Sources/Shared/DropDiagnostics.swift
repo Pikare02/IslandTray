@@ -30,6 +30,13 @@ enum DropDiagnostics {
         defaults.removeObject(forKey: key)
     }
 
+    /// A dropped item that did not make it in, and why.
+    static func failure(name: String?, types: [String], error: Error) -> String {
+        let shortTypes = types.map { $0.components(separatedBy: ".").suffix(2).joined(separator: ".") }
+        let reason = (error as NSError).domain + " \((error as NSError).code): " + error.localizedDescription
+        return "✗ \(name ?? "?")\n  \(shortTypes.joined(separator: ", "))\n  \(reason)"
+    }
+
     /// One line per dropped item: what it was, what the provider offered, and
     /// what came out of it.
     static func line(name: String?, types: [String], origin: TrayItemOrigin?) -> String {

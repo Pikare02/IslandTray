@@ -44,6 +44,7 @@ Each version's full notes, with its `.ipa` files, are on its GitHub release page
 
 | Version | Highlights |
 |---|---|
+| [1.3.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.1) | Folders come in more reliably and through the share-sheet shortcut; failed drops say why |
 | [1.3.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0) | Folders go into the tray and come out as folders |
 | [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | Copy from the clipboard board (tap the name, swipe right, or long-press); the island follows the share-sheet shortcut at once |
 | [1.1.5](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5) | The two shortcuts are back (1.1.4 shipped without them) |

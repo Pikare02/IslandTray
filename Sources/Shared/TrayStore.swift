@@ -102,6 +102,13 @@ final class TrayStore: Sendable {
         try prepare()
         let name = suggestedName ?? source.lastPathComponent
         let size = Self.byteCount(of: source)
+        // A folder handed over with no type, or a vague one (Shortcuts can
+        // say nothing), is still a folder. A package keeps its own type.
+        var uti = uti
+        if (try? source.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+           UTType(uti ?? "")?.conforms(to: .directory) != true {
+            uti = UTType.folder.identifier
+        }
         var item = makeItem(suggestedName: name, uti: uti, size: size)
         item.origin = origin
         item.board = board
@@ -109,7 +116,7 @@ final class TrayStore: Sendable {
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
         }
-        try FileManager.default.copyItem(at: source, to: destination)
+        try Self.coordinatedCopy(from: source, to: destination)
         try commit(item, payload: destination)
         return item
     }
@@ -548,6 +555,26 @@ final class TrayStore: Sendable {
             .sorted {
                 $0.addedAt == $1.addedAt ? $0.id.uuidString < $1.id.uuidString : $0.addedAt > $1.addedAt
             }
+    }
+
+    /// Copies inside a coordinated read of the source.
+    ///
+    /// The source is often another app's file -- the Files app's own copy of
+    /// a folder, a document in iCloud Drive -- and its provider only
+    /// materialises the contents (a folder's files, a download not yet on the
+    /// device) for a reader that coordinates. An uncoordinated copy of a
+    /// folder can fail, or copy an empty shell.
+    static func coordinatedCopy(from source: URL, to destination: URL) throws {
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: .withoutChanges, error: &coordinationError) { url in
+            do {
+                try FileManager.default.copyItem(at: url, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+        if let error = coordinationError ?? copyError { throw error }
     }
 
     /// A file's size, or for a folder the total of every file inside it --

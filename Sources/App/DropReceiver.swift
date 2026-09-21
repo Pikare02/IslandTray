@@ -77,6 +77,11 @@ enum DropReceiver {
                 added += 1
             } catch {
                 failed.append(provider.suggestedName ?? "unnamed item")
+                // What would otherwise vanish into "could not be added": which
+                // types the other app offered, and what refused.
+                DropDiagnostics.record(DropDiagnostics.failure(
+                    name: provider.suggestedName, types: provider.registeredTypeIdentifiers, error: error
+                ))
             }
         }
         return Result(added: added, failed: failed, duplicates: duplicates)
@@ -211,10 +216,19 @@ enum DropReceiver {
         if let inPlace = try? await loadInPlace(from: provider, typeIdentifier: typeIdentifier) {
             loaded = inPlace
         } else {
-            loaded = Loaded(
-                payload: try await loadFile(from: provider, typeIdentifier: typeIdentifier),
-                origin: nil
-            )
+            do {
+                loaded = Loaded(
+                    payload: try await loadFile(from: provider, typeIdentifier: typeIdentifier),
+                    origin: nil
+                )
+            } catch where UTType(typeIdentifier)?.conforms(to: .directory) == true {
+                // A folder has one more way out: some providers hand over its
+                // URL as the item itself rather than as a file representation.
+                loaded = Loaded(
+                    payload: try await loadURLItem(from: provider, typeIdentifier: typeIdentifier),
+                    origin: nil
+                )
+            }
         }
         // The in-place file itself, then a file URL the provider hands over.
         // Nothing else: a photo arrives re-encoded with nothing in it that
@@ -286,6 +300,35 @@ enum DropReceiver {
         }
     }
 
+    /// The provider's item for `typeIdentifier`, when that item is a URL,
+    /// staged like the other two paths.
+    @MainActor
+    private static func loadURLItem(
+        from provider: NSItemProvider, typeIdentifier: String
+    ) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: typeIdentifier) { item, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let url = item as? URL ?? (item as? Data).flatMap({
+                    URL(dataRepresentation: $0, relativeTo: nil)
+                }) else {
+                    continuation.resume(throwing: CocoaError(.fileReadUnsupportedScheme))
+                    return
+                }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    continuation.resume(returning: try stage(url))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     /// Copies a file that is about to become invalid into a staging location.
     ///
     /// Both load paths need this and both need it synchronously: the URL they
@@ -295,7 +338,7 @@ enum DropReceiver {
         let staging = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension(url.pathExtension)
-        try FileManager.default.copyItem(at: url, to: staging)
+        try TrayStore.coordinatedCopy(from: url, to: staging)
         return staging
     }
 
