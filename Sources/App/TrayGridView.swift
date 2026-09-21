@@ -26,7 +26,7 @@ struct TrayGridView: UIViewRepresentable {
         let view = UICollectionView(
             frame: .zero,
             collectionViewLayout: Self.collectionLayout(
-                headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions
+                headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions, copySwipe: context.coordinator.copyActions
             )
         )
         view.backgroundColor = .clear
@@ -58,7 +58,7 @@ struct TrayGridView: UIViewRepresentable {
             context.coordinator.layout = layout
             view.setCollectionViewLayout(
                 Self.collectionLayout(
-                    headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions
+                    headers: ordering.groupsByKind, layout: layout, swipe: context.coordinator.swipeActions, copySwipe: context.coordinator.copyActions
                 ),
                 animated: false
             )
@@ -71,7 +71,8 @@ struct TrayGridView: UIViewRepresentable {
     private static func collectionLayout(
         headers: Bool,
         layout: TrayLayout,
-        swipe: @escaping UICollectionLayoutListConfiguration.SwipeActionsConfigurationProvider
+        swipe: @escaping UICollectionLayoutListConfiguration.SwipeActionsConfigurationProvider,
+        copySwipe: @escaping UICollectionLayoutListConfiguration.SwipeActionsConfigurationProvider
     ) -> UICollectionViewCompositionalLayout {
         UICollectionViewCompositionalLayout { _, environment in
             if layout == .list {
@@ -85,6 +86,8 @@ struct TrayGridView: UIViewRepresentable {
                 // row red, taps the haptic and deletes -- a full swipe performs
                 // the first action by default.
                 configuration.trailingSwipeActionsConfigurationProvider = swipe
+                // Swipe right for Copy, the same way round.
+                configuration.leadingSwipeActionsConfigurationProvider = copySwipe
                 return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
             }
             let spacing: CGFloat = 12
@@ -253,6 +256,20 @@ struct TrayGridView: UIViewRepresentable {
             }
             delete.image = UIImage(systemName: "trash")
             return UISwipeActionsConfiguration(actions: [delete])
+        }
+
+        /// Clipboard items only: copying a tray file back out is what the
+        /// drag and the share sheet are for.
+        func copyActions(at indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard !parent.isSelecting,
+                  let id = dataSource.itemIdentifier(for: indexPath),
+                  let item = shown[id], item.boardOrTray == .clipboard else { return nil }
+            let copy = UIContextualAction(style: .normal, title: L.s("common.copy")) { _, _, done in
+                done(RichText.copy(item))
+            }
+            copy.image = UIImage(systemName: "doc.on.doc")
+            copy.backgroundColor = .systemBlue
+            return UISwipeActionsConfiguration(actions: [copy])
         }
 
         // MARK: - Selection

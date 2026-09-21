@@ -36,6 +36,21 @@ Dynamic Island がその取っ手になります。作業中に放り込んで�
   または取り出した項目をトレイから消す設定（コピーではなく切り取り）。
 - **英語と日本語**、ライト / ダークのテーマ、好きなハイライトカラー。
 
+## リリースノート
+
+各バージョンの詳しい内容と `.ipa` は、GitHub のリリースページにあります。全体は[変更履歴](CHANGELOG.ja.md)にもまとめています。
+
+| バージョン | 主な変更 |
+|---|---|
+| [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | クリップボードからコピー（名前をタップ・右スワイプ・長押し）。共有シートのショートカットで追加するとアイランドがすぐ更新 |
+| [1.1.5](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5) | 2 つのショートカットを復旧（1.1.4 に含まれていなかった） |
+| [1.1.4](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4) | トレイからの削除と元ファイルの削除を別々の設定に。取り出しは常にコピー |
+| [1.1.3](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3) | インストールページを GitHub Pages に移動 |
+| [1.1.2](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2) | iOS が知らない形式（`.ipa` など）もファイルアプリへドラッグ可能に |
+| [1.1.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1) | アップデートのお知らせで、そのバージョンをスキップ可能に |
+| [1.1.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0) | 起動時に新しいリリースを確認。既定は切り取りではなくコピー |
+| [1.0.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.0.0) | 最初のリリース |
+
 ## 動作環境
 
 - iOS / iPadOS 17.0 以降

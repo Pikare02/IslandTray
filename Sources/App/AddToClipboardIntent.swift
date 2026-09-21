@@ -48,7 +48,7 @@ struct AddToClipboardIntent: AppIntent {
 
         await TrayStore.didChangeFromIntent()
         let result = DropReceiver.Result(added: added, failed: failed)
-        return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
+        return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result, board: .clipboard)))
     }
 
     /// The last resort when the shortcut handed over nothing: read the
@@ -68,9 +68,9 @@ struct AddToClipboardIntent: AppIntent {
                     data: Data(text.utf8), suggestedName: Self.name(for: text),
                     uti: UTType.utf8PlainText.identifier, board: .clipboard
                 )
-                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []))
+                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []), board: .clipboard)
             } catch {
-                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]))
+                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]), board: .clipboard)
             }
         }
         if let type = board.types.first, let data = board.data(forPasteboardType: type) {
@@ -81,9 +81,9 @@ struct AddToClipboardIntent: AppIntent {
                     data: data, suggestedName: "clipboard\(ext)",
                     uti: uti?.identifier, board: .clipboard
                 )
-                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []))
+                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []), board: .clipboard)
             } catch {
-                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]))
+                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]), board: .clipboard)
             }
         }
         return L.s("clipboard.connectVariable")

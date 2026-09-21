@@ -162,3 +162,5 @@
 "update.later" = "Later";
 "update.skip" = "Don’t Show Again for This Version";
 "settings.export.deleteOriginal" = "Also delete the original file";
+"clipboard.result.added" = "Added to the clipboard";
+"clipboard.result.partial" = "Added %1$d to the clipboard (%2$d could not be added)";

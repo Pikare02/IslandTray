@@ -7,6 +7,17 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.2.0] — 2026-09-21
+
+### クリップボード
+- 項目の名前をタップすると、iPhone のクリップボードにコピーされます。行を右にスワイプすると
+  「コピー」、そのまま最後まで引くとすぐにコピー。グリッドでは長押しメニューに「コピー」が
+  あります。テキストだけでなく画像やファイルもコピーできます。
+- クリップボード用ショートカットの完了メッセージが「クリップボードに追加されました」になりました。
+
+### 修正
+- 共有シートのショートカットで追加すると、アプリを開かなくても Dynamic Island がすぐ更新されます。
+
 ## [1.1.5] — 2026-09-21
 
 ### 修正
@@ -86,6 +97,7 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3

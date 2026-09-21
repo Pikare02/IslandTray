@@ -163,10 +163,11 @@ enum DropReceiver {
     /// A partial outcome names both sides, the same rule `TrayRemovalResult`,
     /// `incompleteRemoval` and `ingestBanner` follow. Counts, not names: the
     /// sheet is a few lines tall and a long share can fail a dozen items.
-    static func shareSheetMessage(for result: Result) -> String {
+    static func shareSheetMessage(for result: Result, board: TrayBoard = .tray) -> String {
         guard result.added > 0 else { return L.s("share.result.none") }
-        guard !result.failed.isEmpty else { return L.s("share.result.added", result.added) }
-        return L.s("share.result.partial", result.added, result.failed.count)
+        let prefix = board == .clipboard ? "clipboard.result" : "share.result"
+        guard !result.failed.isEmpty else { return L.s("\(prefix).added", result.added) }
+        return L.s("\(prefix).partial", result.added, result.failed.count)
     }
 
     /// Prefer the most specific concrete type the provider offers, ignoring

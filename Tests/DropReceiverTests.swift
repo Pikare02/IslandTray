@@ -74,6 +74,14 @@ final class DropReceiverTests: XCTestCase {
         )
     }
 
+    /// The clipboard shortcut says where things went, not "to the tray".
+    func testTheClipboardSaysClipboard() {
+        XCTAssertEqual(
+            DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []), board: .clipboard),
+            "クリップボードに追加されました"
+        )
+    }
+
 
     // MARK: - duplicate(of:among:at:)
     //
