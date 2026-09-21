@@ -143,3 +143,4 @@
 "settings.shortcut.clip.header" = "Saving what you copy";
 "コピーした内容をアプリのクリップボードに保存します。「クリップボードを取得」の出力をつなげてください。" = "Saves what you copied to the app's clipboard. Connect the output of “Get Clipboard” to it.";
 "内容" = "Content";
+"clipboard.connectVariable" = "Nothing to save. Connect the output of “Get Clipboard” to this action's Content field.";

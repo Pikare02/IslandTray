@@ -1,4 +1,5 @@
 import AppIntents
+import UIKit
 import UniformTypeIdentifiers
 
 /// Puts what is on the system clipboard onto the app's clipboard board.
@@ -19,14 +20,22 @@ struct AddToClipboardIntent: AppIntent {
     )
     static let openAppWhenRun: Bool = false
 
+    /// Optional, so a shortcut that has not had the Clipboard variable
+    /// connected to it still runs instead of stopping to ask for a file every
+    /// time. What it does with nothing is below.
     @Parameter(title: "内容", supportedTypeIdentifiers: ["public.item"])
-    var content: [IntentFile]
+    var content: [IntentFile]?
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        let files = content ?? []
+        guard !files.isEmpty else {
+            return .result(dialog: IntentDialog(stringLiteral: await fromPasteboard()))
+        }
+
         var added = 0
         var failed: [String] = []
 
-        for file in content {
+        for file in files {
             do {
                 try add(file)
                 added += 1
@@ -37,6 +46,44 @@ struct AddToClipboardIntent: AppIntent {
 
         let result = DropReceiver.Result(added: added, failed: failed)
         return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
+    }
+
+    /// The last resort when the shortcut handed over nothing: read the
+    /// system clipboard here instead.
+    ///
+    /// iOS only lets an app read the clipboard while it is in front, so this
+    /// works when the shortcut is run with the app open and not when it is
+    /// run from a back tap in another app. That is exactly when it says so,
+    /// rather than reporting that it added nothing and leaving the person to
+    /// guess which of the two happened.
+    @MainActor
+    private func fromPasteboard() async -> String {
+        let board = UIPasteboard.general
+        if let text = board.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            do {
+                _ = try TrayStore.shared.add(
+                    data: Data(text.utf8), suggestedName: Self.name(for: text),
+                    uti: UTType.utf8PlainText.identifier, board: .clipboard
+                )
+                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []))
+            } catch {
+                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]))
+            }
+        }
+        if let type = board.types.first, let data = board.data(forPasteboardType: type) {
+            let uti = UTType(type)
+            let ext = uti?.preferredFilenameExtension.map { ".\($0)" } ?? ""
+            do {
+                _ = try TrayStore.shared.add(
+                    data: data, suggestedName: "clipboard\(ext)",
+                    uti: uti?.identifier, board: .clipboard
+                )
+                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []))
+            } catch {
+                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]))
+            }
+        }
+        return L.s("clipboard.connectVariable")
     }
 
     private func add(_ file: IntentFile) throws {
