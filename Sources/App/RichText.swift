@@ -47,12 +47,24 @@ enum RichText {
         return (type, data, plain)
     }
 
-    /// Puts a text item on the system clipboard: the formatting for apps that
-    /// paste it, and the plain words beside it for every app that does not.
-    /// Returns false for an item that is not text.
+    /// Puts an item on the system clipboard: for text, the formatting for
+    /// apps that paste it and the plain words beside it for every app that
+    /// does not; anything else, as its bytes under its own type. Returns false
+    /// when the file could not be read.
+    ///
+    /// Bytes, not an NSItemProvider: a provider is read lazily, from this
+    /// process, and the paste happens in another app after this one is
+    /// suspended.
     @MainActor
     @discardableResult
     static func copy(_ item: TrayItem) -> Bool {
+        let copied = write(item)
+        UINotificationFeedbackGenerator().notificationOccurred(copied ? .success : .error)
+        return copied
+    }
+
+    @MainActor
+    private static func write(_ item: TrayItem) -> Bool {
         if let rich = contents(of: item) {
             UIPasteboard.general.setItems([[
                 rich.type.identifier: rich.data,
@@ -60,10 +72,12 @@ enum RichText {
             ]])
             return true
         }
-        guard UTType(item.uti)?.conforms(to: .text) == true,
-              let data = try? Data(contentsOf: item.fileURL),
-              let text = String(data: data, encoding: .utf8) else { return false }
-        UIPasteboard.general.string = text
+        guard let data = try? Data(contentsOf: item.fileURL) else { return false }
+        if UTType(item.uti)?.conforms(to: .text) == true, let text = String(data: data, encoding: .utf8) {
+            UIPasteboard.general.string = text
+        } else {
+            UIPasteboard.general.setItems([[item.uti: data]])
+        }
         return true
     }
 }

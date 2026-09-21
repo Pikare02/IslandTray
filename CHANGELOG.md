@@ -8,6 +8,18 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.2.0] — 2026-09-21
+
+### Clipboard
+- Tap an item's name to copy it back to the system clipboard; swipe a row
+  right for Copy, or all the way to copy at once; in the grid, Copy is in the
+  long-press menu. Works for images and files as well as text.
+- The clipboard shortcut says “Added to the clipboard”, not “to the tray”.
+
+### Fixed
+- Adding through the share-sheet shortcut updates the Dynamic Island at once,
+  instead of the next time the app is opened.
+
 ## [1.1.5] — 2026-09-21
 
 ### Fixed
@@ -92,6 +104,7 @@ The first release.
 - Unsigned `.ipa` builds for TrollStore (`Release`) and AltStore / SideStore
   (`Free-Release`).
 
+[1.2.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0
 [1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3

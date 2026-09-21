@@ -10,7 +10,12 @@ import AppIntents
 /// to the app's own container. A one-action shortcut built on this, with
 /// "Show in Share Sheet" turned on, appears in the share sheet of every app
 /// that can share a file.
-struct AddToTrayIntent: AppIntent {
+///
+/// `LiveActivityIntent` because the island has to follow what this adds: a
+/// plain intent run from another app's share sheet gets a background process
+/// that ActivityKit will not let update the island, so the count stayed put
+/// until the app was next opened.
+struct AddToTrayIntent: AppIntent, LiveActivityIntent {
     // `let`, not `var`, for the same reason as RefreshTrayActivityIntent: the
     // protocol's requirements are get-only and a mutable static is shared
     // state Swift 6 cannot prove safe.

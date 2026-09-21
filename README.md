@@ -38,6 +38,21 @@ from any app, and drag them out where they are needed.
   (cut instead of copy).
 - **English and Japanese**, light/dark theme and a highlight colour of your own.
 
+## Release notes
+
+Each version's full notes, with its `.ipa` files, are on its GitHub release page. Everything is also in the [changelog](CHANGELOG.md).
+
+| Version | Highlights |
+|---|---|
+| [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | Copy from the clipboard board (tap the name, swipe right, or long-press); the island follows the share-sheet shortcut at once |
+| [1.1.5](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5) | The two shortcuts are back (1.1.4 shipped without them) |
+| [1.1.4](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4) | Removing from the tray and deleting the original are separate settings; drags out are always a copy |
+| [1.1.3](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3) | The install page moves to GitHub Pages |
+| [1.1.2](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2) | Files of an unknown type (`.ipa`) can be dragged into Files |
+| [1.1.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1) | The update popup can skip a version |
+| [1.1.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0) | Checks for a newer release on launch; copy, not cut, by default |
+| [1.0.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.0.0) | First release |
+
 ## Requirements
 
 - iOS / iPadOS 17.0 or later

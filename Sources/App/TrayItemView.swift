@@ -39,7 +39,7 @@ struct TrayItemView: View {
                 ShareLink(item: SharedTrayFile(item: item), preview: SharePreview(item.name)) {
                     Label(L.s("common.share"), systemImage: "square.and.arrow.up")
                 }
-                if UTType(item.uti)?.conforms(to: .text) == true {
+                if isClipboard || UTType(item.uti)?.conforms(to: .text) == true {
                     Button { RichText.copy(item) } label: {
                         Label(L.s("common.copy"), systemImage: "doc.on.doc")
                     }
@@ -48,6 +48,22 @@ struct TrayItemView: View {
                     Label(L.s("common.delete"), systemImage: "trash")
                 }
             }
+    }
+
+    private var isClipboard: Bool { item.boardOrTray == .clipboard }
+
+    /// On the clipboard board the name is a copy button: putting a kept item
+    /// back on the system clipboard is what that board is for. Anywhere else,
+    /// and while selecting, it is only a label and a tap opens the item.
+    @ViewBuilder
+    private func name(_ text: some View) -> some View {
+        if isClipboard && !isSelecting {
+            Button { RichText.copy(item) } label: { text }
+                .buttonStyle(.plain)
+                .accessibilityHint(L.s("common.copy"))
+        } else {
+            text
+        }
     }
 
     @ViewBuilder
@@ -82,9 +98,9 @@ struct TrayItemView: View {
             .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
+                name(Text(item.name)
                     .lineLimit(2)
-                    .truncationMode(.middle)
+                    .truncationMode(.middle))
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -123,10 +139,10 @@ struct TrayItemView: View {
             }
             .aspectRatio(1, contentMode: .fit)
 
-            Text(item.name)
+            name(Text(item.name)
                 .font(.caption2)
                 .lineLimit(1)
-                .truncationMode(.middle)
+                .truncationMode(.middle))
         }
     }
 
