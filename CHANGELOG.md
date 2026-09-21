@@ -8,6 +8,12 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.1.3] — 2026-09-21
+
+### Changed
+- The install page moved to GitHub Pages
+  (<https://pikare02.github.io/IslandTray/>); the update popup opens it there.
+
 ## [1.1.2] — 2026-09-21
 
 ### Fixed
@@ -69,6 +75,7 @@ The first release.
 - Unsigned `.ipa` builds for TrollStore (`Release`) and AltStore / SideStore
   (`Free-Release`).
 
+[1.1.3]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0
