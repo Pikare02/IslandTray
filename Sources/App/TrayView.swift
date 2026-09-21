@@ -52,15 +52,19 @@ struct TrayView: View {
             L.s("update.title"),
             isPresented: Binding(get: { availableUpdate != nil }, set: { if !$0 { availableUpdate = nil } })
         ) {
-            Button(L.s("update.later"), role: .cancel) {}
             Button(L.s("update.open")) { openURL(UpdateChecker.installPage) }
+            Button(L.s("update.skip")) { TraySettings().skippedUpdateVersion = availableUpdate }
+            Button(L.s("update.later"), role: .cancel) {}
         } message: {
             Text(L.s("update.message", availableUpdate ?? "", UpdateChecker.currentVersion))
         }
         .task {
             // Quietly: a failed check on launch is not worth interrupting for.
-            if TraySettings().checksForUpdates {
-                availableUpdate = try? await UpdateChecker.newerVersion()
+            let settings = TraySettings()
+            if settings.checksForUpdates,
+               let version = try? await UpdateChecker.newerVersion(),
+               version != settings.skippedUpdateVersion {
+                availableUpdate = version
             }
         }
         .task {
