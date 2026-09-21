@@ -9,6 +9,7 @@
 "banner.removeFailed" = "Deletion failed";
 "banner.removePartial" = "Some files could not be deleted";
 "common.close" = "Close";
+"common.copy" = "Copy";
 "common.delete" = "Delete";
 "common.deselectAll" = "Deselect All";
 "common.done" = "Done";

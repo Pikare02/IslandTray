@@ -21,15 +21,19 @@ from pathlib import Path
 BUNDLE = "com.pikare.islandtray"
 OUT = Path("Resources/Shortcuts")
 
-# Every content type the share sheet can offer, so the shortcut appears for
-# anything shareable rather than for files alone.
+# Only what can actually become a file. A URL cannot: Shortcuts answers a
+# shared web image with "WFURLContentItem produced no file representation for
+# type public.data" and stops before the action runs. Leaving URL-ish classes
+# out makes Shortcuts take the image representation the same share offers
+# instead -- and where a share really is only a link, the shortcut stays out
+# of the sheet rather than appearing and failing.
 SHARE_INPUTS = [
-    "WFAppStoreAppContentItem", "WFArticleContentItem", "WFContactContentItem",
-    "WFDateContentItem", "WFEmailAddressContentItem", "WFGenericFileContentItem",
-    "WFImageContentItem", "WFiTunesProductContentItem", "WFLocationContentItem",
-    "WFDCMapsLinkContentItem", "WFAVAssetContentItem", "WFPDFContentItem",
-    "WFPhoneNumberContentItem", "WFRichTextContentItem", "WFSafariWebPageContentItem",
-    "WFStringContentItem", "WFURLContentItem",
+    "WFGenericFileContentItem",
+    "WFImageContentItem",
+    "WFAVAssetContentItem",
+    "WFPDFContentItem",
+    "WFRichTextContentItem",
+    "WFStringContentItem",
 ]
 
 

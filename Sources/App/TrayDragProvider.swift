@@ -37,6 +37,18 @@ enum TrayDragProvider {
             completion(item.fileURL, false, nil)
             return nil
         }
+        // Formatted text is offered as its plain words too, after the file so
+        // that a receiver that reads the formatting still prefers it. Without
+        // this a notes field or a chat box gets nothing, or the RTF source.
+        if let plain = RichText.contents(of: item)?.plain {
+            provider.registerDataRepresentation(
+                forTypeIdentifier: UTType.utf8PlainText.identifier, visibility: .all
+            ) { completion in
+                model.markExported(item.id)
+                completion(Data(plain.utf8), nil)
+                return nil
+            }
+        }
         return provider
     }
 

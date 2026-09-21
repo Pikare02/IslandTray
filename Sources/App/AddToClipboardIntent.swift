@@ -29,7 +29,9 @@ struct AddToClipboardIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let files = content ?? []
         guard !files.isEmpty else {
-            return .result(dialog: IntentDialog(stringLiteral: await fromPasteboard()))
+            let message = await fromPasteboard()
+            await TrayStore.didChangeFromIntent()
+            return .result(dialog: IntentDialog(stringLiteral: message))
         }
 
         var added = 0
@@ -37,13 +39,14 @@ struct AddToClipboardIntent: AppIntent {
 
         for file in files {
             do {
-                try add(file)
+                try await add(file)
                 added += 1
             } catch {
                 failed.append(file.filename)
             }
         }
 
+        await TrayStore.didChangeFromIntent()
         let result = DropReceiver.Result(added: added, failed: failed)
         return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
     }
@@ -86,7 +89,23 @@ struct AddToClipboardIntent: AppIntent {
         return L.s("clipboard.connectVariable")
     }
 
+    @MainActor
     private func add(_ file: IntentFile) throws {
+        // Formatted text is kept as the format it came in -- a receiver that
+        // reads it gets the formatting, and every other one is offered the
+        // plain words on the way out (TrayDragProvider). Decoded as UTF-8
+        // instead, it became a .txt of RTF or HTML source.
+        let data = file.data
+        if let rich = RichText.type(uti: file.type?.identifier, filename: file.filename, data: data),
+           let plain = RichText.plainText(data, type: rich) {
+            _ = try TrayStore.shared.add(
+                data: data,
+                suggestedName: Self.name(for: plain, ext: rich.preferredFilenameExtension ?? "rtf"),
+                uti: rich.identifier,
+                board: .clipboard
+            )
+            return
+        }
         // Text arrives as a file whose name is whatever Shortcuts made up.
         // Naming it after what it says is the difference between a readable
         // board and a column of "Text.txt".
@@ -99,19 +118,7 @@ struct AddToClipboardIntent: AppIntent {
             )
             return
         }
-        // The URL when there is one: it is already a file on disk, and `data`
-        // would read a video into memory to write it straight back out.
-        if let url = file.fileURL {
-            _ = try TrayStore.shared.add(
-                copyingFrom: url, suggestedName: file.filename, uti: file.type?.identifier,
-                board: .clipboard
-            )
-        } else {
-            _ = try TrayStore.shared.add(
-                data: file.data, suggestedName: file.filename, uti: file.type?.identifier,
-                board: .clipboard
-            )
-        }
+        try TrayStore.shared.add(file, board: .clipboard)
     }
 
     /// The file's contents when it is text, and nil when it is anything else.
@@ -128,12 +135,12 @@ struct AddToClipboardIntent: AppIntent {
 
     /// A filename made of the text's first line, short enough to read on a
     /// card and safe enough to hand to the sanitizer.
-    static func name(for text: String) -> String {
+    static func name(for text: String, ext: String = "txt") -> String {
         let firstLine = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: .newlines)
             .first ?? ""
         let head = String(firstLine.prefix(40)).trimmingCharacters(in: .whitespaces)
-        return head.isEmpty ? "clipboard.txt" : "\(head).txt"
+        return head.isEmpty ? "clipboard.\(ext)" : "\(head).\(ext)"
     }
 }
