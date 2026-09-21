@@ -8,6 +8,17 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.1.4] — 2026-09-21
+
+### Changed
+- *Remove from the tray once taken* and *Also delete the original file* are
+  now two separate settings, both off by default. Deleting the original no
+  longer requires removing the item from the tray.
+
+### Fixed
+- Dragging an item out is always offered as a copy, so the Files app shows
+  the "+" instead of treating the drop as a move.
+
 ## [1.1.3] — 2026-09-21
 
 ### Changed
@@ -75,6 +86,7 @@ The first release.
 - Unsigned `.ipa` builds for TrollStore (`Release`) and AltStore / SideStore
   (`Free-Release`).
 
+[1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2
 [1.1.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1

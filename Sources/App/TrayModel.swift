@@ -199,6 +199,8 @@ final class TrayModel {
     /// the first call can run before the mark does, and the second is what
     /// makes it certain.
     func returnToTray(_ duplicates: [DropReceiver.Staged]) async {
+        // Nor may its original be deleted: it was never taken anywhere.
+        originalsToDelete.subtract(duplicates.map(\.existing.id))
         let returned = duplicates.map(\.existing.id).filter { exported.remove($0) != nil }
         guard !returned.isEmpty else { return }
         await syncActivity()
@@ -312,14 +314,28 @@ final class TrayModel {
     /// switches to copy mode in between gets their file kept, not deleted.
     /// `removeOnExport` is a parameter only so a test can set it without
     /// writing to the real user defaults.
-    nonisolated func markExported(_ id: UUID, removeOnExport: Bool = TraySettings().removeOnExport) {
-        guard removeOnExport else { return }
+    ///
+    /// Deleting the original is its own setting: it is queued in
+    /// `originalsToDelete` and does not hide the item.
+    nonisolated func markExported(
+        _ id: UUID,
+        removeOnExport: Bool = TraySettings().removeOnExport,
+        deleteOriginal: Bool = TraySettings().deleteOriginalOnExport
+    ) {
+        guard removeOnExport || deleteOriginal else { return }
         Task { @MainActor in
-            guard self.exported.insert(id).inserted else { return }
-            await self.syncActivity()
+            let hidden = removeOnExport && self.exported.insert(id).inserted
+            let queued = deleteOriginal && self.originalsToDelete.insert(id).inserted
+            guard hidden || queued else { return }
+            if hidden { await self.syncActivity() }
             await self.finishExportWhileAway(id)
         }
     }
+
+    /// Items whose original file is to be deleted at the next flush. Not
+    /// written to disk: a kill in between loses the deletion, which is the
+    /// safe way to lose it.
+    private(set) var originalsToDelete: Set<UUID> = []
 
     /// Finishes the move without waiting for the user to come back.
     ///
@@ -394,11 +410,15 @@ final class TrayModel {
     ///
     /// The set is emptied either way, so turning the setting on later cannot
     /// retroactively delete items handed out while it was off.
+    ///
+    /// The original is deleted only when `deleteOriginalOnExport` says so,
+    /// read again here for the same reason `removeOnExport` is.
     func flushExported(settings: TraySettings = TraySettings()) async {
-        let ids = exported
+        let removals = settings.removeOnExport ? exported : []
+        let originals = settings.deleteOriginalOnExport ? originalsToDelete : []
         exported = []
-        guard settings.removeOnExport else { return }
-        for id in ids {
+        originalsToDelete = []
+        for id in removals.union(originals) {
             // Re-read `items` each time rather than resolving the whole batch
             // up front: `remove(_:)` reloads, and an id that is already gone
             // must not be handed to the store again as a failed removal.
@@ -406,18 +426,24 @@ final class TrayModel {
             // these are exactly the ids it held.
             guard let item = items.first(where: { $0.id == id }) else { continue }
             let origin = item.origin
-            await remove(item)
+            let removing = removals.contains(id)
+            if removing { await remove(item) }
             // The tray copy goes first: whatever happens to the original, the
             // destination already has the file, so neither order can lose it.
             // Items with no origin -- most of them -- are simply copies, and
             // say nothing about it.
-            guard let origin, origin.deletesOriginal else {
+            guard originals.contains(id), let origin, origin.deletesOriginal else {
                 DropDiagnostics.record(L.s("diag.export.copy", item.name))
                 continue
             }
             switch OriginalRemover.remove(origin) {
             case .removed:
                 DropDiagnostics.record(L.s("diag.export.deleted", item.name))
+                // A kept item must not try to delete the same original again.
+                if !removing {
+                    try? store.clearOrigin(id: id)
+                    reload()
+                }
             case .failed(let reason):
                 banner = L.s("banner.originalFailed", reason)
             }

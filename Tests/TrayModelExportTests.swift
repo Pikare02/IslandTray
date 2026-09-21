@@ -215,4 +215,48 @@ final class TrayModelExportTests: XCTestCase {
         XCTAssertNil(model.banner, "and nothing is reported about an original it never had")
         XCTAssertTrue(try store.load().isEmpty, "the tray copy still goes")
     }
+
+    // MARK: - Deleting the original is its own setting
+
+    /// An item copied in from a real file, with a bookmark back to it.
+    private func addItemWithOriginal() throws -> (TrayItem, URL) {
+        let original = root.appendingPathComponent("original-\(UUID().uuidString).txt")
+        try Data("x".utf8).write(to: original)
+        let item = try store.add(
+            copyingFrom: original, suggestedName: "a.txt", uti: "public.plain-text",
+            origin: .file(bookmark: try original.bookmarkData())
+        )
+        model.reload()
+        return (item, original)
+    }
+
+    private func settings(removeOnExport: Bool, deleteOriginal: Bool) -> TraySettings {
+        let settings = self.settings(removeOnExport: removeOnExport)
+        settings.deleteOriginalOnExport = deleteOriginal
+        return settings
+    }
+
+    func testRemovingFromTheTrayLeavesTheOriginalAlone() async throws {
+        let (item, original) = try addItemWithOriginal()
+        model.markExported(item.id, removeOnExport: true, deleteOriginal: false)
+        try await waitForMark(item.id)
+
+        await model.flushExported(settings: settings(removeOnExport: true, deleteOriginal: false))
+
+        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: original.path))
+    }
+
+    func testDeletingTheOriginalKeepsTheTrayCopy() async throws {
+        let (item, original) = try addItemWithOriginal()
+        model.markExported(item.id, removeOnExport: false, deleteOriginal: true)
+        for _ in 0..<1000 where !model.originalsToDelete.contains(item.id) { await Task.yield() }
+        XCTAssertEqual(model.visible.map(\.id), [item.id], "a kept item stays on the island")
+
+        await model.flushExported(settings: settings(removeOnExport: false, deleteOriginal: true))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: original.path))
+        XCTAssertEqual(model.items.map(\.id), [item.id])
+        XCTAssertNil(try store.load().first?.origin, "so a second hand-out does not try again")
+    }
 }

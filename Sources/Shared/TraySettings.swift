@@ -35,6 +35,7 @@ struct TraySettings {
     private enum Keys {
         static let showActivityWhenEmpty = "showActivityWhenEmpty"
         static let removeOnExport = "removeOnExport"
+        static let deleteOriginalOnExport = "deleteOriginalOnExport"
         static let orderingKey = "orderingKey"
         static let orderingAscending = "orderingAscending"
         static let groupsByKind = "groupsByKind"
@@ -70,6 +71,15 @@ struct TraySettings {
     var removeOnExport: Bool {
         get { defaults.object(forKey: Keys.removeOnExport) as? Bool ?? false }
         nonmutating set { defaults.set(newValue, forKey: Keys.removeOnExport) }
+    }
+
+    /// Whether handing an item to another app also deletes the file it was
+    /// originally taken from (files only). Separate from `removeOnExport`
+    /// and off by default: it is the one setting that deletes something
+    /// outside the tray.
+    var deleteOriginalOnExport: Bool {
+        get { defaults.object(forKey: Keys.deleteOriginalOnExport) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.deleteOriginalOnExport) }
     }
 
     /// How the grid is arranged. Stored as its parts rather than as encoded
