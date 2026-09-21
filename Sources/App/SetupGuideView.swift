@@ -13,6 +13,10 @@ struct SetupGuideView: View {
     @State private var removeOnExport = TraySettings().removeOnExport
     @AppStorage("language", store: TraySettings.store) private var language = ""
     @AppStorage("theme", store: TraySettings.store) private var theme = ""
+    @AppStorage(AccentColor.key, store: TraySettings.store) private var accent = ""
+    /// The system picker works in `Color`, the setting is stored as hex; this
+    /// holds the picker's side of that between the two.
+    @State private var customColor = Color.accentColor
 
     var body: some View {
         NavigationStack {
@@ -53,6 +57,7 @@ struct SetupGuideView: View {
                         Text(L.s("theme.light")).tag("light")
                         Text(L.s("theme.dark")).tag("dark")
                     }
+                    accentRow
                 } header: {
                     Text(L.s("settings.appearance.section"))
                 }
@@ -144,6 +149,71 @@ struct SetupGuideView: View {
                 }
             }
         }
+    }
+
+    /// Swatches for choosing without thinking, and the system's own picker
+    /// for everything else -- it already has the spectrum, the sliders and a
+    /// hex field, all of which would otherwise be rebuilt worse here.
+    private var accentRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L.s("settings.accent"))
+
+            swatches(AccentColor.common)
+            if !AccentColor.recents.isEmpty {
+                Text(L.s("settings.accent.recent"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                swatches(AccentColor.recents)
+            }
+
+            HStack {
+                ColorPicker(L.s("settings.accent.custom"), selection: $customColor, supportsOpacity: false)
+                    .onChange(of: customColor) { _, picked in
+                        choose(AccentColor.hex(for: picked))
+                    }
+                if !accent.isEmpty {
+                    Button(L.s("settings.accent.default")) { accent = "" }
+                        .font(.footnote)
+                        .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear {
+            customColor = AccentColor.color(forHex: accent) ?? .accentColor
+        }
+    }
+
+    private func swatches(_ hexes: [String]) -> some View {
+        HStack(spacing: 10) {
+            ForEach(hexes, id: \.self) { hex in
+                Button {
+                    choose(hex)
+                } label: {
+                    Circle()
+                        .fill(AccentColor.color(forHex: hex) ?? .clear)
+                        .frame(width: 28, height: 28)
+                        .overlay {
+                            // The current one is marked rather than merely
+                            // bigger: on a row of circles, size alone is not
+                            // a state anyone reads.
+                            if hex.caseInsensitiveCompare(accent) == .orderedSame {
+                                Image(systemName: "checkmark")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func choose(_ hex: String) {
+        accent = hex
+        AccentColor.remember(hex)
+        customColor = AccentColor.color(forHex: hex) ?? .accentColor
     }
 
     private func step(_ number: Int, _ text: String) -> some View {
