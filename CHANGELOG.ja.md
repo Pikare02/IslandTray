@@ -7,6 +7,12 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.1.1] — 2026-09-21
+
+### アプリ
+- 起動時のアップデート通知に「このバージョンは今後表示しない」を追加しました。
+  それより新しいリリースは引き続き通知されます。
+
 ## [1.1.0] — 2026-09-21
 
 ### アプリ
@@ -50,5 +56,6 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.1.1]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.1
 [1.1.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.0.0
