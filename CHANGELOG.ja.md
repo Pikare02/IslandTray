@@ -7,6 +7,12 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.1.5] — 2026-09-21
+
+### 修正
+- 1.1.4 は 2 つのショートカットが入らないままビルドされ、設定のインストール
+  ボタンが動作していませんでした。元に戻しました。
+
 ## [1.1.4] — 2026-09-21
 
 ### 変更
@@ -80,6 +86,7 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.1.5]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.5
 [1.1.4]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.4
 [1.1.3]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.3
 [1.1.2]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.2
