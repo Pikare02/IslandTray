@@ -8,6 +8,7 @@ struct TrayView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = TrayModel()
     @State private var isTargeted = false
+    @AppStorage(AccentColor.key, store: TraySettings.store) private var accent = ""
 
     var body: some View {
         TabView {
@@ -15,7 +16,11 @@ struct TrayView: View {
                 .tabItem { Label(L.s("tray.title"), systemImage: "tray") }
             BoardView(board: .clipboard, model: model)
                 .tabItem { Label(L.s("clipboard.title"), systemImage: "list.clipboard") }
+            BoardView(board: nil, model: model)
+                .tabItem { Label(L.s("search.title"), systemImage: "magnifyingglass") }
         }
+        // One tint for the whole app, applied where everything inherits it.
+        .tint(AccentColor.color(forHex: accent))
         .background(dropHighlight)
         // The drop target is the whole app, not one board: something dropped
         // on the app goes to the tray wherever the user happens to be.
@@ -81,10 +86,15 @@ struct TrayView: View {
 /// they are filled, not in what can be done with what is in them, so this is
 /// written once and told which board it is.
 struct BoardView: View {
-    let board: TrayBoard
+    /// The board this shows, or `nil` for the search screen, which shows
+    /// whatever the query and the scope pick out of both.
+    let board: TrayBoard?
     let model: TrayModel
 
     @State private var showsSetupGuide = false
+    @State private var filter = TrayFilter()
+    /// Search only: which board to look in, `nil` for both.
+    @State private var scope: TrayBoard?
     @State private var isSelecting = false
     @State private var selection: Set<UUID> = []
     @State private var previewing: TrayItem?
@@ -97,17 +107,33 @@ struct BoardView: View {
     /// as a grid of thumbnails, while a clipboard reads as a timeline.
     @AppStorage private var layoutRaw: String
 
-    init(board: TrayBoard, model: TrayModel) {
+    init(board: TrayBoard?, model: TrayModel) {
         self.board = board
         self.model = model
         _layoutRaw = AppStorage(
-            wrappedValue: board == .clipboard ? TrayLayout.list.rawValue : TrayLayout.grid.rawValue,
-            "layout.\(board.rawValue)",
+            wrappedValue: board == .tray ? TrayLayout.grid.rawValue : TrayLayout.list.rawValue,
+            "layout.\(board?.rawValue ?? "search")",
             store: TraySettings.store
         )
     }
 
-    private var items: [TrayItem] { model.visible(on: board) }
+    private var isSearch: Bool { board == nil }
+
+    /// What this screen is looking at before the filter, which for search is
+    /// the scope and for a board is the board.
+    private var source: [TrayItem] {
+        guard isSearch else { return model.visible(on: board ?? .tray) }
+        guard let scope else { return model.visible }
+        return model.visible(on: scope)
+    }
+
+    private var items: [TrayItem] { filter.apply(to: source) }
+
+    /// Search shows nothing until it is asked something: a screen that opens
+    /// on every file you own is a worse answer than an empty one.
+    private var showsResults: Bool {
+        !isSearch || filter.isActive
+    }
     private var layout: TrayLayout { TrayLayout(rawValue: layoutRaw) ?? .grid }
 
     private var ordering: TrayOrdering {
@@ -121,18 +147,28 @@ struct BoardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                if items.isEmpty { emptyState } else { list }
+                if !showsResults {
+                    startSearching
+                } else if items.isEmpty {
+                    emptyState
+                } else {
+                    list
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle(L.s(board == .tray ? "tray.title" : "clipboard.title"))
+            .navigationTitle(L.s(titleKey))
+            .modifier(SearchField(active: isSearch, text: $filter.text, scope: $scope))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !items.isEmpty {
+                    if !items.isEmpty && !isSearch {
                         Button(isSelecting ? L.s("common.done") : L.s("common.select")) {
                             isSelecting.toggle()
                             if !isSelecting { selection = [] }
                         }
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !isSelecting { FilterMenu(filter: $filter) }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if !isSelecting && !items.isEmpty { arrangeMenu }
@@ -254,14 +290,77 @@ struct BoardView: View {
         !items.isEmpty && items.allSatisfy { selection.contains($0.id) }
     }
 
+    private var titleKey: String {
+        switch board {
+        case .tray: return "tray.title"
+        case .clipboard: return "clipboard.title"
+        case nil: return "search.title"
+        }
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(
-                L.s(board == .tray ? "tray.empty.title" : "clipboard.empty.title"),
-                systemImage: board == .tray ? "tray" : "list.clipboard"
-            )
+            Label(L.s(emptyTitleKey), systemImage: emptyIcon)
         } description: {
-            Text(L.s(board == .tray ? "tray.empty.body" : "clipboard.empty.body"))
+            Text(L.s(emptyBodyKey))
+        }
+    }
+
+    private var startSearching: some View {
+        ContentUnavailableView {
+            Label(L.s("search.start.title"), systemImage: "magnifyingglass")
+        } description: {
+            Text(L.s("search.start.body"))
+        }
+    }
+
+    private var emptyTitleKey: String {
+        switch board {
+        case .tray: return "tray.empty.title"
+        case .clipboard: return "clipboard.empty.title"
+        case nil: return "search.empty.title"
+        }
+    }
+
+    private var emptyBodyKey: String {
+        switch board {
+        case .tray: return "tray.empty.body"
+        case .clipboard: return "clipboard.empty.body"
+        case nil: return "search.empty.body"
+        }
+    }
+
+    private var emptyIcon: String {
+        switch board {
+        case .tray: return "tray"
+        case .clipboard: return "list.clipboard"
+        case nil: return "magnifyingglass"
+        }
+    }
+}
+
+/// `.searchable` on the search screen and nothing on a board.
+///
+/// A modifier rather than an `if` in the body: applying `.searchable`
+/// conditionally changes the view's type from one render to the next, and
+/// SwiftUI answers that by rebuilding the whole screen and dropping the
+/// selection with it.
+private struct SearchField: ViewModifier {
+    let active: Bool
+    @Binding var text: String
+    @Binding var scope: TrayBoard?
+
+    func body(content: Content) -> some View {
+        if active {
+            content
+                .searchable(text: $text, prompt: L.s("search.prompt"))
+                .searchScopes($scope) {
+                    Text(L.s("search.scope.all")).tag(TrayBoard?.none)
+                    Text(L.s("tray.title")).tag(TrayBoard?.some(.tray))
+                    Text(L.s("clipboard.title")).tag(TrayBoard?.some(.clipboard))
+                }
+        } else {
+            content
         }
     }
 }
