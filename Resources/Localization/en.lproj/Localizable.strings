@@ -160,3 +160,4 @@
 "update.message" = "Version %1$@ is out (you have %2$@). Download the .ipa from the install page.";
 "update.open" = "Open Install Page";
 "update.later" = "Later";
+"update.skip" = "Don’t Show Again for This Version";

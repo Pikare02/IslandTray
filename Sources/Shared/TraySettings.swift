@@ -41,6 +41,7 @@ struct TraySettings {
         static let language = "language"
         static let theme = "theme"
         static let checksForUpdates = "checksForUpdates"
+        static let skippedUpdateVersion = "skippedUpdateVersion"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -115,5 +116,12 @@ struct TraySettings {
     var checksForUpdates: Bool {
         get { defaults.object(forKey: Keys.checksForUpdates) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Keys.checksForUpdates) }
+    }
+
+    /// A release the user asked not to be told about again. A later release
+    /// is still offered.
+    var skippedUpdateVersion: String? {
+        get { defaults.string(forKey: Keys.skippedUpdateVersion) }
+        nonmutating set { defaults.set(newValue, forKey: Keys.skippedUpdateVersion) }
     }
 }
