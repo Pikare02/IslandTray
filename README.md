@@ -4,6 +4,11 @@
 
 <h1 align="center">IslandTray</h1>
 
+<p align="center">
+  <a href="https://pikare02.github.io/IslandTray/"><img src="https://img.shields.io/badge/Install_on_iPhone-1d6f86?style=for-the-badge&logo=apple&logoColor=white" alt="Install on iPhone"></a>
+  <a href="https://github.com/Pikare02/IslandTray/releases/latest"><img src="https://img.shields.io/github/v/release/Pikare02/IslandTray?style=for-the-badge&color=13161c" alt="Latest release"></a>
+</p>
+
 **English** · [日本語](README.ja.md)
 
 A shelf for files, photos and copied text on iPhone and iPad, with the Dynamic
