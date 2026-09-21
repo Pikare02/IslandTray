@@ -48,12 +48,12 @@ struct FilterMenu: View {
                 }
             }
         } label: {
-            Image(systemName: hasFunnelFilters ? "line.3.horizontal.decrease.circle.fill"
-                                               : "line.3.horizontal.decrease.circle")
+            // The same colour as the buttons beside it; a filter in effect
+            // shows as a circle around the funnel. Only for what this menu
+            // itself sets: typing in the search field is visible in the field.
+            Image(systemName: hasFunnelFilters ? "line.3.horizontal.decrease.circle"
+                                               : "line.3.horizontal.decrease")
         }
-        // Coloured only for what this menu itself sets: typing in the search
-        // field is visible in the field.
-        .tint(hasFunnelFilters ? Color.accentColor : nil)
     }
 
     private var hasFunnelFilters: Bool { !filter.kinds.isEmpty || filter.window != nil }

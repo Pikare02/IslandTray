@@ -147,9 +147,7 @@ actor TrayActivityController {
             // is inert today, but do not "simplify" this back to a plain
             // `Task { }`; that reintroduces the actor-blocking bug this fix
             // exists for.
-            items = try await Task.detached(priority: .userInitiated) {
-                try TrayStore.shared.load()
-            }.value
+            items = try await loadTray()
         } catch {
             // TrayStore.load() throws precisely so a failed read is not read
             // back as an empty tray. Ending the island over a transient
@@ -179,20 +177,42 @@ actor TrayActivityController {
         await retireOthers(keeping: replacement)
     }
 
+    /// Brings the island up to date with what is on disk, updating the
+    /// activity that is up rather than replacing it.
+    ///
+    /// For a shortcut that just wrote to the store. `restart()` would request
+    /// a new activity, and ActivityKit refuses that while another app is in
+    /// front -- which is where a shortcut runs from -- so the island kept its
+    /// old count until the app was next opened. An update is allowed from
+    /// the background; `sync` still falls back to starting one when nothing
+    /// is up.
+    func syncFromStore() async {
+        guard let items = try? await loadTray() else {
+            Self.logger.error("syncFromStore() aborted: TrayStore.load() threw.")
+            return
+        }
+        await sync(items: items)
+    }
+
+    /// What the island shows: the tray's items, read off the actor. See
+    /// `restart()` for why the load must be detached. The clipboard board
+    /// has its own screen and does not belong in the island's count.
+    private func loadTray() async throws -> [TrayItem] {
+        try await Task.detached(priority: .userInitiated) {
+            try TrayStore.shared.load()
+        }.value.filter { $0.boardOrTray == .tray }
+    }
+
     /// Moves the island's strip by `delta` pages and updates what is on
     /// screen. Called from the buttons in the expanded island.
     func turnPage(by delta: Int) async {
-        let items: [TrayItem]
+        let tray: [TrayItem]
         do {
-            items = try await Task.detached(priority: .userInitiated) {
-                try TrayStore.shared.load()
-            }.value
+            tray = try await loadTray()
         } catch {
             Self.logger.error("turnPage() aborted: TrayStore.load() threw.")
             return
         }
-        // The island is the tray; the clipboard board has its own screen.
-        let tray = items.filter { $0.boardOrTray == .tray }
         page = TrayContentState.clampedPage(page + delta, count: tray.count)
         _ = await update(await pagedState(for: tray))
     }

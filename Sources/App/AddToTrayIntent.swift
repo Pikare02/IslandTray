@@ -53,12 +53,10 @@ extension TrayStore {
     static let didChangeFromIntentNotification = Notification.Name("TrayStore.didChangeFromIntent")
 
     /// The island and any open screen, after a shortcut wrote to the store.
-    /// `restart()` rather than `sync()`: this process may have just been
-    /// launched for the intent and have no activity of its own yet. Main
-    /// actor so the notification arrives where SwiftUI can take it.
+    /// Main actor so the notification arrives where SwiftUI can take it.
     @MainActor
     static func didChangeFromIntent() async {
-        await TrayActivityController.shared.restart()
+        await TrayActivityController.shared.syncFromStore()
         NotificationCenter.default.post(name: didChangeFromIntentNotification, object: nil)
     }
 
