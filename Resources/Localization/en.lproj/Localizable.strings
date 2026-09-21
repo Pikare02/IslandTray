@@ -148,3 +148,15 @@
 "settings.shortcut.install.clip" = "Add the clipboard shortcut";
 "settings.shortcut.install.note" = "Each opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. The clipboard one is worth assigning to the Action button or a back tap, so copying and keeping is one press. The share sheet one appears by itself in the share sheet of any app.";
 "settings.shortcut.install.share" = "Add the share sheet shortcut";
+"settings.update.section" = "Updates";
+"settings.update.current" = "Version";
+"settings.update.auto" = "Check for updates automatically";
+"settings.update.check" = "Check for Updates";
+"settings.update.latest" = "Up to date";
+"settings.update.failed" = "Could not check";
+"settings.update.install" = "Get version %@ from the install page";
+"settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one.";
+"update.title" = "Update available";
+"update.message" = "Version %1$@ is out (you have %2$@). Download the .ipa from the install page.";
+"update.open" = "Open Install Page";
+"update.later" = "Later";

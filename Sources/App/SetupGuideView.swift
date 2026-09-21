@@ -11,6 +11,11 @@ struct SetupGuideView: View {
     /// the old lines on screen until the sheet was closed and reopened.
     @State private var diagnostics = DropDiagnostics.lines
     @State private var removeOnExport = TraySettings().removeOnExport
+    @State private var checksForUpdates = TraySettings().checksForUpdates
+    /// nil until checked; "" when up to date; otherwise the newer version.
+    @State private var newerVersion: String?
+    @State private var isChecking = false
+    @State private var checkFailed = false
     @AppStorage("language", store: TraySettings.store) private var language = ""
     @AppStorage("theme", store: TraySettings.store) private var theme = ""
     @AppStorage(AccentColor.key, store: TraySettings.store) private var accent = ""
@@ -81,6 +86,37 @@ struct SetupGuideView: View {
                         }
                 } footer: {
                     Text(L.s("settings.export.footer"))
+                }
+
+                Section {
+                    LabeledContent(L.s("settings.update.current"), value: UpdateChecker.currentVersion)
+                    Toggle(L.s("settings.update.auto"), isOn: $checksForUpdates)
+                        .onChange(of: checksForUpdates) { _, newValue in
+                            TraySettings().checksForUpdates = newValue
+                        }
+                    Button {
+                        Task { await checkForUpdates() }
+                    } label: {
+                        HStack {
+                            Text(L.s("settings.update.check"))
+                            Spacer()
+                            if isChecking {
+                                ProgressView()
+                            } else if checkFailed {
+                                Text(L.s("settings.update.failed")).foregroundStyle(.secondary)
+                            } else if newerVersion == "" {
+                                Text(L.s("settings.update.latest")).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .disabled(isChecking)
+                    if let version = newerVersion, !version.isEmpty {
+                        Link(L.s("settings.update.install", version), destination: UpdateChecker.installPage)
+                    }
+                } header: {
+                    Text(L.s("settings.update.section"))
+                } footer: {
+                    Text(L.s("settings.update.footer"))
                 }
 
                 Section {
@@ -231,6 +267,17 @@ struct SetupGuideView: View {
         accent = hex
         AccentColor.remember(hex)
         customColor = AccentColor.color(forHex: hex) ?? .accentColor
+    }
+
+    private func checkForUpdates() async {
+        isChecking = true
+        defer { isChecking = false }
+        do {
+            newerVersion = try await UpdateChecker.newerVersion() ?? ""
+            checkFailed = false
+        } catch {
+            checkFailed = true
+        }
     }
 
     private func step(_ number: Int, _ text: String) -> some View {

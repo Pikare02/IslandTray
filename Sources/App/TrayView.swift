@@ -9,6 +9,9 @@ struct TrayView: View {
     @State private var model = TrayModel()
     @State private var isTargeted = false
     @AppStorage(AccentColor.key, store: TraySettings.store) private var accent = ""
+    @Environment(\.openURL) private var openURL
+    /// A newer release found on launch, offered once per launch.
+    @State private var availableUpdate: String?
 
     var body: some View {
         TabView {
@@ -44,6 +47,21 @@ struct TrayView: View {
             Button(L.s("dup.add")) { Task { await model.addPendingDuplicates() } }
         } message: {
             Text(model.duplicatePrompt)
+        }
+        .alert(
+            L.s("update.title"),
+            isPresented: Binding(get: { availableUpdate != nil }, set: { if !$0 { availableUpdate = nil } })
+        ) {
+            Button(L.s("update.later"), role: .cancel) {}
+            Button(L.s("update.open")) { openURL(UpdateChecker.installPage) }
+        } message: {
+            Text(L.s("update.message", availableUpdate ?? "", UpdateChecker.currentVersion))
+        }
+        .task {
+            // Quietly: a failed check on launch is not worth interrupting for.
+            if TraySettings().checksForUpdates {
+                availableUpdate = try? await UpdateChecker.newerVersion()
+            }
         }
         .task {
             // Migrate, reload, and -- only when the migration actually moved

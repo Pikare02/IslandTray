@@ -7,6 +7,16 @@
 バージョンは `project.yml`（`MARKETING_VERSION`）の 1 か所だけで設定し、リリースごとに
 `vX.Y.Z` のタグを付け、GitHub に `.ipa` ファイルを添付します。
 
+## [1.1.0] — 2026-09-21
+
+### アプリ
+- 起動時に GitHub で新しいリリースを確認し、インストールページを案内します。
+  設定 →「アップデート」でオフにしたり、手動で確認したりできます。
+
+### 変更
+- 「取り出したらトレイから削除する」の初期値をオフ（切り取りではなくコピー）に
+  変更しました。すでに設定済みの値はそのまま残ります。
+
 ## [1.0.0] — 2026-09-21
 
 最初のリリースです。
@@ -40,4 +50,5 @@
 - 英語と日本語、ライト / ダークのテーマ、好きなハイライトカラー。
 - TrollStore 用（`Release`）と AltStore / SideStore 用（`Free-Release`）の署名なし `.ipa`。
 
+[1.1.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Pikare02/IslandTray/releases/tag/v1.0.0
