@@ -1,4 +1,8 @@
-# IslandTray
+<p align="center">
+  <img src="docs/icon.png" width="220" alt="IslandTray app icon">
+</p>
+
+<h1 align="center">IslandTray</h1>
 
 [English](README.md) · **日本語**
 
