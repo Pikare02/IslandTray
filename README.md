@@ -70,5 +70,6 @@ xcodebuild test -project IslandTray.xcodeproj -scheme IslandTray \
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Installing and building the .ipa](docs/INSTALL.md)
 - [Shortcuts: share sheet, clipboard and keeping the island up](docs/SHORTCUTS.md)
