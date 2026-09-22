@@ -71,7 +71,14 @@ struct TrayContentState: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent, atlas, page
+        case count, recent, atlas, page, added
+    }
+
+    /// What a shortcut just put in, shown with a check while the island is
+    /// briefly expanded for it.
+    struct Added: Codable, Hashable {
+        let count: Int
+        let board: TrayBoard
     }
 
     let count: Int
@@ -89,14 +96,24 @@ struct TrayContentState: Codable, Hashable {
     /// through with buttons in the expanded island, and this is what they
     /// move.
     let page: Int
+    /// Set only for the moment after a shortcut adds something; see
+    /// `TrayActivityController.announce(_:)`.
+    let added: Added?
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
     /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
-    private init(count: Int, recent: [Preview], atlas: Data?, page: Int = 0) {
+    private init(count: Int, recent: [Preview], atlas: Data?, page: Int = 0, added: Added? = nil) {
         self.count = count
         self.recent = recent
         self.atlas = atlas
         self.page = page
+        self.added = added
+    }
+
+    /// The same state, carrying `added`. A few dozen bytes, which the
+    /// headroom `buildBudget` leaves covers.
+    func announcing(_ added: Added?) -> TrayContentState {
+        TrayContentState(count: count, recent: recent, atlas: atlas, page: page, added: added)
     }
 
     /// Whether there is a run of items before or after this one.
@@ -140,22 +157,23 @@ struct TrayContentState: Codable, Hashable {
         let decodedRecent = (try? container.decode([Preview].self, forKey: .recent)) ?? []
         let decodedAtlas = try? container.decodeIfPresent(Data.self, forKey: .atlas)
         let decodedPage = (try? container.decodeIfPresent(Int.self, forKey: .page)) ?? 0
+        let added = (try? container.decodeIfPresent(Added.self, forKey: .added)) ?? nil
         let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
         let page = Self.clampedPage(decodedPage, count: decodedCount)
 
         let full = TrayContentState(
-            count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page
+            count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page, added: added
         )
         if full.encodedByteCount <= Self.maxEncodedBytes {
             self = full
             return
         }
         let noAtlas = TrayContentState(
-            count: decodedCount, recent: clampedRecent, atlas: nil, page: page
+            count: decodedCount, recent: clampedRecent, atlas: nil, page: page, added: added
         )
         self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
             ? noAtlas
-            : TrayContentState(count: decodedCount, recent: [], atlas: nil, page: page)
+            : TrayContentState(count: decodedCount, recent: [], atlas: nil, page: page, added: added)
     }
 
     /// A JPEG strip built for one `make(from:atlas:)` call, plus which of

@@ -84,6 +84,26 @@ final class TrayFilterTests: XCTestCase {
         ]
         XCTAssertEqual(filter.apply(to: all, now: now).count, 1)
     }
+
+    func testModesPickNameContentOrEither() {
+        let note = item("memo.txt")
+        let shot = item("IMG_1.png")
+        let words: [UUID: String] = [note.id: "grocery list", shot.id: "invoice 2026"]
+        let content: (TrayItem) -> String? = { words[$0.id] }
+        var filter = TrayFilter()
+
+        filter.text = "invoice"
+        XCTAssertEqual(names(filter.apply(to: [note, shot], now: now, content: content)), ["IMG_1.png"])
+        filter.mode = .name
+        XCTAssertEqual(names(filter.apply(to: [note, shot], now: now, content: content)), [])
+
+        filter.text = "memo"
+        XCTAssertEqual(names(filter.apply(to: [note, shot], now: now, content: content)), ["memo.txt"])
+        filter.mode = .content
+        XCTAssertEqual(names(filter.apply(to: [note, shot], now: now, content: content)), [])
+        filter.mode = .all
+        XCTAssertEqual(names(filter.apply(to: [note, shot], now: now, content: content)), ["memo.txt"])
+    }
 }
 
 /// The highlight colour survives a round trip through the only form

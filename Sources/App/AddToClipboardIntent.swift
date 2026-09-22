@@ -13,7 +13,9 @@ import UniformTypeIdentifiers
 /// two slots makes the person decide every time which one today's copy goes
 /// in. Shortcuts converts text to a file on its way into this, and text is
 /// recognised again on arrival by its type.
-struct AddToClipboardIntent: AppIntent {
+/// `LiveActivityIntent` for the same reason as AddToTrayIntent: it answers
+/// by expanding the island, which a plain background intent may not touch.
+struct AddToClipboardIntent: AppIntent, LiveActivityIntent {
     static let title: LocalizedStringResource = "クリップボードに追加"
     static let description = IntentDescription(
         "コピーした内容をアプリのクリップボードに保存します。「クリップボードを取得」の出力をつなげてください。"
@@ -26,12 +28,14 @@ struct AddToClipboardIntent: AppIntent {
     @Parameter(title: "内容", supportedTypeIdentifiers: ["public.item"])
     var content: [IntentFile]?
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         let files = content ?? []
         guard !files.isEmpty else {
-            let message = await fromPasteboard()
-            await TrayStore.didChangeFromIntent()
-            return .result(dialog: IntentDialog(stringLiteral: message))
+            guard let result = await fromPasteboard() else {
+                throw IntentMessage(L.s("clipboard.connectVariable"))
+            }
+            try await TrayStore.finishIntent(result, board: .clipboard)
+            return .result()
         }
 
         var added = 0
@@ -46,9 +50,8 @@ struct AddToClipboardIntent: AppIntent {
             }
         }
 
-        await TrayStore.didChangeFromIntent()
-        let result = DropReceiver.Result(added: added, failed: failed)
-        return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result, board: .clipboard)))
+        try await TrayStore.finishIntent(.init(added: added, failed: failed), board: .clipboard)
+        return .result()
     }
 
     /// The last resort when the shortcut handed over nothing: read the
@@ -58,9 +61,9 @@ struct AddToClipboardIntent: AppIntent {
     /// works when the shortcut is run with the app open and not when it is
     /// run from a back tap in another app. That is exactly when it says so,
     /// rather than reporting that it added nothing and leaving the person to
-    /// guess which of the two happened.
+    /// guess which of the two happened: nil means there was nothing to read.
     @MainActor
-    private func fromPasteboard() async -> String {
+    private func fromPasteboard() async -> DropReceiver.Result? {
         let board = UIPasteboard.general
         if let text = board.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             do {
@@ -68,9 +71,9 @@ struct AddToClipboardIntent: AppIntent {
                     data: Data(text.utf8), suggestedName: Self.name(for: text),
                     uti: UTType.utf8PlainText.identifier, board: .clipboard
                 )
-                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []), board: .clipboard)
+                return .init(added: 1, failed: [])
             } catch {
-                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]), board: .clipboard)
+                return .init(added: 0, failed: ["clipboard"])
             }
         }
         if let type = board.types.first, let data = board.data(forPasteboardType: type) {
@@ -81,12 +84,12 @@ struct AddToClipboardIntent: AppIntent {
                     data: data, suggestedName: "clipboard\(ext)",
                     uti: uti?.identifier, board: .clipboard
                 )
-                return DropReceiver.shareSheetMessage(for: .init(added: 1, failed: []), board: .clipboard)
+                return .init(added: 1, failed: [])
             } catch {
-                return DropReceiver.shareSheetMessage(for: .init(added: 0, failed: ["clipboard"]), board: .clipboard)
+                return .init(added: 0, failed: ["clipboard"])
             }
         }
-        return L.s("clipboard.connectVariable")
+        return nil
     }
 
     @MainActor

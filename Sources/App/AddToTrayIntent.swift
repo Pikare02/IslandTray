@@ -31,7 +31,7 @@ struct AddToTrayIntent: AppIntent, LiveActivityIntent {
     @Parameter(title: "ファイル", supportedTypeIdentifiers: ["public.item"])
     var files: [IntentFile]
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         var added = 0
         var failed: [String] = []
         for file in files {
@@ -43,12 +43,19 @@ struct AddToTrayIntent: AppIntent, LiveActivityIntent {
             }
         }
         // The island is what the user sees from wherever they ran this, so it
-        // has to be told.
-        await TrayStore.didChangeFromIntent()
-
-        let result = DropReceiver.Result(added: added, failed: failed)
-        return .result(dialog: IntentDialog(stringLiteral: DropReceiver.shareSheetMessage(for: result)))
+        // is what answers -- no dialog on top of it.
+        try await TrayStore.finishIntent(.init(added: added, failed: failed), board: .tray)
+        return .result()
     }
+}
+
+/// What a shortcut says when it has something to say: a failure, or a
+/// success the island could not show. Thrown, because an intent that
+/// usually shows nothing cannot also declare a dialog.
+struct IntentMessage: Error, CustomLocalizedStringResourceConvertible {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var localizedStringResource: LocalizedStringResource { "\(text)" }
 }
 
 extension TrayStore {
@@ -57,12 +64,23 @@ extension TrayStore {
     /// the next time the app comes to the front.
     static let didChangeFromIntentNotification = Notification.Name("TrayStore.didChangeFromIntent")
 
-    /// The island and any open screen, after a shortcut wrote to the store.
-    /// Main actor so the notification arrives where SwiftUI can take it.
+    /// Tells the island and any open screen what a shortcut added. Main
+    /// actor so the notification arrives where SwiftUI can take it. Success
+    /// is shown by the island expanding with a check; only what it cannot
+    /// show -- a failure, or no island to show it on -- is thrown as words.
     @MainActor
-    static func didChangeFromIntent() async {
-        await TrayActivityController.shared.syncFromStore()
+    static func finishIntent(_ result: DropReceiver.Result, board: TrayBoard) async throws {
         NotificationCenter.default.post(name: didChangeFromIntentNotification, object: nil)
+        let shown: Bool
+        if result.added > 0 {
+            shown = await TrayActivityController.shared.announce(.init(count: result.added, board: board))
+        } else {
+            await TrayActivityController.shared.syncFromStore()
+            shown = false
+        }
+        guard shown, result.failed.isEmpty else {
+            throw IntentMessage(DropReceiver.shareSheetMessage(for: result, board: board))
+        }
     }
 
     /// Stores a file handed over by Shortcuts.

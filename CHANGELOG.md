@@ -8,6 +8,32 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.4.0] — 2026-09-23
+
+### Shortcuts
+- Adding through ShareToTray or ClipboardToTray no longer ends in an "Added"
+  dialog: the Dynamic Island expands for a moment with a green check (and the
+  alert's sound/haptic) instead. A dialog appears only when something could
+  not be added or there is no island to show it on.
+- Every action in the two shortcuts now carries a fixed identity, so the
+  "Always Allow" you tap on the sharing question is remembered. It was asked
+  again for each new item because the permission is kept against the identity
+  of the action that asked, and the actions had none.
+- On iOS 27, the clipboard shortcut carries a screenshot automation: turn it
+  on once and every screenshot you copy lands on the clipboard board by
+  itself. Settings explains the two switches. (Signing on macOS 26 strips the
+  automation out of the shipped file; the build says so when it does.)
+
+### Search
+- Search by contents too: what a text item says, and the words recognised in
+  images (OCR). Choose *All*, *Names* or *Contents* at the top left of the
+  search screen.
+
+### Updates
+- An important update — an urgent fix, or a version that changes how the app
+  works — says so and keeps saying so until the app is updated. Ordinary
+  updates are still offered once and can be dismissed for good.
+
 ## [1.3.1] — 2026-09-22
 
 ### Fixed

@@ -194,6 +194,44 @@ actor TrayActivityController {
         await sync(items: items)
     }
 
+    /// How long the check stays up after a shortcut adds something.
+    static let announcementDuration: Duration = .seconds(2.5)
+
+    /// Shows what a shortcut just added in place of a dialog: the island
+    /// expands with a check, then settles back to the ordinary state.
+    ///
+    /// An update carrying an alert is the one way an app can expand the
+    /// island; the alert's sound is also what brings the haptic, since an app
+    /// in the background cannot play one itself. `false` when there is no
+    /// island to show it on, so the caller can say it in words instead.
+    func announce(_ added: TrayContentState.Added) async -> Bool {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled,
+              let tray = try? await loadTray() else { return false }
+        let state = await pagedState(for: tray).announcing(added)
+        let message = added.board == .clipboard
+            ? L.s("clipboard.result.added")
+            : L.s("share.result.added", added.count)
+        let alert = AlertConfiguration(
+            title: "\(message)", body: "\(L.s("island.count", tray.count))", sound: .default
+        )
+        let activities = liveActivities
+        if activities.isEmpty {
+            // Nothing up -- a clipboard add while an empty tray hides its
+            // island. ActivityKit usually refuses a start from behind another
+            // app, and then this reports false; when it allows one, the sync
+            // below takes it down again if the setting says so.
+            guard let id = start(state) else { return false }
+            await retireOthers(keeping: id)
+        } else {
+            for activity in activities {
+                await activity.update(.init(state: state, staleDate: nil), alertConfiguration: alert)
+            }
+        }
+        try? await Task.sleep(for: Self.announcementDuration)
+        await syncFromStore()
+        return true
+    }
+
     /// What the island shows: the tray's items, read off the actor. See
     /// `restart()` for why the load must be detached. The clipboard board
     /// has its own screen and does not belong in the island's count.

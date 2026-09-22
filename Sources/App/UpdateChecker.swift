@@ -13,16 +13,41 @@ enum UpdateChecker {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
-    /// The latest release's version when it is newer than this build, nil
-    /// when it is not. Throws when GitHub could not be asked.
-    static func newerVersion() async throws -> String? {
+    /// A release newer than this build.
+    struct Update: Equatable {
+        let version: String
+        /// Whether this one should be pressed rather than merely offered: a
+        /// fix that cannot wait, or a version that changes how the app is
+        /// used. Nothing else interrupts twice.
+        let isImportant: Bool
+    }
+
+    /// The latest release when it is newer than this build, nil when it is
+    /// not. Throws when GitHub could not be asked.
+    static func newerVersion() async throws -> Update? {
         var request = URLRequest(url: latestRelease)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        struct Release: Decodable { let tag_name: String }
-        let latest = try JSONDecoder().decode(Release.self, from: data).tag_name
-        return isNewer(latest, than: currentVersion) ? version(latest) : nil
+        struct Release: Decodable { let tag_name: String; let body: String? }
+        let release = try JSONDecoder().decode(Release.self, from: data)
+        guard isNewer(release.tag_name, than: currentVersion) else { return nil }
+        return update(tag: release.tag_name, notes: release.body, local: currentVersion)
+    }
+
+    /// Marker a release's notes carry when the release fixes something that
+    /// cannot wait. Written in the notes rather than derived from the version,
+    /// because a patch release is exactly where an urgent fix lands.
+    static let urgentMarker = "[urgent]"
+
+    /// A major version means the app works differently than it did -- the one
+    /// thing worth insisting on besides an urgent fix; everything else is a
+    /// normal update, offered once and skippable.
+    static func update(tag: String, notes: String?, local: String) -> Update {
+        let remote = version(tag)
+        let major = { (s: String) in Int(s.split(separator: ".").first ?? "") ?? 0 }
+        let isUrgent = notes?.localizedCaseInsensitiveContains(urgentMarker) == true
+        return Update(version: remote, isImportant: isUrgent || major(remote) > major(local))
     }
 
     /// Compares dotted versions numerically ("1.10.0" > "1.9.2"), ignoring a

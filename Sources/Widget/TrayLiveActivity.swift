@@ -14,10 +14,15 @@ struct TrayLiveActivity: Widget {
                         .padding(.leading, 4)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(L.s("tray.title"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 4)
+                    if let added = context.state.added {
+                        addedBadge(added)
+                            .padding(.trailing, 4)
+                    } else {
+                        Text(L.s("tray.title"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.trailing, 4)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     // No ScrollView and no swipe: a widget receives no
@@ -34,7 +39,8 @@ struct TrayLiveActivity: Widget {
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                Image(systemName: "tray.full.fill")
+                Image(systemName: context.state.added == nil ? "tray.full.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(context.state.added == nil ? Color.primary : Color.green)
             } compactTrailing: {
                 Text("\(context.state.count)")
                     .font(.caption.monospacedDigit())
@@ -44,6 +50,17 @@ struct TrayLiveActivity: Widget {
             }
             .widgetURL(TrayIDs.dropURL)
         }
+    }
+
+    /// The check a shortcut's add is answered with, instead of a dialog.
+    private func addedBadge(_ added: TrayContentState.Added) -> some View {
+        Label(
+            added.board == .clipboard ? L.s("island.added.clipboard") : L.s("island.added", added.count),
+            systemImage: "checkmark.circle.fill"
+        )
+        .font(.caption.bold())
+        .foregroundStyle(.green)
+        .lineLimit(1)
     }
 
     private enum Direction {
@@ -70,8 +87,12 @@ struct TrayLiveActivity: Widget {
             Image(systemName: "tray.full.fill")
                 .font(.title3)
             VStack(alignment: .leading, spacing: 6) {
-                Text(L.s("island.count", state.count))
-                    .font(.subheadline.bold())
+                if let added = state.added {
+                    addedBadge(added)
+                } else {
+                    Text(L.s("island.count", state.count))
+                        .font(.subheadline.bold())
+                }
                 TrayPreviewStrip(previews: state.recent, atlas: state.atlas, side: 32)
             }
             Spacer()
