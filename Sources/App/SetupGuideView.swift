@@ -152,6 +152,20 @@ struct SetupGuideView: View {
                     Text(L.s("settings.shortcut.clip.header"))
                 }
 
+                // iOS 26 and earlier have no screenshot trigger at all, so
+                // this section would only describe something that is not there.
+                if #available(iOS 27, *) {
+                    Section {
+                        step(1, L.s("settings.shortcut.shot.1"))
+                        step(2, L.s("settings.shortcut.shot.2"))
+                        step(3, L.s("settings.shortcut.shot.3"))
+                    } header: {
+                        Text(L.s("settings.shortcut.shot.header"))
+                    } footer: {
+                        Text(L.s("settings.shortcut.shot.footer"))
+                    }
+                }
+
                 Section {
                     Text(L.s("settings.why.body"))
                         .font(.callout)
@@ -278,7 +292,7 @@ struct SetupGuideView: View {
         isChecking = true
         defer { isChecking = false }
         do {
-            newerVersion = try await UpdateChecker.newerVersion() ?? ""
+            newerVersion = try await UpdateChecker.newerVersion()?.version ?? ""
             checkFailed = false
         } catch {
             checkFailed = true

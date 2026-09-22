@@ -11,7 +11,7 @@ struct TrayView: View {
     @AppStorage(AccentColor.key, store: TraySettings.store) private var accent = ""
     @Environment(\.openURL) private var openURL
     /// A newer release found on launch, offered once per launch.
-    @State private var availableUpdate: String?
+    @State private var availableUpdate: UpdateChecker.Update?
 
     var body: some View {
         TabView {
@@ -49,22 +49,31 @@ struct TrayView: View {
             Text(model.duplicatePrompt)
         }
         .alert(
-            L.s("update.title"),
+            L.s(availableUpdate?.isImportant == true ? "update.title.important" : "update.title"),
             isPresented: Binding(get: { availableUpdate != nil }, set: { if !$0 { availableUpdate = nil } })
         ) {
             Button(L.s("update.open")) { openURL(UpdateChecker.installPage) }
-            Button(L.s("update.skip")) { TraySettings().skippedUpdateVersion = availableUpdate }
+            // No "don't show again" for an important one: it is shown every
+            // launch until the app is actually updated.
+            if availableUpdate?.isImportant == false {
+                Button(L.s("update.skip")) { TraySettings().skippedUpdateVersion = availableUpdate?.version }
+            }
             Button(L.s("update.later"), role: .cancel) {}
         } message: {
-            Text(L.s("update.message", availableUpdate ?? "", UpdateChecker.currentVersion))
+            Text(L.s(
+                availableUpdate?.isImportant == true ? "update.message.important" : "update.message",
+                availableUpdate?.version ?? "", UpdateChecker.currentVersion
+            ))
         }
         .task {
             // Quietly: a failed check on launch is not worth interrupting for.
             let settings = TraySettings()
+            // An important one ignores "don't show again": that answer was
+            // given about an ordinary update.
             if settings.checksForUpdates,
-               let version = try? await UpdateChecker.newerVersion(),
-               version != settings.skippedUpdateVersion {
-                availableUpdate = version
+               let update = try? await UpdateChecker.newerVersion(),
+               update.isImportant || update.version != settings.skippedUpdateVersion {
+                availableUpdate = update
             }
         }
         .task {
@@ -159,7 +168,10 @@ struct BoardView: View {
         return model.visible(on: scope)
     }
 
-    private var items: [TrayItem] { filter.apply(to: source) }
+    private var items: [TrayItem] {
+        guard isSearch else { return filter.apply(to: source) }
+        return filter.apply(to: source, content: ContentIndex.shared.text(for:))
+    }
 
     /// Search shows nothing until it is asked something: a screen that opens
     /// on every file you own is a worse answer than an empty one.
@@ -189,10 +201,18 @@ struct BoardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(L.s(titleKey))
-            .modifier(SearchField(active: isSearch, text: $filter.text, scope: $scope))
+            .modifier(SearchField(
+                active: isSearch, text: $filter.text, scope: $scope,
+                prompt: L.s("search.prompt.\(filter.mode.rawValue)")
+            ))
+            .task(id: model.items) {
+                if isSearch { await ContentIndex.shared.update(model.items) }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !items.isEmpty && !isSearch {
+                    if isSearch {
+                        searchModeMenu
+                    } else if !items.isEmpty {
                         Button(isSelecting ? L.s("common.done") : L.s("common.select")) {
                             isSelecting.toggle()
                             if !isSelecting { selection = [] }
@@ -347,6 +367,24 @@ struct BoardView: View {
         }
     }
 
+    /// What the typed text is matched against: names, contents, or both.
+    private var searchModeMenu: some View {
+        Menu {
+            Picker(L.s("search.mode"), selection: $filter.mode) {
+                ForEach(TrayFilter.Mode.allCases, id: \.self) { mode in
+                    Text(L.s("search.mode.\(mode.rawValue)")).tag(mode)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(L.s("search.mode.\(filter.mode.rawValue)"))
+                if ContentIndex.shared.isIndexing && filter.mode != .name {
+                    ProgressView().controlSize(.small)
+                }
+            }
+        }
+    }
+
     private var startSearching: some View {
         ContentUnavailableView {
             Label(L.s("search.start.title"), systemImage: "magnifyingglass")
@@ -390,11 +428,12 @@ private struct SearchField: ViewModifier {
     let active: Bool
     @Binding var text: String
     @Binding var scope: TrayBoard?
+    let prompt: String
 
     func body(content: Content) -> some View {
         if active {
             content
-                .searchable(text: $text, prompt: L.s("search.prompt"))
+                .searchable(text: $text, prompt: prompt)
                 .searchScopes($scope) {
                     Text(L.s("search.scope.all")).tag(TrayBoard?.none)
                     Text(L.s("tray.title")).tag(TrayBoard?.some(.tray))
