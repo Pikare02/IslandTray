@@ -81,10 +81,9 @@
 "settings.step4" = "「すぐに実行」を選びます。確認を求める設定のままだと自動で動きません。";
 "settings.step5" = "アクションで「%@」を選びます。";
 "settings.step6" = "同じ手順を 15:00 と 23:00 でも繰り返します。";
-"settings.steps.header" = "設定手順";
+"settings.steps.header" = "ダイナミックアイランドを常に表示する";
 "settings.title" = "設定";
 "settings.why.body" = "ダイナミックアイランドの表示は 8 時間で自動的に消えます。ショートカットのオートメーションで 8 時間ごとに作り直すと、24 時間途切れずに表示できます。";
-"settings.why.header" = "なぜ設定が必要か";
 "share.freeOnly" = "共有シートからこのアプリを直接選べるのは、有料の Apple Developer アカウントでビルドした場合だけです。かわりに「ファイルに保存」→「このiPhone内」→「IslandTray」に保存してください。次にアプリを開いたときトレイへ取り込まれます。";
 "share.result.added" = "%d 件をトレイに追加しました";
 "share.result.none" = "追加できませんでした";

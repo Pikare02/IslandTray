@@ -113,6 +113,21 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    LabeledContent(L.s("settings.status.container"), value: L.s(TrayContainer.isShared ? "common.on" : "common.off"))
+                    if !TrayContainer.isShared {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(L.s("settings.free.1"))
+                            Text(L.s("settings.free.2"))
+                            Text(L.s("settings.free.3"))
+                        }
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(L.s("settings.status.header"))
+                }
+
+                Section {
                     Text(L.s("settings.shortcut.intro"))
                         .font(.callout)
                     ShortcutLink("ShareToTray", title: L.s("settings.shortcut.install.share"))
@@ -152,13 +167,10 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    // The rationale for the automation lives right above the
+                    // steps it justifies, instead of in an orphan section.
                     Text(L.s("settings.why.body"))
                         .font(.callout)
-                } header: {
-                    Text(L.s("settings.why.header"))
-                }
-
-                Section {
                     step(1, L.s("settings.step1"))
                     step(2, L.s("settings.step2"))
                     step(3, L.s("settings.step3"))
@@ -180,21 +192,6 @@ struct SetupGuideView: View {
                     Text(L.s("settings.reopen"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    LabeledContent(L.s("settings.status.container"), value: L.s(TrayContainer.isShared ? "common.on" : "common.off"))
-                    if !TrayContainer.isShared {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(L.s("settings.free.1"))
-                            Text(L.s("settings.free.2"))
-                            Text(L.s("settings.free.3"))
-                        }
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text(L.s("settings.status.header"))
                 }
 
                 Section {
