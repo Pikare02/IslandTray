@@ -145,7 +145,7 @@ struct TraySettings {
         nonmutating set { defaults.set(newValue, forKey: Keys.insistsOnImportantUpdates) }
     }
 
-    /// Labs: whether the tray syncs through a folder at all. Defaults to
+    /// Whether the tray syncs through a folder at all. Defaults to
     /// `false` -- the tray stays on this device, as it always has. Only the
     /// app reads it.
     var cloudSyncEnabled: Bool {

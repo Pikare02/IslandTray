@@ -99,7 +99,7 @@ struct CloudSyncView: View {
     }
 }
 
-/// Labs, and under it the sync settings while the switch is on.
+/// The sync switch, and under it the folder while the switch is on.
 struct CloudSettingsSection: View {
     let model: TrayModel
     @State private var picking = false
@@ -107,34 +107,26 @@ struct CloudSettingsSection: View {
     var body: some View {
         @Bindable var cloud = model.cloud
         Section {
-            Toggle(L.s("labs.cloud"), isOn: $cloud.isOn)
+            Toggle(L.s("cloud.toggle"), isOn: $cloud.isOn)
                 .onChange(of: cloud.isOn) { _, on in
                     if on { Task { await model.syncCloud() } }
                 }
-        } header: {
-            Text(L.s("labs.section"))
-        } footer: {
-            Text(L.s("labs.cloud.footer"))
-        }
-        if cloud.isOn { folderSection }
-    }
-
-    private var folderSection: some View {
-        Section {
-            if model.cloud.folderName != nil {
-                LabeledContent(L.s("cloud.folder"), value: model.cloud.folderName ?? "")
-                NavigationLink(L.s("cloud.details")) { CloudSyncView(cloud: model.cloud) }
-                Button(L.s("cloud.syncNow")) { Task { await model.syncCloud() } }
-                    .disabled(model.cloud.isSyncing)
-                Button(L.s("cloud.change")) { picking = true }
-                Button(L.s("cloud.off"), role: .destructive) { model.cloud.turnOff() }
-            } else {
-                Button(L.s("cloud.choose")) { picking = true }
+            if cloud.isOn {
+                if cloud.folderName != nil {
+                    LabeledContent(L.s("cloud.folder"), value: cloud.folderName ?? "")
+                    NavigationLink(L.s("cloud.details")) { CloudSyncView(cloud: cloud) }
+                    Button(L.s("cloud.syncNow")) { Task { await model.syncCloud() } }
+                        .disabled(cloud.isSyncing)
+                    Button(L.s("cloud.change")) { picking = true }
+                    Button(L.s("cloud.off"), role: .destructive) { cloud.turnOff() }
+                } else {
+                    Button(L.s("cloud.choose")) { picking = true }
+                }
             }
         } header: {
             Text(L.s("cloud.section"))
         } footer: {
-            Text(L.s(model.cloud.folderName != nil ? "cloud.footer.on" : "cloud.footer.off"))
+            Text(L.s(!cloud.isOn ? "cloud.footer.disabled" : cloud.folderName != nil ? "cloud.footer.on" : "cloud.footer.off"))
         }
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
             guard case .success(let url) = result else { return }

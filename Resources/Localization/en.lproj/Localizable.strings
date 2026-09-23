@@ -109,7 +109,6 @@
 "共有されたファイルをトレイに入れます。共有シートに出すショートカットに使えます。" = "Puts shared files into the tray. Use it in a shortcut shown in the share sheet.";
 "settings.appearance.section" = "Appearance";
 "settings.behaviour.section" = "Behaviour";
-"settings.setup.section" = "Setup";
 "settings.theme" = "Theme";
 "theme.dark" = "Dark";
 "theme.light" = "Light";
@@ -160,7 +159,7 @@
 "内容" = "Content";
 "clipboard.connectVariable" = "Nothing to save. Connect the output of “Get Clipboard” to this action's Content field.";
 "settings.shortcut.install.clip" = "Add the clipboard shortcut";
-"settings.shortcut.install.note" = "Each opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. The clipboard one is worth assigning to the Action button or a back tap, so copying and keeping is one press. The share sheet one appears by itself in the share sheet of any app.";
+"settings.shortcut.install.note.share" = "The button opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. It appears by itself in the share sheet of any app. The steps are for building it yourself.";
 "settings.shortcut.install.share" = "Add the share sheet shortcut";
 "settings.update.section" = "Updates";
 "settings.update.current" = "Version";
@@ -171,6 +170,8 @@
 "settings.update.install" = "Get version %@ from the install page";
 "settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one. Important updates (an urgent fix, or a version that changes how the app works) are shown every launch until you update; turn that off to be told once, like any other update.";
 "settings.update.insist" = "Keep reminding about important updates";
+"settings.shortcut.install.note.clip" = "The button opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. Assigned to the Action button or a back tap, copying and keeping is one press. Steps 1 and 2 are for building it yourself.";
+"settings.update.releases" = "Open the Releases Page";
 "update.title.important" = "Important update";
 "update.message.important" = "Version %1$@ is an important update (you have %2$@) — an urgent fix, or a version that changes how the app works. Download the .ipa from the install page.";
 "update.title" = "Update available";
@@ -207,6 +208,5 @@
 "cloud.downloadFailed" = "Couldn't download %1$@: %2$@";
 "cloud.footer.off" = "Create a folder in iCloud Drive (for example, iCloud Drive › IslandTray) and choose that same folder on each of your devices. The tray and clipboard lists are shared through it. A file from another device shows a cloud and downloads when you tap it. Works on a free account too.";
 "cloud.footer.on" = "Turning sync off or choosing another folder deletes nothing, on this device or in the folder. Deleting an item deletes it on every device.";
-"labs.section" = "Labs";
-"labs.cloud" = "iCloud Sync";
-"labs.cloud.footer" = "Experimental. Off: the tray and clipboard stay on this device only. On: they are shared with your other devices through a folder in iCloud Drive.";
+"cloud.toggle" = "Sync through iCloud Drive";
+"cloud.footer.disabled" = "Off: the tray and clipboard stay on this device only. On: they are shared with your other devices through a folder in iCloud Drive.";

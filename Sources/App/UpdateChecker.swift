@@ -7,6 +7,8 @@ import Foundation
 /// with whatever tool installed this one.
 enum UpdateChecker {
     static let installPage = URL(string: "https://pikare02.github.io/IslandTray/")!
+    /// Every release with its notes, older ones included.
+    static let releasesPage = URL(string: "https://github.com/Pikare02/IslandTray/releases")!
     private static let latestRelease = URL(string: "https://api.github.com/repos/Pikare02/IslandTray/releases/latest")!
 
     static var currentVersion: String {
