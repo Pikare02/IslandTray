@@ -9,10 +9,14 @@ import UniformTypeIdentifiers
 enum TrayDragProvider {
     @MainActor
     static func provider(for item: TrayItem, model: TrayModel) -> NSItemProvider {
+        // A clipboard item is a clipboard: pasting it somewhere does not use
+        // it up. Nothing is recorded for it, so neither "remove on export"
+        // nor "delete original" ever touches it.
+        let consumes = handsOver(item)
         // Background time, taken here because this runs as the drag begins,
         // with the app still in front. Asking at the handover is too late --
         // by then the user is in the other app and this one is suspending.
-        model.beginHandover()
+        if consumes { model.beginHandover() }
 
         let provider = NSItemProvider()
         // NSItemProvider takes its suggested filename from the URL's last path
@@ -33,7 +37,7 @@ enum TrayDragProvider {
         ) { completion in
             // Recorded, never acted on here: the receiving app copies the file
             // after this returns, and the tray may hold the user's only copy.
-            model.markExported(item.id)
+            if consumes { model.markExported(item.id) }
             completion(item.fileURL, false, nil)
             return nil
         }
@@ -44,12 +48,19 @@ enum TrayDragProvider {
             provider.registerDataRepresentation(
                 forTypeIdentifier: UTType.utf8PlainText.identifier, visibility: .all
             ) { completion in
-                model.markExported(item.id)
+                if consumes { model.markExported(item.id) }
                 completion(Data(plain.utf8), nil)
                 return nil
             }
         }
         return provider
+    }
+
+    /// Whether dragging `item` out counts as handing it over -- the thing the
+    /// export settings act on. Only the tray moves things; the clipboard
+    /// board keeps what is dragged out of it, whatever the settings say.
+    static func handsOver(_ item: TrayItem) -> Bool {
+        item.boardOrTray == .tray
     }
 
     /// The type the dragged file is offered as.
