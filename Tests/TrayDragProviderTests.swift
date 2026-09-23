@@ -20,4 +20,12 @@ final class TrayDragProviderTests: XCTestCase {
         XCTAssertEqual(TrayDragProvider.typeIdentifier(for: item(uti: "com.apple.itunes.ipa", ext: "ipa")), "public.data")
         XCTAssertEqual(TrayDragProvider.typeIdentifier(for: item(uti: "dyn.ah62d4rv4ge80w6db", ext: "ipa")), "public.data")
     }
+
+    /// Dragging out of the clipboard board is a paste, not a move.
+    func testOnlyTheTrayHandsItemsOver() {
+        var tray = item(uti: "public.png", ext: "png")
+        XCTAssertTrue(TrayDragProvider.handsOver(tray))
+        tray.board = .clipboard
+        XCTAssertFalse(TrayDragProvider.handsOver(tray))
+    }
 }
