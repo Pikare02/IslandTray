@@ -8,6 +8,13 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.4.1] — 2026-09-23
+
+### Clipboard
+- Dragging an item out of the clipboard board no longer removes it, whatever
+  the export settings say: it is a clipboard, so it stays to be pasted again.
+  Only the tray moves items.
+
 ## [1.4.0] — 2026-09-23
 
 ### Shortcuts
@@ -23,11 +30,6 @@ files attached on GitHub.
   on once and every screenshot you copy lands on the clipboard board by
   itself. Settings explains the two switches. (Signing on macOS 26 strips the
   automation out of the shipped file; the build says so when it does.)
-
-### Clipboard
-- Dragging an item out of the clipboard board no longer removes it, whatever
-  the export settings say: it is a clipboard, so it stays to be pasted again.
-  Only the tray moves items.
 
 ### Search
 - Search by contents too: what a text item says, and the words recognised in
