@@ -50,6 +50,19 @@ enum UpdateChecker {
         return Update(version: remote, isImportant: isUrgent || major(remote) > major(local))
     }
 
+    /// Whether `update` may be dismissed for good. An important one may not,
+    /// unless the user turned insisting off.
+    static func isSkippable(_ update: Update, insisting: Bool) -> Bool {
+        !(update.isImportant && insisting)
+    }
+
+    /// Whether `update` is shown on launch. "Don't show again" is honoured
+    /// only for an update that could be skipped: an important one ignores an
+    /// answer given about an ordinary update.
+    static func shouldOffer(_ update: Update, skipped: String?, insisting: Bool) -> Bool {
+        !isSkippable(update, insisting: insisting) || update.version != skipped
+    }
+
     /// Compares dotted versions numerically ("1.10.0" > "1.9.2"), ignoring a
     /// leading "v" and treating missing parts as zero.
     static func isNewer(_ remote: String, than local: String) -> Bool {

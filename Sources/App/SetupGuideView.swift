@@ -13,6 +13,7 @@ struct SetupGuideView: View {
     @State private var removeOnExport = TraySettings().removeOnExport
     @State private var deleteOriginalOnExport = TraySettings().deleteOriginalOnExport
     @State private var checksForUpdates = TraySettings().checksForUpdates
+    @State private var insistsOnImportantUpdates = TraySettings().insistsOnImportantUpdates
     /// nil until checked; "" when up to date; otherwise the newer version.
     @State private var newerVersion: String?
     @State private var isChecking = false
@@ -99,6 +100,12 @@ struct SetupGuideView: View {
                         .onChange(of: checksForUpdates) { _, newValue in
                             TraySettings().checksForUpdates = newValue
                         }
+                    Toggle(L.s("settings.update.insist"), isOn: $insistsOnImportantUpdates)
+                        .onChange(of: insistsOnImportantUpdates) { _, newValue in
+                            TraySettings().insistsOnImportantUpdates = newValue
+                        }
+                        // Only the launch check shows the alert this changes.
+                        .disabled(!checksForUpdates)
                     Button {
                         Task { await checkForUpdates() }
                     } label: {

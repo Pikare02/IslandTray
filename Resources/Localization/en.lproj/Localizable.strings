@@ -169,7 +169,8 @@
 "settings.update.latest" = "Up to date";
 "settings.update.failed" = "Could not check";
 "settings.update.install" = "Get version %@ from the install page";
-"settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one.";
+"settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one. Important updates (an urgent fix, or a version that changes how the app works) are shown every launch until you update; turn that off to be told once, like any other update.";
+"settings.update.insist" = "Keep reminding about important updates";
 "update.title.important" = "Important update";
 "update.message.important" = "Version %1$@ is an important update (you have %2$@) — an urgent fix, or a version that changes how the app works. Download the .ipa from the install page.";
 "update.title" = "Update available";
