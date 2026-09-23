@@ -8,6 +8,23 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.6.0-nightly.1] — 2026-09-23 · Nightly
+
+A preview build, published as a pre-release. The app's update check only
+follows stable releases, so it will not offer this build or move anyone onto
+it.
+
+### Labs
+- New *Labs* section in Settings, with **iCloud Sync** (off by default). Off,
+  the tray and clipboard stay on this device, exactly as before. On, choose the
+  same folder in iCloud Drive on each device and both lists are shared through
+  it. Works on a free account; no iCloud entitlement is needed.
+- An item from another device shows a cloud next to its name and downloads
+  when tapped. A bar under the board shows a sync or download in progress; tap
+  it for the details (folder, last sync, uploads waiting, activity log).
+- Deleting an item deletes it on every device. Turning sync off, disconnecting
+  or changing the folder deletes nothing.
+
 ## [1.5.0] — 2026-09-23
 
 ### Updates

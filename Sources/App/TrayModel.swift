@@ -15,11 +15,36 @@ final class TrayModel {
     /// Where `exported` lives between launches. A parameter so a test can use
     /// an isolated suite instead of the real user defaults.
     private let exports: ExportRegister
+    /// The sync folder, when the user has picked one.
+    let cloud: CloudSync
 
-    init(store: TrayStore = .shared, exports: ExportRegister = ExportRegister()) {
+    init(store: TrayStore = .shared, exports: ExportRegister = ExportRegister(), cloud: CloudSync? = nil) {
         self.store = store
         self.exports = exports
+        self.cloud = cloud ?? CloudSync(store: store)
         self.exported = exports.ids
+    }
+
+    /// Set once `start()` is through. Syncing before the migration has
+    /// landed would compare the folder against a half-moved tray.
+    private var started = false
+
+    /// One sync pass, and a reload when it changed what is on this device.
+    func syncCloud() async {
+        guard started, await cloud.sync() else { return }
+        reload()
+        await syncActivity()
+    }
+
+    /// Brings an item from another device down, so it can be opened or
+    /// dragged like any other.
+    func download(_ item: TrayItem) async {
+        guard await cloud.download(item) else {
+            banner = cloud.lastError
+            return
+        }
+        reload()
+        await syncActivity()
     }
 
     /// `load()` deliberately distinguishes a failed read from an empty tray
@@ -70,6 +95,8 @@ final class TrayModel {
         // Even when nothing was taken in: the folder has to exist and be
         // non-empty before the user can find it to save into.
         DocumentsInbox.ensureVisible()
+        started = true
+        await syncCloud()
     }
 
     /// Takes in anything the user saved into the app's folder in the Files
@@ -301,6 +328,14 @@ final class TrayModel {
         visible.filter { $0.boardOrTray == board }
     }
 
+    /// What a screen lists: `visible` plus what is only in the sync folder.
+    /// The island keeps to `visible` -- it can show only what is here.
+    func listed(on board: TrayBoard?) -> [TrayItem] {
+        let all = visible + cloud.cloudOnly.filter { cloudItem in !items.contains { $0.id == cloudItem.id } }
+        guard let board else { return all }
+        return all.filter { $0.boardOrTray == board }
+    }
+
     /// Records that another app took `id`'s bytes, and takes it off the
     /// island immediately.
     ///
@@ -451,6 +486,12 @@ final class TrayModel {
     }
 
     func remove(_ item: TrayItem) async {
+        // Never downloaded: there is nothing here to remove, only the entry
+        // in the sync folder.
+        if cloud.isCloudOnly(item.id) {
+            await cloud.delete(item)
+            return
+        }
         // remove(id:) returns what actually happened on disk. A partial failure
         // must not be reported to the user as a clean delete, nor as a no-op.
         do {

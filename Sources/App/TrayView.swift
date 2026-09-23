@@ -88,6 +88,15 @@ struct TrayView: View {
         // A shortcut run while this screen is up -- the Action button, a back
         // tap -- never takes the app out of the foreground, so the scene-phase
         // reload below would not see its item until the next visit.
+        // Every change on this device goes up, and while the app is in front
+        // the folder is looked at again every half minute for other devices'.
+        .task(id: model.items.map(\.id)) { await model.syncCloud() }
+        .task(id: scenePhase) {
+            while scenePhase == .active, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                await model.syncCloud()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: TrayStore.didChangeFromIntentNotification)) { _ in
             model.reload()
         }
@@ -165,9 +174,7 @@ struct BoardView: View {
     /// What this screen is looking at before the filter, which for search is
     /// the scope and for a board is the board.
     private var source: [TrayItem] {
-        guard isSearch else { return model.visible(on: board ?? .tray) }
-        guard let scope else { return model.visible }
-        return model.visible(on: scope)
+        model.listed(on: isSearch ? scope : board)
     }
 
     private var items: [TrayItem] {
@@ -243,6 +250,7 @@ struct BoardView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
+            .safeAreaInset(edge: .bottom) { CloudStatusBar(cloud: model.cloud) }
             .safeAreaInset(edge: .bottom) {
                 if let banner = model.banner {
                     Text(banner)
@@ -267,9 +275,17 @@ struct BoardView: View {
             layout: layout,
             isSelecting: isSelecting,
             selection: $selection,
+            cloud: cloudStates,
             model: model,
             onDelete: { item in Task { await model.remove(item) } },
-            onOpen: { previewing = $0 }
+            onOpen: { item in
+                // An item from another device opens by coming down first.
+                if model.cloud.isCloudOnly(item.id) {
+                    Task { await model.download(item) }
+                } else {
+                    previewing = item
+                }
+            }
         )
         // Items can leave while the sheet of checkmarks is open -- handed to
         // another app, deleted from a context menu -- and a selection holding
@@ -280,13 +296,19 @@ struct BoardView: View {
         }
     }
 
+    private var cloudStates: [UUID: TrayItemView.Cloud] {
+        Dictionary(uniqueKeysWithValues: model.cloud.cloudOnly.map {
+            ($0.id, model.cloud.downloading.contains($0.id) ? .downloading : .remote)
+        })
+    }
+
     /// What the selection can be done with: the two ways an item leaves.
     private var selectionBar: some View {
         HStack {
             // A custom Transferable needs its own preview, one per item:
             // ShareLink only defaults that for URL and String.
             ShareLink(
-                items: selectedItems.map(SharedTrayFile.init(item:)),
+                items: selectedItems.filter { !model.cloud.isCloudOnly($0.id) }.map(SharedTrayFile.init(item:)),
                 preview: { SharePreview($0.item.name) }
             ) {
                 Label(L.s("common.share"), systemImage: "square.and.arrow.up")
