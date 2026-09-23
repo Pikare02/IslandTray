@@ -53,9 +53,10 @@ struct TrayView: View {
             isPresented: Binding(get: { availableUpdate != nil }, set: { if !$0 { availableUpdate = nil } })
         ) {
             Button(L.s("update.open")) { openURL(UpdateChecker.installPage) }
-            // No "don't show again" for an important one: it is shown every
-            // launch until the app is actually updated.
-            if availableUpdate?.isImportant == false {
+            // No "don't show again" for an important one while insisting is
+            // on: it is shown every launch until the app is actually updated.
+            if let update = availableUpdate,
+               UpdateChecker.isSkippable(update, insisting: TraySettings().insistsOnImportantUpdates) {
                 Button(L.s("update.skip")) { TraySettings().skippedUpdateVersion = availableUpdate?.version }
             }
             Button(L.s("update.later"), role: .cancel) {}
@@ -68,11 +69,12 @@ struct TrayView: View {
         .task {
             // Quietly: a failed check on launch is not worth interrupting for.
             let settings = TraySettings()
-            // An important one ignores "don't show again": that answer was
-            // given about an ordinary update.
             if settings.checksForUpdates,
                let update = try? await UpdateChecker.newerVersion(),
-               update.isImportant || update.version != settings.skippedUpdateVersion {
+               UpdateChecker.shouldOffer(
+                   update, skipped: settings.skippedUpdateVersion,
+                   insisting: settings.insistsOnImportantUpdates
+               ) {
                 availableUpdate = update
             }
         }

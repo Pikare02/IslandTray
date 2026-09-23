@@ -8,7 +8,12 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
-## [1.4.1] — 2026-09-23
+## [1.5.0] — 2026-09-23
+
+### Updates
+- New setting *Keep reminding about important updates* (on by default). Turn
+  it off and an important update is offered once, with "Don't Show Again",
+  like any other.
 
 ### Clipboard
 - Dragging an item out of the clipboard board no longer removes it, whatever
