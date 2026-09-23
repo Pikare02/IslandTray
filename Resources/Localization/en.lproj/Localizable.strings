@@ -81,10 +81,9 @@
 "settings.step4" = "Choose Run Immediately. Left asking for confirmation, it will not run on its own.";
 "settings.step5" = "For the action, choose “%@”.";
 "settings.step6" = "Repeat the same steps for 15:00 and 23:00.";
-"settings.steps.header" = "Setup steps";
+"settings.steps.header" = "Keeping the Dynamic Island always on";
 "settings.title" = "Settings";
 "settings.why.body" = "The Dynamic Island display ends by itself after eight hours. A Shortcuts automation that rebuilds it every eight hours keeps it up around the clock.";
-"settings.why.header" = "Why this setup is needed";
 "share.freeOnly" = "Choosing this app directly from the share sheet only works in a build made with a paid Apple Developer account. Save to Files → On My iPhone → IslandTray instead; it will be taken into the tray the next time you open the app.";
 "share.result.added" = "Added %d to the tray";
 "share.result.none" = "Nothing could be added";

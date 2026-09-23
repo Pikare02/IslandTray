@@ -8,6 +8,15 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.6.1] — 2026-09-24
+
+### Settings
+- The setup guide reads more clearly. The note on why the automation is needed
+  now leads the steps it explains, instead of standing alone under its own
+  header, and that section is titled for what it does — *Keeping the Dynamic
+  Island always on* — rather than a bare *Setup steps*.
+- Status now sits right after Appearance.
+
 ## [1.6.0] — 2026-09-24
 
 ### iCloud Sync
