@@ -22,4 +22,17 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(urgent.version, "1.3.2")
         XCTAssertFalse(UpdateChecker.update(tag: "v1.3.2", notes: nil, local: "1.3.1").isImportant)
     }
+
+    func testInsistingDecidesWhetherAnImportantUpdateCanBeSkipped() {
+        let important = UpdateChecker.Update(version: "2.0.0", isImportant: true)
+        let ordinary = UpdateChecker.Update(version: "1.5.0", isImportant: false)
+        XCTAssertFalse(UpdateChecker.isSkippable(important, insisting: true))
+        XCTAssertTrue(UpdateChecker.isSkippable(important, insisting: false))
+        XCTAssertTrue(UpdateChecker.isSkippable(ordinary, insisting: true))
+
+        XCTAssertTrue(UpdateChecker.shouldOffer(important, skipped: "2.0.0", insisting: true))
+        XCTAssertFalse(UpdateChecker.shouldOffer(important, skipped: "2.0.0", insisting: false))
+        XCTAssertTrue(UpdateChecker.shouldOffer(important, skipped: nil, insisting: false))
+        XCTAssertFalse(UpdateChecker.shouldOffer(ordinary, skipped: "1.5.0", insisting: true))
+    }
 }

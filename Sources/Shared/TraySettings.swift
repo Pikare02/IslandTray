@@ -43,6 +43,7 @@ struct TraySettings {
         static let theme = "theme"
         static let checksForUpdates = "checksForUpdates"
         static let skippedUpdateVersion = "skippedUpdateVersion"
+        static let insistsOnImportantUpdates = "insistsOnImportantUpdates"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -133,5 +134,13 @@ struct TraySettings {
     var skippedUpdateVersion: String? {
         get { defaults.string(forKey: Keys.skippedUpdateVersion) }
         nonmutating set { defaults.set(newValue, forKey: Keys.skippedUpdateVersion) }
+    }
+
+    /// Whether an important update is shown every launch until the app is
+    /// updated. Defaults to `true`. Off, it is offered like any other: once,
+    /// with "don't show again".
+    var insistsOnImportantUpdates: Bool {
+        get { defaults.object(forKey: Keys.insistsOnImportantUpdates) as? Bool ?? true }
+        nonmutating set { defaults.set(newValue, forKey: Keys.insistsOnImportantUpdates) }
     }
 }
