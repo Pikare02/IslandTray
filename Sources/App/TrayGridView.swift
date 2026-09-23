@@ -16,6 +16,9 @@ struct TrayGridView: UIViewRepresentable {
     let layout: TrayLayout
     let isSelecting: Bool
     @Binding var selection: Set<UUID>
+    /// Items that are only in the sync folder, by id. A value rather than a
+    /// read of `model`, so a change to it reaches `updateUIView`.
+    var cloud: [UUID: TrayItemView.Cloud] = [:]
     let model: TrayModel
     let onDelete: (TrayItem) -> Void
     let onOpen: (TrayItem) -> Void
@@ -168,6 +171,8 @@ struct TrayGridView: UIViewRepresentable {
                             style: parent.layout == .list ? .row : .card,
                             isSelecting: parent.isSelecting,
                             isSelected: parent.selection.contains(id),
+                            cloud: parent.cloud[id],
+                            onDownload: { [parent] in Task { await parent.model.download(item) } },
                             onDelete: { [parent] in parent.onDelete(item) }
                         )
                     }
@@ -326,7 +331,8 @@ struct TrayGridView: UIViewRepresentable {
             let ids = parent.selection.contains(id)
                 ? dataSource.snapshot().itemIdentifiers.filter(parent.selection.contains)
                 : [id]
-            return ids.compactMap { shown[$0] }.map(dragItem(for:))
+            // Nothing of an item from the folder is here to hand over yet.
+            return ids.filter { parent.cloud[$0] == nil }.compactMap { shown[$0] }.map(dragItem(for:))
         }
 
         /// The second finger: a card tapped while a drag is already in flight
@@ -337,7 +343,8 @@ struct TrayGridView: UIViewRepresentable {
             at indexPath: IndexPath,
             point: CGPoint
         ) -> [UIDragItem] {
-            guard let id = dataSource.itemIdentifier(for: indexPath), let item = shown[id] else { return [] }
+            guard let id = dataSource.itemIdentifier(for: indexPath), let item = shown[id],
+                  parent.cloud[id] == nil else { return [] }
             // Tapping a card that is already travelling must not hand the same
             // file over twice.
             guard !session.items.contains(where: { $0.localObject as? UUID == id }) else { return [] }

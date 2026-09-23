@@ -11,10 +11,18 @@ struct TrayItemView: View {
         case row
     }
 
+    /// An item that is in the sync folder but not on this device.
+    enum Cloud: Hashable {
+        case remote
+        case downloading
+    }
+
     let item: TrayItem
     var style: Style = .card
     var isSelecting = false
     var isSelected = false
+    var cloud: Cloud?
+    var onDownload: () -> Void = {}
     let onDelete: () -> Void
 
     // The thumbnail generator takes the scale rather than discovering it: read
@@ -26,10 +34,30 @@ struct TrayItemView: View {
 
     var body: some View {
         content
-            .task(id: item.id) {
+            // Keyed on the cloud state too: the same item has a thumbnail
+            // to make once it has been downloaded.
+            .task(id: [item.id.hashValue, cloud.hashValue]) {
+                guard cloud == nil else { return }
                 thumbnail = await ThumbnailService.shared.thumbnail(for: item, scale: displayScale)
             }
             .contextMenu {
+                if cloud != nil {
+                    // Nothing here to share or copy yet.
+                    Button(action: onDownload) {
+                        Label(L.s("cloud.download"), systemImage: "icloud.and.arrow.down")
+                    }
+                    .disabled(cloud == .downloading)
+                    Button(role: .destructive, action: onDelete) {
+                        Label(L.s("common.delete"), systemImage: "trash")
+                    }
+                } else {
+                    menu
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var menu: some View {
                 // No markExported here, unlike the drag: ShareLink reports
                 // neither success nor cancellation, and its Transferable is
                 // exported when an activity is *picked* -- a user who backs
@@ -47,7 +75,22 @@ struct TrayItemView: View {
                 Button(role: .destructive, action: onDelete) {
                     Label(L.s("common.delete"), systemImage: "trash")
                 }
-            }
+    }
+
+    /// The cloud beside a name, or the download in progress.
+    @ViewBuilder
+    private var cloudMark: some View {
+        switch cloud {
+        case .remote:
+            Image(systemName: "icloud.and.arrow.down")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(L.s("cloud.cloudOnly"))
+        case .downloading:
+            ProgressView().controlSize(.mini)
+        case nil:
+            EmptyView()
+        }
     }
 
     private var isClipboard: Bool { item.boardOrTray == .clipboard }
@@ -57,7 +100,7 @@ struct TrayItemView: View {
     /// and while selecting, it is only a label and a tap opens the item.
     @ViewBuilder
     private func name(_ text: some View) -> some View {
-        if isClipboard && !isSelecting {
+        if isClipboard && !isSelecting && cloud == nil {
             Button { RichText.copy(item) } label: { text }
                 .buttonStyle(.plain)
                 .accessibilityHint(L.s("common.copy"))
@@ -98,9 +141,12 @@ struct TrayItemView: View {
             .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                name(Text(item.name)
-                    .lineLimit(2)
-                    .truncationMode(.middle))
+                HStack(spacing: 4) {
+                    name(Text(item.name)
+                        .lineLimit(2)
+                        .truncationMode(.middle))
+                    cloudMark
+                }
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -139,10 +185,13 @@ struct TrayItemView: View {
             }
             .aspectRatio(1, contentMode: .fit)
 
-            name(Text(item.name)
-                .font(.caption2)
-                .lineLimit(1)
-                .truncationMode(.middle))
+            HStack(spacing: 3) {
+                name(Text(item.name)
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .truncationMode(.middle))
+                cloudMark
+            }
         }
     }
 

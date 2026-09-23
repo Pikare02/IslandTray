@@ -121,6 +121,32 @@ final class TrayStore: Sendable {
         return item
     }
 
+    /// Takes in an item that already exists elsewhere -- another device's,
+    /// through the sync folder -- keeping its id, name and date, so every
+    /// device agrees on which item this is.
+    @discardableResult
+    func adopt(_ item: TrayItem, copyingFrom source: URL) throws -> TrayItem {
+        try prepare()
+        var item = item
+        // A bookmark only means something on the device that took it.
+        item.origin = nil
+        let destination = item.fileURL(in: itemsDirectory)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try Self.coordinatedCopy(from: source, to: destination)
+        try commit(item, payload: destination)
+        return item
+    }
+
+    /// Where `item`'s bytes live in this store.
+    func payloadURL(for item: TrayItem) -> URL { item.fileURL(in: itemsDirectory) }
+
+    /// What the sync folder last agreed with. Kept beside the items it
+    /// describes: a store that moved or started over must not inherit a list
+    /// that would read its missing items as deletions.
+    var cloudStateURL: URL { root.appendingPathComponent("cloud-synced.json") }
+
     /// See `sweep` for the contract. Not `@discardableResult`: a caller that
     /// wants to ignore what happened to the user's files has to write it down.
     func remove(id: UUID) throws -> TrayRemovalResult {

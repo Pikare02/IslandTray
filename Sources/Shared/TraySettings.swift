@@ -44,6 +44,7 @@ struct TraySettings {
         static let checksForUpdates = "checksForUpdates"
         static let skippedUpdateVersion = "skippedUpdateVersion"
         static let insistsOnImportantUpdates = "insistsOnImportantUpdates"
+        static let cloudSyncEnabled = "cloudSyncEnabled"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -142,5 +143,13 @@ struct TraySettings {
     var insistsOnImportantUpdates: Bool {
         get { defaults.object(forKey: Keys.insistsOnImportantUpdates) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Keys.insistsOnImportantUpdates) }
+    }
+
+    /// Labs: whether the tray syncs through a folder at all. Defaults to
+    /// `false` -- the tray stays on this device, as it always has. Only the
+    /// app reads it.
+    var cloudSyncEnabled: Bool {
+        get { defaults.object(forKey: Keys.cloudSyncEnabled) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.cloudSyncEnabled) }
     }
 }

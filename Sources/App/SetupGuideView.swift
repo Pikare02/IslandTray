@@ -204,6 +204,8 @@ struct SetupGuideView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                CloudSettingsSection(model: model)
+
                 Section {
                     LabeledContent(L.s("settings.status.container"), value: L.s(TrayContainer.isShared ? "common.on" : "common.off"))
                     if !TrayContainer.isShared {
