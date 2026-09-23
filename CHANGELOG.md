@@ -24,6 +24,11 @@ files attached on GitHub.
   itself. Settings explains the two switches. (Signing on macOS 26 strips the
   automation out of the shipped file; the build says so when it does.)
 
+### Clipboard
+- Dragging an item out of the clipboard board no longer removes it, whatever
+  the export settings say: it is a clipboard, so it stays to be pasted again.
+  Only the tray moves items.
+
 ### Search
 - Search by contents too: what a text item says, and the words recognised in
   images (OCR). Choose *All*, *Names* or *Contents* at the top left of the
