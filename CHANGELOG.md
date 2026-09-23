@@ -8,6 +8,26 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.6.0] — 2026-09-24
+
+### iCloud Sync
+- **iCloud Sync** is now a regular feature, at the top of Settings (it was
+  under Labs in 1.6.0 Nightly 1). Still off by default: off, the tray and
+  clipboard stay on this device; on, choose the same folder in iCloud Drive on
+  each device and both lists are shared through it. Works on a free account.
+- An item from another device shows a cloud and downloads when tapped; a bar
+  under the board shows sync progress, with the details one tap away.
+- Deleting an item deletes it on every device. Turning sync off, disconnecting
+  or changing the folder deletes nothing.
+
+### Settings
+- New order: iCloud Sync, Updates, Behaviour, Appearance, Setup, Status,
+  Import log.
+- Each one-click shortcut install now sits in the section of the guide it
+  sets up (share sheet, clipboard).
+- Updates has an *Open the Releases Page* link that is always there, up to date
+  or not, for release notes and older builds.
+
 ## [1.6.0-nightly.1] — 2026-09-23 · Nightly
 
 A preview build, published as a pre-release. The app's update check only

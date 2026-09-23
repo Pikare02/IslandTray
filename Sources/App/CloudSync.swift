@@ -216,7 +216,7 @@ final class CloudSync {
     /// Newest first, capped: what the details screen shows.
     private(set) var log: [String] = []
     private(set) var folderName: String?
-    /// The Labs switch. Off is the local mode: nothing is read from or
+    /// The sync switch. Off is the local mode: nothing is read from or
     /// written to the folder, and its items are not listed. The folder stays
     /// remembered, so switching back on carries on where it left off.
     var isOn: Bool {

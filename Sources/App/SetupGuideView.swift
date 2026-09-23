@@ -28,71 +28,7 @@ struct SetupGuideView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    // Collapsed: this is a debug record, and left expanded it
-                    // filled the first screen of the settings with a dozen
-                    // lines before anything a person came here to change.
-                    DisclosureGroup(L.s("settings.records")) {
-                        if diagnostics.isEmpty {
-                            Text(L.s("settings.records.empty"))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(Array(diagnostics.enumerated()), id: \.offset) { _, line in
-                                Text(line)
-                                    .font(.system(.caption2, design: .monospaced))
-                            }
-                            Button(L.s("settings.records.clear"), role: .destructive) {
-                                DropDiagnostics.clear()
-                                diagnostics = []
-                            }
-                        }
-                    }
-                } footer: {
-                    Text(L.s("settings.records.footer"))
-                }
-
-                Section {
-                    Picker(L.s("settings.language"), selection: $language) {
-                        Text(L.s("settings.language.system")).tag("")
-                        // Each in its own language, the way iOS lists them.
-                        Text("日本語").tag("ja")
-                        Text("English").tag("en")
-                    }
-                    Picker(L.s("settings.theme"), selection: $theme) {
-                        Text(L.s("theme.system")).tag("")
-                        Text(L.s("theme.light")).tag("light")
-                        Text(L.s("theme.dark")).tag("dark")
-                    }
-                    accentRow
-                } header: {
-                    Text(L.s("settings.appearance.section"))
-                }
-
-                Section {
-                    Toggle(L.s("settings.activity.showEmpty"), isOn: $showActivityWhenEmpty)
-                        .onChange(of: showActivityWhenEmpty) { _, newValue in
-                            TraySettings().showActivityWhenEmpty = newValue
-                            Task { await model.syncActivity() }
-                        }
-                } header: {
-                    Text(L.s("settings.behaviour.section"))
-                } footer: {
-                    Text(L.s("settings.activity.footer"))
-                }
-
-                Section {
-                    Toggle(L.s("settings.export.remove"), isOn: $removeOnExport)
-                        .onChange(of: removeOnExport) { _, newValue in
-                            TraySettings().removeOnExport = newValue
-                        }
-                    Toggle(L.s("settings.export.deleteOriginal"), isOn: $deleteOriginalOnExport)
-                        .onChange(of: deleteOriginalOnExport) { _, newValue in
-                            TraySettings().deleteOriginalOnExport = newValue
-                        }
-                } footer: {
-                    Text(L.s("settings.export.footer"))
-                }
+                CloudSettingsSection(model: model)
 
                 Section {
                     LabeledContent(L.s("settings.update.current"), value: UpdateChecker.currentVersion)
@@ -125,6 +61,9 @@ struct SetupGuideView: View {
                     if let version = newerVersion, !version.isEmpty {
                         Link(L.s("settings.update.install", version), destination: UpdateChecker.installPage)
                     }
+                    // Always there, up to date or not: the way back to an
+                    // older build, or to the notes of the one installed.
+                    Link(L.s("settings.update.releases"), destination: UpdateChecker.releasesPage)
                 } header: {
                     Text(L.s("settings.update.section"))
                 } footer: {
@@ -132,31 +71,70 @@ struct SetupGuideView: View {
                 }
 
                 Section {
-                    ShortcutLink("ClipboardToTray", title: L.s("settings.shortcut.install.clip"))
-                    ShortcutLink("ShareToTray", title: L.s("settings.shortcut.install.share"))
+                    Toggle(L.s("settings.activity.showEmpty"), isOn: $showActivityWhenEmpty)
+                        .onChange(of: showActivityWhenEmpty) { _, newValue in
+                            TraySettings().showActivityWhenEmpty = newValue
+                            Task { await model.syncActivity() }
+                        }
                 } header: {
-                    Text(L.s("settings.setup.section"))
+                    Text(L.s("settings.behaviour.section"))
                 } footer: {
-                    Text(L.s("settings.shortcut.install.note"))
+                    Text(L.s("settings.activity.footer"))
+                }
+
+                Section {
+                    Toggle(L.s("settings.export.remove"), isOn: $removeOnExport)
+                        .onChange(of: removeOnExport) { _, newValue in
+                            TraySettings().removeOnExport = newValue
+                        }
+                    Toggle(L.s("settings.export.deleteOriginal"), isOn: $deleteOriginalOnExport)
+                        .onChange(of: deleteOriginalOnExport) { _, newValue in
+                            TraySettings().deleteOriginalOnExport = newValue
+                        }
+                } footer: {
+                    Text(L.s("settings.export.footer"))
+                }
+
+                Section {
+                    Picker(L.s("settings.language"), selection: $language) {
+                        Text(L.s("settings.language.system")).tag("")
+                        // Each in its own language, the way iOS lists them.
+                        Text("日本語").tag("ja")
+                        Text("English").tag("en")
+                    }
+                    Picker(L.s("settings.theme"), selection: $theme) {
+                        Text(L.s("theme.system")).tag("")
+                        Text(L.s("theme.light")).tag("light")
+                        Text(L.s("theme.dark")).tag("dark")
+                    }
+                    accentRow
+                } header: {
+                    Text(L.s("settings.appearance.section"))
                 }
 
                 Section {
                     Text(L.s("settings.shortcut.intro"))
                         .font(.callout)
+                    ShortcutLink("ShareToTray", title: L.s("settings.shortcut.install.share"))
                     step(1, L.s("settings.shortcut.1"))
                     step(2, L.s("settings.shortcut.2"))
                     step(3, L.s("settings.shortcut.3"))
                     step(4, L.s("settings.shortcut.4"))
                 } header: {
                     Text(L.s("settings.shortcut.header"))
+                } footer: {
+                    Text(L.s("settings.shortcut.install.note.share"))
                 }
 
                 Section {
+                    ShortcutLink("ClipboardToTray", title: L.s("settings.shortcut.install.clip"))
                     step(1, L.s("settings.shortcut.clip.1"))
                     step(2, L.s("settings.shortcut.clip.2"))
                     step(3, L.s("settings.shortcut.clip.3"))
                 } header: {
                     Text(L.s("settings.shortcut.clip.header"))
+                } footer: {
+                    Text(L.s("settings.shortcut.install.note.clip"))
                 }
 
                 // iOS 26 and earlier have no screenshot trigger at all, so
@@ -204,8 +182,6 @@ struct SetupGuideView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                CloudSettingsSection(model: model)
-
                 Section {
                     LabeledContent(L.s("settings.status.container"), value: L.s(TrayContainer.isShared ? "common.on" : "common.off"))
                     if !TrayContainer.isShared {
@@ -219,6 +195,30 @@ struct SetupGuideView: View {
                     }
                 } header: {
                     Text(L.s("settings.status.header"))
+                }
+
+                Section {
+                    // Collapsed: this is a debug record, and left expanded it
+                    // filled the first screen of the settings with a dozen
+                    // lines before anything a person came here to change.
+                    DisclosureGroup(L.s("settings.records")) {
+                        if diagnostics.isEmpty {
+                            Text(L.s("settings.records.empty"))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(diagnostics.enumerated()), id: \.offset) { _, line in
+                                Text(line)
+                                    .font(.system(.caption2, design: .monospaced))
+                            }
+                            Button(L.s("settings.records.clear"), role: .destructive) {
+                                DropDiagnostics.clear()
+                                diagnostics = []
+                            }
+                        }
+                    }
+                } footer: {
+                    Text(L.s("settings.records.footer"))
                 }
             }
             .onAppear { diagnostics = DropDiagnostics.lines }
