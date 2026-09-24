@@ -40,11 +40,12 @@ files attached on GitHub.
   left no room for the drawer's data, or the drawer had no shortcuts yet.
 - The drawer arrow switches the island at once (it no longer waits on a
   weather refresh).
-- Sharper drawer icons in the island: the sharpest JPEG that fits is picked
-  (fewer icons or hidden names leave room for more detail). Nightly 4 sent
-  HEIC and decoded the icon strip again for every tile, which pushed the
-  Live Activity past its limits: the whole island and Lock Screen showed grey
-  placeholders. The strip is now decoded once per render.
+- Sharper drawer icons in the island: sent as HEIC, about half the size of a
+  JPEG, at the sharpest quality that fits (fewer icons or hidden names leave
+  room for more detail).
+- Fixed (Nightly 4): the whole island and Lock Screen showed grey
+  placeholders. The widget decoded the icon strip again for every tile; it
+  now decodes it once per render.
 - Turning app names off in the drawer settings now hides them in the island
   too, and the icons get bigger.
 - Drawer: long-press an icon and drag it to rearrange; ↑↓ sorts by name,
