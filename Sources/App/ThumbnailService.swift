@@ -98,6 +98,19 @@ actor ThumbnailService {
         return Self.strip(from: images)
     }
 
+    /// The tray page's strip with drawer icons appended, for a tray state
+    /// that also carries the drawer (`TrayContentState.withDrawer`). The tray
+    /// tiles are sliced back out of `tray` rather than regenerated. `nil` when
+    /// no drawer slot has an image -- the tray atlas alone is then enough.
+    func combinedAtlas(tray: TrayContentState.Atlas?, trayCount: Int, drawer: [UIImage?]) async -> TrayContentState.Atlas? {
+        guard drawer.contains(where: { $0 != nil }) else { return nil }
+        let trayTiles: [UIImage?] = (0..<trayCount).map { i in
+            guard let tray, tray.filled.indices.contains(i), tray.filled[i] else { return nil }
+            return AtlasSlicer.tile(tray.jpeg, index: i, count: trayCount)
+        }
+        return Self.strip(from: trayTiles + drawer)
+    }
+
     private func islandTile(for item: TrayItem) async -> UIImage? {
         let side = CGFloat(Self.atlasTile)
         let request = QLThumbnailGenerator.Request(

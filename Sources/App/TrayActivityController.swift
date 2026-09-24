@@ -283,17 +283,32 @@ actor TrayActivityController {
     /// this is byte-for-byte the pre-drawer paged behavior.
     private func pagedState(for items: [TrayItem]) async -> TrayContentState {
         let settings = TraySettings()
+        // An emptied tray forgets the flip, so the next item lands on the tray view.
+        if items.isEmpty { drawerView = false }
         if settings.appDrawerEnabled, items.isEmpty || drawerView {
             return await drawerContentState(count: items.count, view: .drawer, settings: settings)
         }
 
         page = TrayContentState.clampedPage(page, count: items.count)
         let onPage = TrayContentState.items(items, onPage: page)
-        return TrayContentState.make(
-            from: items,
-            atlas: await ThumbnailService.shared.islandAtlas(for: onPage),
-            page: page
-        )
+        let trayAtlas = await ThumbnailService.shared.islandAtlas(for: onPage)
+        let tray = TrayContentState.make(from: items, atlas: trayAtlas, page: page)
+        guard settings.appDrawerEnabled else { return tray }
+
+        // The drawer rides along on the tray state: its slots are what put
+        // the drawer arrow on the first page, and with the Lock Screen
+        // setting on, its icons are what the Lock Screen shows instead.
+        let shortcuts = DrawerStore.shared.load()
+        let slots = DrawerState.slots(from: shortcuts, showNames: settings.showAppNames)
+        let lockDrawer = settings.lockScreenShowsDrawer
+        // Icons only when the Lock Screen draws them: the island's tray view
+        // shows the arrow, not the icons, so they would be spent bytes.
+        let combined = lockDrawer
+            ? await ThumbnailService.shared.combinedAtlas(
+                tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count,
+                drawer: await DrawerState.icons(for: shortcuts))
+            : nil
+        return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer)
     }
 
     /// Builds the date/weather + drawer-slots state from what is on disk.
@@ -317,7 +332,8 @@ actor TrayActivityController {
             tempText: "", symbol: "thermometer"
         )
         return TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas,
-                                           view: view, count: count)
+                                           view: view, count: count,
+                                           lockDrawer: settings.lockScreenShowsDrawer)
     }
 
     // MARK: - Internals

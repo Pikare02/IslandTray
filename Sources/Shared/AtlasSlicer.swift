@@ -15,6 +15,14 @@ enum AtlasSlicer {
     /// it. A strip whose width is not a whole multiple of `count` -- which
     /// would mean it was built for a different list -- is refused rather
     /// than sliced at an offset.
+    /// The `index`-th tile, taking the tile count from the strip itself
+    /// (square tiles, so width / height). For a tray strip that may have the
+    /// drawer's icons appended after the tray's own tiles.
+    static func tile(_ atlas: Data?, index: Int) -> UIImage? {
+        guard let atlas, let image = UIImage(data: atlas)?.cgImage, image.height > 0 else { return nil }
+        return tile(atlas, index: index, count: image.width / image.height)
+    }
+
     static func tile(_ atlas: Data?, index: Int, count: Int) -> UIImage? {
         guard count > 0, index >= 0, index < count,
               let atlas, let image = UIImage(data: atlas)?.cgImage else { return nil }

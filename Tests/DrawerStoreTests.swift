@@ -2,6 +2,12 @@ import XCTest
 @testable import IslandTray
 
 final class DrawerStoreTests: XCTestCase {
+    /// Documents is the Files-app inbox; a drawer folder there gets swept
+    /// into the tray as an item and deleted.
+    func testDefaultLocationIsOutsideFilesInbox() {
+        XCTAssertFalse(DrawerStore().dir.path.hasPrefix(DocumentsInbox.directory.path))
+    }
+
     func testLaunchURLPerKind() {
         let scheme = DrawerShortcut(id: UUID(), kind: .urlScheme("instagram://"),
                                     displayName: "IG", customIconName: nil, order: 0)

@@ -45,9 +45,14 @@ struct TrayLiveActivity: Widget {
                     // and how the drawer is switched to and from.
                     if context.state.view == .drawer, let slots = context.state.drawer {
                         HStack(spacing: 4) {
-                            drawerToggleButton(systemImage: "chevron.left")
                             DrawerStrip(slots: slots, atlas: context.state.atlas, side: 44)
                                 .frame(maxWidth: .infinity)
+                            // The drawer sits to the left of the tray, so the
+                            // way back is a right arrow -- and with an empty
+                            // tray there is nothing to go back to at all.
+                            if context.state.count > 0 {
+                                drawerToggleButton(systemImage: "chevron.right")
+                            }
                         }
                         .padding(.top, 2)
                     } else {
@@ -57,7 +62,7 @@ struct TrayLiveActivity: Widget {
                             // instead -- but only once the drawer has
                             // something to show.
                             if context.state.drawerAvailable && !context.state.hasPreviousPage {
-                                drawerToggleButton(systemImage: "square.grid.2x2")
+                                drawerToggleButton(systemImage: "chevron.left")
                             } else {
                                 pageButton(.backward, enabled: context.state.hasPreviousPage)
                             }
@@ -79,7 +84,7 @@ struct TrayLiveActivity: Widget {
                     let parts = w.dateText.split(separator: " ")
                     let weekday = parts.last.map(String.init) ?? ""
                     let date = parts.dropLast().joined(separator: " ")
-                    VStack(alignment: .leading, spacing: -2) {
+                    VStack(alignment: .center, spacing: -2) {
                         Text(date).font(.system(size: 11, weight: .semibold)).lineLimit(1)
                         Text(weekday).font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.secondary).lineLimit(1)
@@ -140,7 +145,7 @@ struct TrayLiveActivity: Widget {
     }
 
     /// Same footprint and look as `pageButton`, wired to `ToggleDrawerIntent`
-    /// instead: the grid icon on the tray's first page, and the back chevron
+    /// instead: the left chevron on the tray's first page, and the right one
     /// inside the drawer.
     private func drawerToggleButton(systemImage: String) -> some View {
         Button(intent: ToggleDrawerIntent()) {
@@ -152,7 +157,21 @@ struct TrayLiveActivity: Widget {
         .buttonStyle(.plain)
     }
 
-    private func lockScreen(_ state: TrayContentState) -> some View {
+    @ViewBuilder private func lockScreen(_ state: TrayContentState) -> some View {
+        if state.lockDrawer, let slots = state.drawer, !slots.isEmpty {
+            // Labs setting: the drawer's first six, whatever the tray holds.
+            DrawerStrip(slots: slots, atlas: state.atlas, side: 38,
+                        atlasOffset: state.view == .drawer ? 0 : state.recent.count)
+                .frame(maxWidth: .infinity)
+                .padding(14)
+                .activityBackgroundTint(Color.black.opacity(0.45))
+                .widgetURL(TrayIDs.dropURL)
+        } else {
+            trayLockScreen(state)
+        }
+    }
+
+    private func trayLockScreen(_ state: TrayContentState) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "tray.full.fill")
                 .font(.title3)

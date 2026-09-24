@@ -1,9 +1,10 @@
 import PhotosUI
 import SwiftUI
 
-/// The full-screen app drawer: a scrolling 6-column grid of shortcuts, its
-/// background colour/image, and the name-label toggle. The first six (by
-/// order) are what the island shows.
+/// The app drawer tab: a scrolling 6-column grid of shortcuts, its
+/// background colour/image, and the name-label toggle. A tap runs the
+/// shortcut; long-press to edit. The first six (by order) are what the
+/// island shows.
 struct DrawerEditorView: View {
     @State private var shortcuts: [DrawerShortcut] = DrawerStore.shared.load()
     @State private var adding = false
@@ -13,7 +14,7 @@ struct DrawerEditorView: View {
     // `@AppStorage(AccentColor.key…)`); `TraySettings.Keys` is private.
     @AppStorage("showAppNames", store: TraySettings.store) private var showNames = true
     @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var bgHex = "000000"
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
 
@@ -22,7 +23,7 @@ struct DrawerEditorView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(shortcuts) { s in
-                        Button { editing = s } label: { cell(s) }
+                        Button { run(s) } label: { cell(s) }
                             .contextMenu { contextMenu(for: s) }
                     }
                     Button { adding = true } label: {
@@ -36,13 +37,14 @@ struct DrawerEditorView: View {
             }
             .background(background.ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button(L.s("common.done")) { dismiss() } }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingBackgroundSettings = true } label: { Image(systemName: "gearshape") }
+                    Button { showingBackgroundSettings = true } label: { Label(L.s("drawer.background"), systemImage: "gearshape") }
                 }
             }
             .navigationTitle(L.s("drawer.title"))
         }
+        // The grid is always drawn on a dark background, so its bar text must be light.
+        .environment(\.colorScheme, .dark)
         .sheet(isPresented: $adding) {
             DrawerAddSheet { new in add(new) }
         }
@@ -92,6 +94,15 @@ struct DrawerEditorView: View {
             } else {
                 AccentColor.color(forHex: bgHex) ?? Color.black
             }
+        }
+    }
+
+    /// Installed apps go through the private launcher; everything else is a URL.
+    private func run(_ s: DrawerShortcut) {
+        if case .installedApp = s.kind {
+            LaunchRouter.performLaunch(s.id)
+        } else if let url = s.launchURL {
+            openURL(url)
         }
     }
 

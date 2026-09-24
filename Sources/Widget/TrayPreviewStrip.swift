@@ -50,7 +50,7 @@ struct TrayPreviewStrip: View {
 
     private func thumbnail(for preview: TrayContentState.Preview, at index: Int) -> UIImage? {
         containerThumbnail(for: preview)
-            ?? (preview.hasThumbnail ? AtlasSlicer.tile(atlas, index: index, count: previews.count) : nil)
+            ?? (preview.hasThumbnail ? AtlasSlicer.tile(atlas, index: index) : nil)
     }
 
     private func containerThumbnail(for preview: TrayContentState.Preview) -> UIImage? {

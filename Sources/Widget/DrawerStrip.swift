@@ -8,6 +8,9 @@ struct DrawerStrip: View {
     let slots: [TrayContentState.DrawerSlot]
     let atlas: Data?
     let side: CGFloat
+    /// Where the drawer's tiles start in `atlas`: after the tray's own on a
+    /// tray state carrying the drawer, 0 on a drawer state.
+    var atlasOffset = 0
 
     var body: some View {
         HStack(spacing: 6) {
@@ -41,7 +44,7 @@ struct DrawerStrip: View {
     }
 
     @ViewBuilder private func iconImage(_ index: Int) -> some View {
-        if slots[index].hasIcon, let ui = AtlasSlicer.tile(atlas, index: index, count: slots.count) {
+        if slots[index].hasIcon, let ui = AtlasSlicer.tile(atlas, index: atlasOffset + index) {
             Image(uiImage: ui).resizable().aspectRatio(contentMode: .fill)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
         } else {

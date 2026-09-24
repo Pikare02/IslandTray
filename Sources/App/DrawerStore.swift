@@ -1,18 +1,20 @@
 import Foundation
 
 /// Persists the drawer's shortcut list and its custom images as plain files
-/// in the app container. The widget never reads these (no shared App Group on
+/// in Application Support -- never Documents: that folder is the Files-app
+/// inbox, and `DocumentsInbox.sweep` would take a "Drawer" folder there into
+/// the tray as an item (and delete it, losing every later save). The widget never reads these (no shared App Group on
 /// the real deployment); the app serialises what the island needs into the
 /// content state instead.
 final class DrawerStore: Sendable {
     static let shared = DrawerStore()
 
-    private let dir: URL
+    let dir: URL
     private let listURL: URL
 
     init(directory: URL? = nil) {
         let base = directory ?? FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Drawer", isDirectory: true)
         dir = base
         listURL = base.appendingPathComponent("shortcuts.json")

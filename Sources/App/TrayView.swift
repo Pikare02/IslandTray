@@ -12,19 +12,27 @@ struct TrayView: View {
     @Environment(\.openURL) private var openURL
     /// A newer release found on launch, offered once per launch.
     @State private var availableUpdate: UpdateChecker.Update?
-    /// Opened from the island's drawer/tray toggle deep link. A separate
-    /// cover from `BoardView`'s `previewing` one -- different screen,
-    /// different state, so the two never fight over which is presented.
-    @State private var showDrawer = false
+    /// Which tab is up; the island's "more" link switches to the drawer.
+    @State private var tab = "tray"
+    /// Labs: the drawer tab only exists while the feature is on.
+    @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
+            if appDrawerEnabled {
+                DrawerEditorView()
+                    .tabItem { Label(L.s("drawer.title"), systemImage: "square.grid.3x3") }
+                    .tag("drawer")
+            }
             BoardView(board: .tray, model: model)
                 .tabItem { Label(L.s("tray.title"), systemImage: "tray") }
+                .tag("tray")
             BoardView(board: .clipboard, model: model)
                 .tabItem { Label(L.s("clipboard.title"), systemImage: "list.clipboard") }
+                .tag("clipboard")
             BoardView(board: nil, model: model)
                 .tabItem { Label(L.s("search.title"), systemImage: "magnifyingglass") }
+                .tag("search")
         }
         // One tint for the whole app, applied where everything inherits it.
         .tint(AccentColor.color(forHex: accent))
@@ -112,8 +120,10 @@ struct TrayView: View {
         .onReceive(NotificationCenter.default.publisher(for: TrayStore.didChangeFromIntentNotification)) { _ in
             model.reload()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in showDrawer = true }
-        .fullScreenCover(isPresented: $showDrawer) { DrawerEditorView() }
+        .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
+            if appDrawerEnabled { tab = "drawer" }
+        }
+        .onChange(of: appDrawerEnabled) { _, on in if !on && tab == "drawer" { tab = "tray" } }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
             // tray now: the receiving app has finished copying by the time the
@@ -258,7 +268,7 @@ struct BoardView: View {
                         }
                     } else {
                         Button { showsSetupGuide = true } label: {
-                            Image(systemName: "gearshape")
+                            Label(L.s("settings.title"), systemImage: "gearshape")
                         }
                     }
                 }
@@ -366,7 +376,7 @@ struct BoardView: View {
             }
             Toggle(L.s("settings.group"), isOn: $groupsByKind)
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
+            Label(L.s("settings.sort.section"), systemImage: "arrow.up.arrow.down")
         }
     }
 
@@ -376,9 +386,9 @@ struct BoardView: View {
         Button {
             layoutRaw = (layout == .grid ? TrayLayout.list : .grid).rawValue
         } label: {
-            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
+            Label(L.s(layout == .grid ? "layout.list" : "layout.grid"),
+                  systemImage: layout == .grid ? "list.bullet" : "square.grid.2x2")
         }
-        .accessibilityLabel(L.s(layout == .grid ? "layout.list" : "layout.grid"))
     }
 
     private var selectedItems: [TrayItem] {

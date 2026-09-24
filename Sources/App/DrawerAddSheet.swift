@@ -15,6 +15,8 @@ struct DrawerAddSheet: View {
     @State private var bundleID = ""          // installed app
     @State private var iconItem: PhotosPickerItem?
     @State private var iconData: Data?
+    /// The picked photo, waiting for the square crop before it becomes `iconData`.
+    @State private var cropping: UIImage?
     private let existingID: UUID?
     /// The icon already on disk when editing, kept unless the picker above
     /// replaces it -- without this, saving an edit without touching the icon
@@ -50,7 +52,16 @@ struct DrawerAddSheet: View {
                 }
                 detail
                 TextField(L.s("drawer.name"), text: $name)
-                PhotosPicker(L.s("drawer.customIcon"), selection: $iconItem, matching: .images)
+                PhotosPicker(selection: $iconItem, matching: .images) {
+                    HStack {
+                        Text(L.s("drawer.customIcon"))
+                        Spacer()
+                        if let preview = iconPreview {
+                            Image(uiImage: preview).resizable().frame(width: 36, height: 36)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
             }
             .navigationTitle(L.s("drawer.add"))
             .toolbar {
@@ -58,7 +69,19 @@ struct DrawerAddSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button(L.s("common.cancel")) { dismiss() } }
             }
             .onChange(of: iconItem) { _, item in
-                Task { iconData = try? await item?.loadTransferable(type: Data.self) }
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        cropping = UIImage(data: data)
+                    }
+                    // Cleared so picking the same photo again still fires.
+                    iconItem = nil
+                }
+            }
+            .fullScreenCover(isPresented: Binding(get: { cropping != nil }, set: { if !$0 { cropping = nil } })) {
+                if let image = cropping {
+                    SquareCropView(image: image) { iconData = $0.jpegData(compressionQuality: 0.85) }
+                }
             }
         }
     }
@@ -77,6 +100,14 @@ struct DrawerAddSheet: View {
         case .urlScheme: TextField("myapp://", text: $value).autocapitalization(.none)
         case .webURL: TextField("https://…", text: $value).autocapitalization(.none)
         }
+    }
+
+    private var iconPreview: UIImage? {
+        if let iconData { return UIImage(data: iconData) }
+        guard let name = existingIconName,
+              let data = try? Data(contentsOf: DrawerStore.shared.dir.appendingPathComponent(name))
+        else { return nil }
+        return UIImage(data: data)
     }
 
     /// `value` is trimmed before being judged non-empty: a field with only

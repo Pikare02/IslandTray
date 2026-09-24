@@ -41,7 +41,6 @@
 "drawer.moveDown" = "Move Right";
 "drawer.moveUp" = "Move Left";
 "drawer.name" = "Name";
-"drawer.open" = "Open App Drawer";
 "drawer.pickApp" = "Choose App";
 "drawer.removeBackgroundImage" = "Remove Background Image";
 "drawer.settings.auto" = "Current Location";
@@ -50,7 +49,8 @@
 "drawer.settings.enable" = "App Drawer";
 "drawer.settings.location" = "Weather Location";
 "drawer.settings.manual" = "Set a City";
-"drawer.settings.title" = "App Drawer (Labs)";
+"drawer.settings.title" = "App Drawer";
+"drawer.settings.lockScreen" = "Always show drawer on Lock Screen";
 "drawer.settings.unit" = "Temperature Unit";
 "drawer.shortcutName" = "Shortcut Name";
 "drawer.showNames" = "Show App Names";
@@ -90,6 +90,7 @@
 "settings.language" = "Language";
 "settings.language.section" = "Language";
 "settings.language.system" = "Match the system";
+"settings.labs" = "Labs";
 "settings.records" = "Import log";
 "settings.records.clear" = "Clear the log";
 "settings.records.empty" = "Nothing recorded yet.";
@@ -156,6 +157,7 @@
 "filter.clear" = "Clear filters";
 "filter.day" = "Last 24 hours";
 "filter.kind" = "Kind";
+"filter.title" = "Filter";
 "filter.month" = "Last 30 days";
 "filter.week" = "Last 7 days";
 "search.empty.body" = "Nothing matches what you typed.";

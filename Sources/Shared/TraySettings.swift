@@ -48,6 +48,7 @@ struct TraySettings {
         static let cloudSyncEnabled = "cloudSyncEnabled"
         static let appDrawerEnabled = "appDrawerEnabled"
         static let showAppNames = "showAppNames"
+        static let lockScreenShowsDrawer = "lockScreenShowsDrawer"
         static let drawerBackgroundHex = "drawerBackgroundHex"
         static let temperatureUnit = "temperatureUnit"
         static let weatherLocationMode = "weatherLocationMode"
@@ -180,6 +181,14 @@ struct TraySettings {
     var showAppNames: Bool {
         get { defaults.object(forKey: Keys.showAppNames) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Keys.showAppNames) }
+    }
+
+    /// Whether the Lock Screen activity always shows the drawer's first six
+    /// icons, whatever the tray holds. Default `false`. The widget never reads
+    /// this; the app carries it in the content state (`lockDrawer`).
+    var lockScreenShowsDrawer: Bool {
+        get { defaults.object(forKey: Keys.lockScreenShowsDrawer) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.lockScreenShowsDrawer) }
     }
 
     /// Full-screen drawer background colour, hex like `AccentColor`. Default black.

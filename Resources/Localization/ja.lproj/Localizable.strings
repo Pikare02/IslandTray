@@ -41,7 +41,6 @@
 "drawer.moveDown" = "右へ移動";
 "drawer.moveUp" = "左へ移動";
 "drawer.name" = "名前";
-"drawer.open" = "アプリドロワーを開く";
 "drawer.pickApp" = "アプリを選ぶ";
 "drawer.removeBackgroundImage" = "背景画像を削除";
 "drawer.settings.auto" = "現在地";
@@ -50,7 +49,8 @@
 "drawer.settings.enable" = "アプリドロワー";
 "drawer.settings.location" = "天気の場所";
 "drawer.settings.manual" = "都市を指定";
-"drawer.settings.title" = "アプリドロワー（Labs）";
+"drawer.settings.title" = "アプリドロワー";
+"drawer.settings.lockScreen" = "ロック画面に常にドロワーを表示";
 "drawer.settings.unit" = "気温の単位";
 "drawer.shortcutName" = "ショートカット名";
 "drawer.showNames" = "アプリ名を表示";
@@ -90,6 +90,7 @@
 "settings.language" = "言語";
 "settings.language.section" = "言語";
 "settings.language.system" = "システムに従う";
+"settings.labs" = "ラボ（実験的機能）";
 "settings.records" = "取り込みの記録";
 "settings.records.clear" = "記録を消す";
 "settings.records.empty" = "まだ記録がありません。";
@@ -156,6 +157,7 @@
 "filter.clear" = "フィルタを解除";
 "filter.day" = "24 時間以内";
 "filter.kind" = "種類";
+"filter.title" = "フィルタ";
 "filter.month" = "30 日以内";
 "filter.week" = "7 日以内";
 "search.empty.body" = "入力に一致する項目がありません。";

@@ -21,6 +21,23 @@ files attached on GitHub.
 - When the drawer is empty it shows the date and current weather, from
   [Open-Meteo](https://open-meteo.com/) for your location if you allow it, or
   a region you pick by hand instead.
+- The drawer is its own tab now, first in the bar (App Drawer · Tray ·
+  Clipboard · Search), shown while the Labs toggle is on. Labs moved to its own
+  page in Settings, just above the import log.
+- Tapping a drawer icon runs it; long-press to edit. Picking a custom icon
+  opens a square crop you can pan and zoom.
+- Fixed: turning the drawer on put an unknown folder into the tray, and after
+  deleting it nothing added to the drawer reached the Dynamic Island. The
+  drawer's data no longer lives in the Files-app folder.
+- Island: no stray arrow on an empty tray. With items, the left arrow on the
+  first page opens the drawer and the right arrow comes back. The compact
+  date and weekday are centred.
+- New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity
+  shows the drawer's first six icons whatever the tray holds.
+
+### Toolbar
+- In a narrow window (iPad Slide Over) the toolbar buttons that do not fit
+  appear in the overflow menu with their names.
 
 ### Updates
 - Turning on *Keep reminding about important updates* now also sends a

@@ -71,7 +71,7 @@ struct TrayContentState: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent, atlas, page, added, weather, drawer, view
+        case count, recent, atlas, page, added, weather, drawer, view, lockDrawer
     }
 
     /// What a shortcut just put in, shown with a check while the island is
@@ -124,15 +124,22 @@ struct TrayContentState: Codable, Hashable {
     /// Shortcut slots shown by the drawer, capped to `maxSlots`, or `nil`
     /// outside `view == .drawer`.
     let drawer: [DrawerSlot]?
-    /// Which face the island is showing. Tray states never set `weather` or
-    /// `drawer`; only `makeDrawer(...)` does.
+    /// Which face the island is showing. Tray states never set `weather`;
+    /// they carry `drawer` only while the drawer feature is on
+    /// (`withDrawer(...)`), so the first page can offer the drawer arrow.
     let view: View
+    /// The Lock Screen shows `drawer` instead of the tray strip.
+    ///
+    /// Atlas layout when a tray state carries drawer icons: the tray's
+    /// `recent.count` tiles first, then one per drawer slot. The widget
+    /// derives the tile count from the strip itself (`AtlasSlicer`).
+    let lockDrawer: Bool
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
     /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
     private init(
         count: Int, recent: [Preview], atlas: Data?, page: Int = 0, added: Added? = nil,
-        weather: Weather? = nil, drawer: [DrawerSlot]? = nil, view: View = .tray
+        weather: Weather? = nil, drawer: [DrawerSlot]? = nil, view: View = .tray, lockDrawer: Bool = false
     ) {
         self.count = count
         self.recent = recent
@@ -142,6 +149,7 @@ struct TrayContentState: Codable, Hashable {
         self.weather = weather
         self.drawer = drawer
         self.view = view
+        self.lockDrawer = lockDrawer
     }
 
     /// The same state, carrying `added`. A few dozen bytes, which the
@@ -149,7 +157,7 @@ struct TrayContentState: Codable, Hashable {
     func announcing(_ added: Added?) -> TrayContentState {
         TrayContentState(
             count: count, recent: recent, atlas: atlas, page: page, added: added,
-            weather: weather, drawer: drawer, view: view
+            weather: weather, drawer: drawer, view: view, lockDrawer: lockDrawer
         )
     }
 
@@ -202,12 +210,13 @@ struct TrayContentState: Codable, Hashable {
         let decodedDrawer = (try? container.decodeIfPresent([DrawerSlot].self, forKey: .drawer))
             .map { Array($0.prefix(Self.maxSlots)) } ?? nil
         let decodedView = (try? container.decodeIfPresent(View.self, forKey: .view)) ?? .tray
+        let lockDrawer = (try? container.decodeIfPresent(Bool.self, forKey: .lockDrawer)) ?? false
         let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
         let page = Self.clampedPage(decodedPage, count: decodedCount)
 
         let full = TrayContentState(
             count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page, added: added,
-            weather: decodedWeather, drawer: decodedDrawer, view: decodedView
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
         )
         if full.encodedByteCount <= Self.maxEncodedBytes {
             self = full
@@ -215,13 +224,13 @@ struct TrayContentState: Codable, Hashable {
         }
         let noAtlas = TrayContentState(
             count: decodedCount, recent: clampedRecent, atlas: nil, page: page, added: added,
-            weather: decodedWeather, drawer: decodedDrawer, view: decodedView
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
         )
         self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
             ? noAtlas
             : TrayContentState(
                 count: decodedCount, recent: [], atlas: nil, page: page, added: added,
-                weather: decodedWeather, drawer: decodedDrawer, view: decodedView
+                weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
             )
     }
 
@@ -289,13 +298,13 @@ struct TrayContentState: Codable, Hashable {
     /// are shed from the end until it fits — worst case an empty drawer showing
     /// only the tiny weather line. `slots` is capped to `maxSlots` first.
     static func makeDrawer(weather: Weather?, slots: [DrawerSlot], atlas: Atlas?,
-                           view: View, count: Int) -> TrayContentState {
+                           view: View, count: Int, lockDrawer: Bool = false) -> TrayContentState {
         let capped = Array(slots.prefix(maxSlots)).map {
             DrawerSlot(symbol: $0.symbol, name: islandName($0.name), launch: $0.launch, hasIcon: $0.hasIcon)
         }
         let withAtlas = TrayContentState(
             count: count, recent: [], atlas: atlas?.jpeg, page: 0, added: nil,
-            weather: weather, drawer: capped, view: view
+            weather: weather, drawer: capped, view: view, lockDrawer: lockDrawer
         )
         if withAtlas.encodedByteCount <= buildBudget { return withAtlas }
 
@@ -308,11 +317,46 @@ struct TrayContentState: Codable, Hashable {
                 count: count, recent: [], atlas: nil, page: 0, added: nil,
                 weather: weather,
                 drawer: kept.map { DrawerSlot(symbol: $0.symbol, name: $0.name, launch: $0.launch, hasIcon: false) },
-                view: view
+                view: view, lockDrawer: lockDrawer
             )
             if candidate.encodedByteCount <= maxEncodedBytes || kept.isEmpty { return candidate }
             kept.removeLast()
         }
+    }
+
+    /// This tray state, also carrying the drawer's slots: for the first
+    /// page's drawer arrow and, with `lockDrawer`, the Lock Screen's icons.
+    ///
+    /// `combined` is a strip of this state's tray tiles followed by one tile
+    /// per slot. Tried first; if it does not fit, the state keeps its own
+    /// tray atlas with symbol-only slots, shedding slots from the end until
+    /// it fits -- the tray's own thumbnails are never given up for the drawer.
+    func withDrawer(_ slots: [DrawerSlot], combined: Atlas?, lockDrawer: Bool) -> TrayContentState {
+        let capped = Array(slots.prefix(Self.maxSlots))
+        if let combined {
+            let offset = recent.count
+            let iconned = capped.enumerated().map { i, slot in
+                DrawerSlot(symbol: slot.symbol, name: Self.islandName(slot.name), launch: slot.launch,
+                           hasIcon: combined.filled.indices.contains(offset + i) && combined.filled[offset + i])
+            }
+            let state = TrayContentState(
+                count: count, recent: recent, atlas: combined.jpeg, page: page, added: added,
+                drawer: iconned, view: view, lockDrawer: lockDrawer
+            )
+            if state.encodedByteCount <= Self.buildBudget { return state }
+        }
+        var kept = capped.map {
+            DrawerSlot(symbol: $0.symbol, name: Self.islandName($0.name), launch: $0.launch, hasIcon: false)
+        }
+        while !kept.isEmpty {
+            let state = TrayContentState(
+                count: count, recent: recent, atlas: atlas, page: page, added: added,
+                drawer: kept, view: view, lockDrawer: lockDrawer
+            )
+            if state.encodedByteCount <= Self.buildBudget { return state }
+            kept.removeLast()
+        }
+        return self
     }
 
     /// `name` capped to `maxNameBytes`, cut in the middle so the extension

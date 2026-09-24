@@ -25,54 +25,11 @@ struct SetupGuideView: View {
     /// The system picker works in `Color`, the setting is stored as hex; this
     /// holds the picker's side of that between the two.
     @State private var customColor = Color.accentColor
-    @State private var showDrawer = false
-    // Literal keys, matching the convention `DrawerEditorView` already uses
-    // for these same App Group keys (`TraySettings.Keys` is private).
-    @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
-    @AppStorage("showAppNames", store: TraySettings.store) private var showAppNames = true
-    @AppStorage("temperatureUnit", store: TraySettings.store) private var temperatureUnit = "c"
-    @AppStorage("weatherLocationMode", store: TraySettings.store) private var weatherLocationMode = "auto"
-    @AppStorage("weatherManualName", store: TraySettings.store) private var manualCityName = ""
-    @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var drawerBackgroundHex = "000000"
-    /// The system picker's side of `drawerBackgroundHex`, same split as `customColor`/`accent`.
-    @State private var drawerBgColor = Color.black
-    @State private var geocodeFailed = false
 
     var body: some View {
         NavigationStack {
             List {
                 CloudSettingsSection(model: model)
-
-                Section {
-                    Toggle(L.s("drawer.settings.enable"), isOn: $appDrawerEnabled)
-                        .onChange(of: appDrawerEnabled) { _, _ in
-                            Task { await TrayActivityController.shared.restart() }
-                        }
-                    if appDrawerEnabled {
-                        Toggle(L.s("drawer.showNames"), isOn: $showAppNames)
-                        Picker(L.s("drawer.settings.unit"), selection: $temperatureUnit) {
-                            Text("°C").tag("c")
-                            Text("°F").tag("f")
-                        }
-                        Picker(L.s("drawer.settings.location"), selection: $weatherLocationMode) {
-                            Text(L.s("drawer.settings.auto")).tag("auto")
-                            Text(L.s("drawer.settings.manual")).tag("manual")
-                        }
-                        if weatherLocationMode == "manual" {
-                            TextField(L.s("drawer.settings.city"), text: $manualCityName)
-                                .onSubmit { geocodeManualCity() }
-                            if geocodeFailed {
-                                Text(L.s("drawer.settings.cityFailed"))
-                                    .font(.footnote)
-                                    .foregroundStyle(.red)
-                            }
-                        }
-                        drawerBackgroundRow
-                        Button(L.s("drawer.open")) { showDrawer = true }
-                    }
-                } header: {
-                    Text(L.s("drawer.settings.title"))
-                }
 
                 Section {
                     LabeledContent(L.s("settings.update.current"), value: UpdateChecker.currentVersion)
@@ -239,6 +196,14 @@ struct SetupGuideView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        LabsSettingsView()
+                    } label: {
+                        Label(L.s("settings.labs"), systemImage: "flask")
+                    }
+                }
+
+                Section {
                     // Collapsed: this is a debug record, and left expanded it
                     // filled the first screen of the settings with a dozen
                     // lines before anything a person came here to change.
@@ -270,7 +235,6 @@ struct SetupGuideView: View {
                     Button(L.s("common.done")) { dismiss() }
                 }
             }
-            .fullScreenCover(isPresented: $showDrawer) { DrawerEditorView() }
         }
     }
 
@@ -339,6 +303,85 @@ struct SetupGuideView: View {
         customColor = AccentColor.color(forHex: hex) ?? .accentColor
     }
 
+    private func checkForUpdates() async {
+        isChecking = true
+        defer { isChecking = false }
+        do {
+            newerVersion = try await UpdateChecker.newerVersion()?.version ?? ""
+            checkFailed = false
+        } catch {
+            checkFailed = true
+        }
+    }
+
+    private func step(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number)")
+                .font(.caption.bold().monospacedDigit())
+                .frame(width: 20, height: 20)
+                .background(.tint.opacity(0.18), in: .circle)
+            Text(text)
+                .font(.callout)
+        }
+    }
+}
+
+/// Labs: features still being tried out, one level below the settings so
+/// their switches do not crowd the ones everyone uses.
+private struct LabsSettingsView: View {
+    // Literal keys, matching the convention `DrawerEditorView` already uses
+    // for these same App Group keys (`TraySettings.Keys` is private).
+    @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
+    @AppStorage("showAppNames", store: TraySettings.store) private var showAppNames = true
+    @AppStorage("lockScreenShowsDrawer", store: TraySettings.store) private var lockScreenShowsDrawer = false
+    @AppStorage("temperatureUnit", store: TraySettings.store) private var temperatureUnit = "c"
+    @AppStorage("weatherLocationMode", store: TraySettings.store) private var weatherLocationMode = "auto"
+    @AppStorage("weatherManualName", store: TraySettings.store) private var manualCityName = ""
+    @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var drawerBackgroundHex = "000000"
+    /// The system picker's side of `drawerBackgroundHex`, same split as `customColor`/`accent`.
+    @State private var drawerBgColor = Color.black
+    @State private var geocodeFailed = false
+
+    var body: some View {
+        List {
+            Section {
+                Toggle(L.s("drawer.settings.enable"), isOn: $appDrawerEnabled)
+                    .onChange(of: appDrawerEnabled) { _, _ in
+                        Task { await TrayActivityController.shared.restart() }
+                    }
+                if appDrawerEnabled {
+                    Toggle(L.s("drawer.showNames"), isOn: $showAppNames)
+                    Toggle(L.s("drawer.settings.lockScreen"), isOn: $lockScreenShowsDrawer)
+                        .onChange(of: lockScreenShowsDrawer) { _, _ in
+                            Task { await TrayActivityController.shared.syncFromStore() }
+                        }
+                    Picker(L.s("drawer.settings.unit"), selection: $temperatureUnit) {
+                        Text("°C").tag("c")
+                        Text("°F").tag("f")
+                    }
+                    Picker(L.s("drawer.settings.location"), selection: $weatherLocationMode) {
+                        Text(L.s("drawer.settings.auto")).tag("auto")
+                        Text(L.s("drawer.settings.manual")).tag("manual")
+                    }
+                    if weatherLocationMode == "manual" {
+                        TextField(L.s("drawer.settings.city"), text: $manualCityName)
+                            .onSubmit { geocodeManualCity() }
+                        if geocodeFailed {
+                            Text(L.s("drawer.settings.cityFailed"))
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    drawerBackgroundRow
+                }
+            } header: {
+                Text(L.s("drawer.settings.title"))
+            }
+        }
+        .navigationTitle(L.s("settings.labs"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
     /// Same swatches-plus-system-picker shape as `accentRow`, over
     /// `drawerBackgroundHex` instead of `accent`. No recents list: that is
     /// specific to the app-wide accent, not this one background.
@@ -398,28 +441,6 @@ struct SetupGuideView: View {
                 TraySettings().weatherManualLon = coordinate.longitude
                 TraySettings().weatherManualName = name
             }
-        }
-    }
-
-    private func checkForUpdates() async {
-        isChecking = true
-        defer { isChecking = false }
-        do {
-            newerVersion = try await UpdateChecker.newerVersion()?.version ?? ""
-            checkFailed = false
-        } catch {
-            checkFailed = true
-        }
-    }
-
-    private func step(_ number: Int, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number)")
-                .font(.caption.bold().monospacedDigit())
-                .frame(width: 20, height: 20)
-                .background(.tint.opacity(0.18), in: .circle)
-            Text(text)
-                .font(.callout)
         }
     }
 }
