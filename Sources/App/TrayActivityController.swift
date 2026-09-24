@@ -79,8 +79,8 @@ actor TrayActivityController {
         case end
     }
 
-    nonisolated static func syncDecision(itemCount: Int, showActivityWhenEmpty: Bool) -> SyncDecision {
-        itemCount > 0 || showActivityWhenEmpty ? .show : .end
+    nonisolated static func syncDecision(itemCount: Int, showActivityWhenEmpty: Bool, appDrawerEnabled: Bool) -> SyncDecision {
+        itemCount > 0 || showActivityWhenEmpty || appDrawerEnabled ? .show : .end
     }
 
     func sync(items: [TrayItem]) async {
@@ -95,7 +95,8 @@ actor TrayActivityController {
         }
         let decision = Self.syncDecision(
             itemCount: items.count,
-            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty,
+            appDrawerEnabled: TraySettings().appDrawerEnabled
         )
         guard decision == .show else {
             await end()
@@ -163,7 +164,8 @@ actor TrayActivityController {
         }
         let decision = Self.syncDecision(
             itemCount: items.count,
-            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty,
+            appDrawerEnabled: TraySettings().appDrawerEnabled
         )
         guard decision == .show else {
             await end()

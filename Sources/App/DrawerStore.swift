@@ -44,6 +44,13 @@ final class DrawerStore: Sendable {
         return name
     }
 
+    /// Removes a shortcut's custom icon file, if it has one. Call this when
+    /// the shortcut itself is deleted, or the file is orphaned on disk.
+    func removeIcon(for shortcut: DrawerShortcut) {
+        guard let name = shortcut.customIconName else { return }
+        try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+    }
+
     var backgroundImageURL: URL? {
         let url = dir.appendingPathComponent("background.jpg")
         return FileManager.default.fileExists(atPath: url.path) ? url : nil

@@ -104,6 +104,7 @@ struct DrawerEditorView: View {
         persist()
     }
     private func delete(_ s: DrawerShortcut) {
+        DrawerStore.shared.removeIcon(for: s)
         shortcuts.removeAll { $0.id == s.id }
         persist()
     }

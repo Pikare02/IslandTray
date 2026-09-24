@@ -30,7 +30,6 @@ enum WeatherFormat {
         let month = cal.component(.month, from: date)
         let day = cal.component(.day, from: date)
         if language == "ja" {
-            cal.locale = Locale(identifier: "ja_JP")
             let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
             let w = cal.component(.weekday, from: date) - 1
             return "\(month)/\(day) \(weekdays[w])"
