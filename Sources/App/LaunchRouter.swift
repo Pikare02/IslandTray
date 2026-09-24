@@ -27,8 +27,11 @@ enum LaunchRouter {
     /// item is missing or launching is unsupported on this build.
     @discardableResult
     static func performLaunch(_ id: UUID) -> Bool {
-        guard let item = DrawerStore.shared.load().first(where: { $0.id == id }) else { return false }
+        // The whole lookup lives inside the flag: on a Free build nothing can
+        // launch an installed app, so reading the store would be a pointless
+        // disk hit and `item` would be an unused binding (a compiler warning).
         #if TROLLSTORE
+        guard let item = DrawerStore.shared.load().first(where: { $0.id == id }) else { return false }
         if case let .installedApp(bundleID) = item.kind {
             return InstalledApps.launch(bundleID: bundleID)
         }
