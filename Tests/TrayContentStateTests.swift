@@ -297,4 +297,12 @@ final class TrayContentStatePagingTests: XCTestCase {
         XCTAssertTrue(back.lockDrawer)
         XCTAssertTrue(back.drawerAvailable)
     }
+
+    /// The tray's first-page arrow into the drawer must show even with no
+    /// shortcuts, or when the tray's thumbnails leave no room for slots.
+    func testTrayStateKeepsDrawerArrowWithNoSlots() {
+        let state = TrayContentState.countOnly(count: 2).withDrawer([], combined: nil, lockDrawer: false)
+        XCTAssertTrue(state.drawerAvailable)
+        XCTAssertFalse(TrayContentState.countOnly(count: 2).drawerAvailable)
+    }
 }

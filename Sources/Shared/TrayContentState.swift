@@ -165,8 +165,10 @@ struct TrayContentState: Codable, Hashable {
     var hasPreviousPage: Bool { page > 0 }
     var hasNextPage: Bool { (page + 1) * Self.maxPreviews < count }
 
-    /// The drawer can be entered from the tray view when drawer slots exist.
-    var drawerAvailable: Bool { drawer?.isEmpty == false || view == .drawer }
+    /// The drawer can be entered from the tray view whenever the feature is
+    /// on -- `drawer` is present, even empty (no shortcuts yet, or every slot
+    /// shed for size): the arrow must not depend on how many bytes are left.
+    var drawerAvailable: Bool { drawer != nil || view == .drawer }
 
     /// The items one page shows, clamped so a page beyond the end shows the
     /// last one rather than nothing.
@@ -356,7 +358,11 @@ struct TrayContentState: Codable, Hashable {
             if state.encodedByteCount <= Self.buildBudget { return state }
             kept.removeLast()
         }
-        return self
+        // An empty list, not `nil`: it is a dozen bytes and keeps the arrow.
+        return TrayContentState(
+            count: count, recent: recent, atlas: atlas, page: page, added: added,
+            drawer: [], view: view, lockDrawer: lockDrawer
+        )
     }
 
     /// `name` capped to `maxNameBytes`, cut in the middle so the extension

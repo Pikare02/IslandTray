@@ -35,6 +35,9 @@ files attached on GitHub.
 - Fixed: tapping a shortcut in the expanded island only opened IslandTray.
   A Live Activity link always opens its own app, so the app now passes the
   shortcut's URL on.
+- The left arrow into the drawer now always shows on the tray's first page
+  while the drawer is on — before, it vanished when the tray's thumbnails
+  left no room for the drawer's data, or the drawer had no shortcuts yet.
 - Tapping a tray thumbnail in the island (or on the Lock Screen) opens that
   item's preview in the app.
 - New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity
