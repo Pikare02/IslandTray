@@ -383,7 +383,10 @@ struct LabsSettingsView: View {
                         Text(L.s("drawer.settings.manual")).tag("manual")
                     }
                     .onChange(of: weatherLocationMode) { _, _ in
-                        Task { await TrayActivityController.shared.syncFromStore() }
+                        Task {
+                            await WeatherProvider.shared.invalidate()
+                            await TrayActivityController.shared.syncFromStore()
+                        }
                     }
                     if weatherLocationMode == "manual" {
                         Button { showingMapPicker = true } label: {
@@ -436,7 +439,10 @@ struct LabsSettingsView: View {
         .sheet(isPresented: $showingMapPicker) {
             MapLocationPicker(initial: currentManualCoordinate) { name in
                 manualCityName = name
-                Task { await TrayActivityController.shared.syncFromStore() }
+                Task {
+                    await WeatherProvider.shared.invalidate()
+                    await TrayActivityController.shared.syncFromStore()
+                }
             }
         }
     }
