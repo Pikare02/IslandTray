@@ -72,17 +72,31 @@ struct TrayLiveActivity: Widget {
                 }
             } compactLeading: {
                 if let w = context.state.weather {
-                    Text(w.dateText).font(.caption2.bold()).lineLimit(1)
+                    // Stack the date over the weekday in two small lines so the
+                    // compact island reads "SEP 24 / THU" (or "9/24 / 木")
+                    // rather than one long line. The weekday is the last
+                    // space-separated token in either language's format.
+                    let parts = w.dateText.split(separator: " ")
+                    let weekday = parts.last.map(String.init) ?? ""
+                    let date = parts.dropLast().joined(separator: " ")
+                    VStack(alignment: .leading, spacing: -2) {
+                        Text(date).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        Text(weekday).font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .padding(.leading, 2)
                 } else {
                     Image(systemName: context.state.added == nil ? "tray.full.fill" : "checkmark.circle.fill")
                         .foregroundStyle(context.state.added == nil ? Color.primary : Color.green)
                 }
             } compactTrailing: {
                 if let w = context.state.weather {
-                    HStack(spacing: 2) {
-                        Image(systemName: w.symbol)
-                        Text(w.tempText).font(.caption.monospacedDigit())
+                    // Weather icon on top, temperature small underneath.
+                    VStack(spacing: -2) {
+                        Image(systemName: w.symbol).font(.system(size: 12))
+                        Text(w.tempText).font(.system(size: 9, weight: .medium).monospacedDigit())
                     }
+                    .padding(.trailing, 2)
                 } else {
                     Text("\(context.state.count)")
                         .font(.caption.monospacedDigit())
