@@ -74,37 +74,61 @@ actor WeatherProvider {
 }
 
 /// One-shot CoreLocation wrapper: asks for when-in-use, resolves a single
-/// fix, then stops. Kept separate so `WeatherProvider` stays testable.
+/// fix, then stops. Concurrent callers coalesce onto ONE in-flight request,
+/// and every continuation is resumed exactly once. An NSLock guards the
+/// mutable state, which is what makes the `@unchecked Sendable` sound; the
+/// delegate is set once in init (never reassigned), so a fresh request is
+/// kicked off only from `begin()`, never doubled by an authorization echo.
 final class LocationOnce: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     static let shared = LocationOnce()
     private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
+    private let lock = NSLock()
+    private var waiters: [CheckedContinuation<CLLocationCoordinate2D?, Never>] = []
+    private var requesting = false
+
+    override init() {
+        super.init()
+        manager.delegate = self // once; never reassigned per-call
+    }
 
     func coordinate() async -> CLLocationCoordinate2D? {
         await withCheckedContinuation { cont in
-            self.continuation = cont
-            manager.delegate = self
-            let status = manager.authorizationStatus
-            if status == .notDetermined {
-                manager.requestWhenInUseAuthorization()
-            } else if status == .denied || status == .restricted {
-                finish(nil)
-            } else {
-                manager.requestLocation()
-            }
+            lock.lock()
+            waiters.append(cont)
+            let shouldStart = !requesting
+            if shouldStart { requesting = true }
+            lock.unlock()
+            // A second concurrent caller just rides the in-flight request.
+            guard shouldStart else { return }
+            Task { @MainActor in self.begin() } // CLLocationManager wants a run loop
         }
     }
 
+    @MainActor private func begin() {
+        switch manager.authorizationStatus {
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        case .denied, .restricted: finish(nil)
+        default: manager.requestLocation()
+        }
+    }
+
+    /// Resumes every pending waiter exactly once and resets for the next request.
     private func finish(_ value: CLLocationCoordinate2D?) {
-        continuation?.resume(returning: value)
-        continuation = nil
+        lock.lock()
+        let pending = waiters
+        waiters.removeAll()
+        requesting = false
+        lock.unlock()
+        for cont in pending { cont.resume(returning: value) }
     }
 
     func locationManagerDidChangeAuthorization(_ m: CLLocationManager) {
+        lock.lock(); let active = requesting; lock.unlock()
+        guard active else { return } // ignore the echo fired when the delegate was first set
         switch m.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: m.requestLocation()
         case .denied, .restricted: finish(nil)
-        default: break
+        default: break // notDetermined: wait for the user's choice
         }
     }
     func locationManager(_ m: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
