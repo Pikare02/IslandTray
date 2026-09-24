@@ -32,6 +32,9 @@ files attached on GitHub.
 - Island: no stray arrow on an empty tray. With items, the left arrow on the
   first page opens the drawer and the right arrow comes back. The compact
   date and weekday are centred.
+- Fixed: tapping a shortcut in the expanded island only opened IslandTray.
+  A Live Activity link always opens its own app, so the app now passes the
+  shortcut's URL on.
 - New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity
   shows the drawer's first six icons whatever the tray holds.
 

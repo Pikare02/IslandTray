@@ -34,6 +34,8 @@ struct IslandTrayApp: App {
                         NotificationCenter.default.post(name: .openDrawer, object: nil)
                     case .launch(let id):
                         LaunchRouter.performLaunch(id)
+                    case .external(let url):
+                        UIApplication.shared.open(url)
                     case .drop, .ignore:
                         // drop just needs the app foregrounded, which already happened;
                         // ignore covers unknown/malformed links.

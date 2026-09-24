@@ -4,12 +4,18 @@ enum LaunchRoute: Equatable {
     case drop
     case drawer
     case launch(UUID)
+    /// A drawer slot's own URL (web, `shortcuts://`, another app's scheme).
+    /// A Live Activity's `Link` always opens this app with the URL rather
+    /// than the target, so the app has to pass it on.
+    case external(URL)
     case ignore
 }
 
 enum LaunchRouter {
     static func route(_ url: URL) -> LaunchRoute {
-        guard url.scheme == TrayIDs.urlScheme else { return .ignore }
+        // file:// is a document handed over with "Open In", never a slot.
+        guard let scheme = url.scheme, !url.isFileURL else { return .ignore }
+        guard scheme == TrayIDs.urlScheme else { return .external(url) }
         switch url.host {
         case "drop": return .drop
         case "drawer": return .drawer
