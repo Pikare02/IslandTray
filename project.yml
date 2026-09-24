@@ -66,6 +66,7 @@ targets:
       # LiveActivityIntent is launched into the app's process -- but it still
       # has to compile here, which is what the two files under it are for.
       - path: Sources/App/TrayPageIntent.swift
+      - path: Sources/App/ToggleDrawerIntent.swift
       - path: Sources/App/TrayActivityController.swift
       - path: Sources/App/ThumbnailService.swift
       # pagedState(for:) now builds the drawer state too, which pulls these
