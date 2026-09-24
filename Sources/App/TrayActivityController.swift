@@ -34,6 +34,10 @@ actor TrayActivityController {
     /// moving one page.
     private var page = 0
 
+    /// Whether the island is currently showing the app drawer instead of the
+    /// tray strip. Only meaningful while the drawer Labs feature is on.
+    private var drawerView = false
+
     /// The activities this controller treats as its own.
     ///
     /// `Activity.activities` is not a list of visible activities: it also
@@ -255,12 +259,32 @@ actor TrayActivityController {
         _ = await update(await pagedState(for: tray))
     }
 
+    /// Flips between the tray strip and the app drawer, then pushes the
+    /// updated state through the existing `update` path. Only meaningful
+    /// while the tray has items -- an empty tray shows the drawer regardless
+    /// of this flag (see `pagedState(for:)`).
+    func toggleDrawer() async {
+        drawerView.toggle()
+        let tray = (try? await loadTray()) ?? []
+        _ = await update(await pagedState(for: tray))
+    }
+
     /// The state for the page currently being shown, with an atlas built from
     /// exactly the items on it.
     ///
     /// Both halves go through `TrayContentState.items(_:onPage:)` so the
     /// picture and the labels can never describe different items.
+    ///
+    /// Drawer-aware: an empty tray with the drawer Labs feature on always
+    /// shows the drawer (nothing else to show), and a non-empty tray shows
+    /// it only once the user has flipped `drawerView`. With the feature off
+    /// this is byte-for-byte the pre-drawer paged behavior.
     private func pagedState(for items: [TrayItem]) async -> TrayContentState {
+        let settings = TraySettings()
+        if settings.appDrawerEnabled, items.isEmpty || drawerView {
+            return await drawerContentState(count: items.count, view: .drawer, settings: settings)
+        }
+
         page = TrayContentState.clampedPage(page, count: items.count)
         let onPage = TrayContentState.items(items, onPage: page)
         return TrayContentState.make(
@@ -268,6 +292,30 @@ actor TrayActivityController {
             atlas: await ThumbnailService.shared.islandAtlas(for: onPage),
             page: page
         )
+    }
+
+    /// Builds the date/weather + drawer-slots state from what is on disk.
+    /// Weather strings are all inherently tiny (`WeatherFormat.dateText`,
+    /// `WeatherProvider.Reading.tempText`, an SF Symbol name) -- never put an
+    /// unbounded string here, or `makeDrawer`'s floor guarantee stops holding.
+    private func drawerContentState(count: Int, view: TrayContentState.View,
+                                     settings: TraySettings) async -> TrayContentState {
+        let shortcuts = DrawerStore.shared.load()
+        let slots = DrawerState.slots(from: shortcuts, showNames: settings.showAppNames)
+        let images = await DrawerState.icons(for: shortcuts)
+        let atlas = await ThumbnailService.shared.drawerAtlas(for: images)
+        let reading = await WeatherProvider.shared.current()
+        let weather = reading.map {
+            TrayContentState.Weather(
+                dateText: WeatherFormat.dateText(Date(), language: settings.language),
+                tempText: $0.tempText, symbol: $0.symbol
+            )
+        } ?? TrayContentState.Weather(
+            dateText: WeatherFormat.dateText(Date(), language: settings.language),
+            tempText: "", symbol: "thermometer"
+        )
+        return TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas,
+                                           view: view, count: count)
     }
 
     // MARK: - Internals

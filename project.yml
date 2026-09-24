@@ -68,6 +68,12 @@ targets:
       - path: Sources/App/TrayPageIntent.swift
       - path: Sources/App/TrayActivityController.swift
       - path: Sources/App/ThumbnailService.swift
+      # pagedState(for:) now builds the drawer state too, which pulls these
+      # three in -- still compile-only here, same reasoning as above.
+      - path: Sources/App/DrawerState.swift
+      - path: Sources/App/DrawerStore.swift
+      - path: Sources/App/WeatherProvider.swift
+      - path: Sources/App/InstalledApps.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
