@@ -3,13 +3,16 @@ import SwiftUI
 
 /// The app drawer tab: a scrolling 6-column grid of shortcuts, its
 /// background colour/image, and the name-label toggle. A tap runs the
-/// shortcut; long-press to edit. The first six (by order) are what the
-/// island shows.
+/// shortcut; long-press for the edit menu, or long-press and drag to move
+/// it. The first six (by order) are what the island shows.
 struct DrawerEditorView: View {
     @State private var shortcuts: [DrawerShortcut] = DrawerStore.shared.load()
     @State private var adding = false
     @State private var editing: DrawerShortcut?
     @State private var showingBackgroundSettings = false
+    /// The shortcut being dragged; the grid rearranges live as it passes
+    /// over other cells, and saves once it is dropped.
+    @State private var dragging: DrawerShortcut?
     // Literal keys, matching the codebase convention (`@AppStorage("theme"…)`,
     // `@AppStorage(AccentColor.key…)`); `TraySettings.Keys` is private.
     @AppStorage("showAppNames", store: TraySettings.store) private var showNames = true
@@ -25,6 +28,13 @@ struct DrawerEditorView: View {
                     ForEach(shortcuts) { s in
                         Button { run(s) } label: { cell(s) }
                             .contextMenu { contextMenu(for: s) }
+                            .opacity(dragging?.id == s.id ? 0.4 : 1)
+                            .onDrag {
+                                dragging = s
+                                return NSItemProvider(object: s.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: ReorderDrop(target: s, items: $shortcuts,
+                                                                       dragging: $dragging, onDrop: persist))
                     }
                     Button { adding = true } label: {
                         Image(systemName: "plus")
@@ -34,9 +44,27 @@ struct DrawerEditorView: View {
                     }
                 }
                 .padding()
+                // Let go between cells: keep the arrangement reached so far.
+                .onDrop(of: [.text], isTargeted: nil) { _ in
+                    dragging = nil
+                    persist()
+                    return true
+                }
             }
             .background(background.ignoresSafeArea())
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        ForEach(DrawerShortcut.Sort.allCases, id: \.self) { sort in
+                            Button(L.s("drawer.sort.\(sort.rawValue)")) {
+                                withAnimation { shortcuts = DrawerShortcut.sorted(shortcuts, by: sort) }
+                                persist()
+                            }
+                        }
+                    } label: {
+                        Label(L.s("drawer.sort"), systemImage: "arrow.up.arrow.down")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingBackgroundSettings = true } label: { Label(L.s("drawer.background"), systemImage: "gearshape") }
                 }
@@ -107,11 +135,15 @@ struct DrawerEditorView: View {
     }
 
     private func add(_ s: DrawerShortcut) {
-        var next = s; next.order = shortcuts.count
+        var next = s; next.order = shortcuts.count; next.addedAt = Date()
         shortcuts.append(next); persist()
     }
     private func update(_ s: DrawerShortcut) {
-        if let i = shortcuts.firstIndex(where: { $0.id == s.id }) { shortcuts[i] = s }
+        if let i = shortcuts.firstIndex(where: { $0.id == s.id }) {
+            var updated = s
+            updated.addedAt = shortcuts[i].addedAt   // the edit sheet does not carry it
+            shortcuts[i] = updated
+        }
         persist()
     }
     private func delete(_ s: DrawerShortcut) {
@@ -132,6 +164,32 @@ struct DrawerEditorView: View {
     }
 }
 
+/// Moves the dragged shortcut into each cell it passes over, like the Home
+/// Screen, and saves when it is let go.
+private struct ReorderDrop: DropDelegate {
+    let target: DrawerShortcut
+    @Binding var items: [DrawerShortcut]
+    @Binding var dragging: DrawerShortcut?
+    let onDrop: () -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging.id != target.id,
+              let from = items.firstIndex(where: { $0.id == dragging.id }),
+              let to = items.firstIndex(where: { $0.id == target.id }) else { return }
+        withAnimation(.snappy) {
+            items.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        onDrop()
+        return true
+    }
+}
+
 /// Background colour/image and the name-label toggle, reached from the
 /// drawer's gear icon. Kept as one small sheet rather than folded into the
 /// main grid screen, which is busy enough already.
@@ -148,6 +206,10 @@ private struct DrawerBackgroundSettingsSheet: View {
             Form {
                 Section {
                     Toggle(L.s("drawer.showNames"), isOn: $showNames)
+                        // The island only redraws when told to.
+                        .onChange(of: showNames) { _, _ in
+                            Task { await TrayActivityController.shared.syncFromStore() }
+                        }
                 }
                 Section {
                     swatches

@@ -38,6 +38,17 @@ files attached on GitHub.
 - The left arrow into the drawer now always shows on the tray's first page
   while the drawer is on — before, it vanished when the tray's thumbnails
   left no room for the drawer's data, or the drawer had no shortcuts yet.
+- The drawer arrow switches the island at once (it no longer waits on a
+  weather refresh).
+- Sharper drawer icons in the island: they are sent as HEIC, about half the
+  size of the JPEG that, beside six names, never fit and fell back to plain
+  symbols.
+- Turning app names off in the drawer settings now hides them in the island
+  too, and the icons get bigger.
+- Drawer: long-press an icon and drag it to rearrange; ↑↓ sorts by name,
+  oldest or newest added.
+- The island's drawer has no "…" tile any more: tap its empty space to open
+  the drawer tab (on the tray face, the tray tab).
 - Tapping a tray thumbnail in the island (or on the Lock Screen) opens that
   item's preview in the app.
 - New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity

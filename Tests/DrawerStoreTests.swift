@@ -35,3 +35,19 @@ final class DrawerStoreTests: XCTestCase {
         XCTAssertEqual(back, items)
     }
 }
+
+final class DrawerSortTests: XCTestCase {
+    private func item(_ name: String, _ order: Int, _ added: TimeInterval?) -> DrawerShortcut {
+        DrawerShortcut(id: UUID(), kind: .webURL("https://\(name)"), displayName: name, customIconName: nil,
+                       order: order, addedAt: added.map { Date(timeIntervalSince1970: $0) })
+    }
+
+    func testSortsAndRenumbers() {
+        let items = [item("b", 0, 20), item("A", 1, nil), item("c", 2, 10), item("a2", 3, nil)]
+        XCTAssertEqual(DrawerShortcut.sorted(items, by: .name).map(\.displayName), ["A", "a2", "b", "c"])
+        // Undated entries count as oldest and keep their relative order.
+        XCTAssertEqual(DrawerShortcut.sorted(items, by: .oldest).map(\.displayName), ["A", "a2", "c", "b"])
+        XCTAssertEqual(DrawerShortcut.sorted(items, by: .newest).map(\.displayName), ["b", "c", "A", "a2"])
+        XCTAssertEqual(DrawerShortcut.sorted(items, by: .name).map(\.order), [0, 1, 2, 3])
+    }
+}

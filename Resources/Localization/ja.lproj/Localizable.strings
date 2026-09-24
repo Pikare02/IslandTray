@@ -37,7 +37,6 @@
 "drawer.kind.scheme" = "URLスキーム";
 "drawer.kind.shortcut" = "ショートカット";
 "drawer.kind.web" = "ウェブサイト";
-"drawer.more" = "もっと見る";
 "drawer.moveDown" = "右へ移動";
 "drawer.moveUp" = "左へ移動";
 "drawer.name" = "名前";
@@ -54,6 +53,10 @@
 "drawer.settings.unit" = "気温の単位";
 "drawer.shortcutName" = "ショートカット名";
 "drawer.showNames" = "アプリ名を表示";
+"drawer.sort" = "並べ替え";
+"drawer.sort.name" = "名前順";
+"drawer.sort.oldest" = "追加が古い順";
+"drawer.sort.newest" = "追加が新しい順";
 "drawer.title" = "アプリドロワー";
 "dup.add" = "追加する";
 "dup.keep" = "追加しない";

@@ -110,7 +110,9 @@ struct TrayLiveActivity: Widget {
                 Text("\(context.state.count)")
                     .font(.caption2.monospacedDigit())
             }
-            .widgetURL(TrayIDs.dropURL)
+            // A tap outside any button or tile: the drawer face opens the
+            // app's drawer tab, the tray face its tray tab.
+            .widgetURL(context.state.view == .drawer ? TrayIDs.drawerURL : TrayIDs.dropURL)
         }
     }
 
@@ -165,7 +167,7 @@ struct TrayLiveActivity: Widget {
                 .frame(maxWidth: .infinity)
                 .padding(14)
                 .activityBackgroundTint(Color.black.opacity(0.45))
-                .widgetURL(TrayIDs.dropURL)
+                .widgetURL(TrayIDs.drawerURL)
         } else {
             trayLockScreen(state)
         }

@@ -125,6 +125,7 @@ struct TrayView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
             if appDrawerEnabled { tab = "drawer" }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openTray)) { _ in tab = "tray" }
         .onReceive(NotificationCenter.default.publisher(for: .openTrayItem)) { note in
             guard let id = note.object as? UUID else { return }
             tab = "tray"

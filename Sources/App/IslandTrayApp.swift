@@ -38,9 +38,10 @@ struct IslandTrayApp: App {
                         NotificationCenter.default.post(name: .openTrayItem, object: id)
                     case .external(let url):
                         UIApplication.shared.open(url)
-                    case .drop, .ignore:
-                        // drop just needs the app foregrounded, which already happened;
-                        // ignore covers unknown/malformed links.
+                    case .drop:
+                        // The tray face of the island (or a drop) lands on the tray tab.
+                        NotificationCenter.default.post(name: .openTray, object: nil)
+                    case .ignore:
                         break
                     }
                 }

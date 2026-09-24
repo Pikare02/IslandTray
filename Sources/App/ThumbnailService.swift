@@ -1,5 +1,7 @@
+import ImageIO
 import QuickLookThumbnailing
 import UIKit
+import UniformTypeIdentifiers
 
 /// Generates and caches thumbnails using the same API the Files app uses,
 /// so tray items look exactly like they do in Files.
@@ -56,8 +58,8 @@ actor ThumbnailService {
     /// not, so a tray of four screenshots would lose its thumbnails
     /// altogether. A soft thumbnail beats a generic icon, which is what this
     /// whole path exists to replace.
-    private static let atlasTile = 48
-    private static let atlasQuality: CGFloat = 0.3
+    static let atlasTile = 48
+    static let atlasQuality: CGFloat = 0.3
 
     /// Last strip built, keyed by the exact item ids it covers.
     ///
@@ -93,10 +95,23 @@ actor ThumbnailService {
     /// Composites drawer icons into one strip the way `islandAtlas` does for
     /// tray thumbnails. Returns nil when no image is present, so the widget
     /// falls back to per-slot SF Symbols.
-    func drawerAtlas(for images: [UIImage?]) async -> TrayContentState.Atlas? {
+    ///
+    /// Unlike tray thumbnails, drawer icons get the whole state budget on
+    /// their own, so the caller walks `drawerQualities` from sharpest down
+    /// and keeps the first strip that fits.
+    func drawerAtlas(for images: [UIImage?], side: Int = atlasTile,
+                     quality: CGFloat = atlasQuality) async -> TrayContentState.Atlas? {
         guard images.contains(where: { $0 != nil }) else { return nil }
-        return Self.strip(from: images)
+        return Self.strip(from: images, side: side, quality: quality, heic: true)
     }
+
+    /// (tile px, HEIC quality), sharpest first. Measured on six gradient
+    /// icons: JPEG could not fit even 48px/0.3 beside six slots and the
+    /// weather (2333 bytes before base64), so the icons were always dropped;
+    /// HEIC is about half the size (80px/0.3 = 2062).
+    static let drawerQualities: [(side: Int, quality: CGFloat)] = [
+        (96, 0.45), (96, 0.3), (80, 0.4), (80, 0.3), (64, 0.35), (64, 0.25), (56, 0.25), (48, 0.2),
+    ]
 
     /// The tray page's strip with drawer icons appended, for a tray state
     /// that also carries the drawer (`TrayContentState.withDrawer`). The tray
@@ -131,18 +146,22 @@ actor ThumbnailService {
     /// than shift the rest. A flat black tile costs almost nothing once
     /// compressed, and the widget draws the SF Symbol over that slot anyway
     /// (`Preview.hasThumbnail` is false for it).
-    private static func strip(from tiles: [UIImage?]) -> TrayContentState.Atlas? {
+    private static func strip(from tiles: [UIImage?], side: Int = atlasTile,
+                              quality: CGFloat = atlasQuality, heic: Bool = false) -> TrayContentState.Atlas? {
         guard !tiles.isEmpty else { return nil }
-        let side = CGFloat(atlasTile)
+        let side = CGFloat(side)
         let format = UIGraphicsImageRendererFormat.preferred()
         // Pixels, not points: `size` below is already in pixels, and the
         // renderer would otherwise multiply it by the device scale.
         format.scale = 1
         format.opaque = true
+        // sRGB: a wide-gamut strip would carry a colour profile in every byte budget.
+        format.preferredRange = .standard
         let size = CGSize(width: side * CGFloat(tiles.count), height: side)
         let strip = UIGraphicsImageRenderer(size: size, format: format).image { context in
             UIColor.black.setFill()
             context.fill(CGRect(origin: .zero, size: size))
+            context.cgContext.interpolationQuality = .high
             for (index, tile) in tiles.enumerated() {
                 guard let tile else { continue }
                 let slot = CGRect(x: side * CGFloat(index), y: 0, width: side, height: side)
@@ -152,8 +171,19 @@ actor ThumbnailService {
                 context.cgContext.restoreGState()
             }
         }
-        guard let jpeg = strip.jpegData(compressionQuality: atlasQuality) else { return nil }
+        // The widget decodes either with UIImage(data:); HEIC falls back to
+        // JPEG where the encoder is unavailable.
+        guard let jpeg = (heic ? heicData(strip, quality: quality) : nil)
+                ?? strip.jpegData(compressionQuality: quality) else { return nil }
         return TrayContentState.Atlas(jpeg: jpeg, filled: tiles.map { $0 != nil })
+    }
+
+    private static func heicData(_ image: UIImage, quality: CGFloat) -> Data? {
+        guard let cg = image.cgImage else { return nil }
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        return CGImageDestinationFinalize(dest) ? data as Data : nil
     }
 
     /// The rect to draw `size` into so it covers `slot` without distortion.

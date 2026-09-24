@@ -351,6 +351,9 @@ private struct LabsSettingsView: View {
                     }
                 if appDrawerEnabled {
                     Toggle(L.s("drawer.showNames"), isOn: $showAppNames)
+                        .onChange(of: showAppNames) { _, _ in
+                            Task { await TrayActivityController.shared.syncFromStore() }
+                        }
                     Toggle(L.s("drawer.settings.lockScreen"), isOn: $lockScreenShowsDrawer)
                         .onChange(of: lockScreenShowsDrawer) { _, _ in
                             Task { await TrayActivityController.shared.syncFromStore() }

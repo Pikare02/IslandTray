@@ -50,6 +50,7 @@ enum LaunchRouter {
 
 extension Notification.Name {
     static let openDrawer = Notification.Name("openDrawer")
+    static let openTray = Notification.Name("openTray")
     /// `object` is the tray item's UUID.
     static let openTrayItem = Notification.Name("openTrayItem")
 }
