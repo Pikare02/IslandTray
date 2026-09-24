@@ -43,8 +43,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray
         INFOPLIST_FILE: Resources/App/Info.plist
       configs:
-        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements }
-        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements }
+        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
+        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
         Free-Debug:   { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/App.entitlements }
         Free-Release: { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/App.entitlements }
     dependencies:
@@ -73,8 +73,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
         INFOPLIST_FILE: Resources/Widget/Info.plist
       configs:
-        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements }
-        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements }
+        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
+        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
         Free-Debug:   { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/Widget.entitlements }
         Free-Release: { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/Widget.entitlements }
 
