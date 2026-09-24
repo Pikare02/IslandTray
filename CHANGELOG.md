@@ -8,6 +8,26 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.7.0] — 2026-09-24
+
+### Labs
+- **App Drawer** is a new Labs toggle (off by default; on, nothing else
+  changes about the tray or clipboard). Turn it on and a full-screen drawer of
+  shortcuts sits under the tray. Add an entry for an installed app, a
+  Shortcuts shortcut, a URL scheme, or a web link — picking an installed app
+  is TrollStore-only, the other three kinds work on the free build too. Each
+  entry can carry its own custom icon, and the drawer can have a background
+  image.
+- When the drawer is empty it shows the date and current weather, from
+  [Open-Meteo](https://open-meteo.com/) for your location if you allow it, or
+  a region you pick by hand instead.
+
+### Updates
+- Turning on *Keep reminding about important updates* now also sends a
+  one-time system notification the first time an important update is found,
+  in addition to the launch alert. Off is unchanged: told once, no
+  notification.
+
 ## [1.6.2] — 2026-09-24
 
 ### iCloud Sync

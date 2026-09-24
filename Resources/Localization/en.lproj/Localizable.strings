@@ -197,7 +197,7 @@
 "settings.update.latest" = "Up to date";
 "settings.update.failed" = "Could not check";
 "settings.update.install" = "Get version %@ from the install page";
-"settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one. Important updates (an urgent fix, or a version that changes how the app works) are shown every launch until you update; turn that off to be told once, like any other update.";
+"settings.update.footer" = "On: the app checks GitHub for a newer release each time it opens and offers the install page. A sideloaded app cannot replace itself, so the new .ipa is installed the same way as this one. Important updates (an urgent fix, or a version that changes how the app works) are shown every launch until you update, and send a one-time system notification the first time one appears; turn that off to be told once, like any other update, with no notification.";
 "settings.update.insist" = "Keep reminding about important updates";
 "settings.shortcut.install.note.clip" = "The button opens a ready-made shortcut; tap Shortcuts in the sheet, then Add. Assigned to the Action button or a back tap, copying and keeping is one press. Steps 1 and 2 are for building it yourself.";
 "settings.update.releases" = "Open the Releases Page";
@@ -208,7 +208,7 @@
 "update.open" = "Open Install Page";
 "update.later" = "Later";
 "update.skip" = "Don’t Show Again for This Version";
-"update.notify.title" = "Important update";
+"update.notify.title" = "Important IslandTray update";
 "update.notify.body" = "Version %@ is available.";
 "settings.export.deleteOriginal" = "Also delete the original file";
 "clipboard.result.added" = "Added to the clipboard";

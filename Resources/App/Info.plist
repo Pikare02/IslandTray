@@ -38,6 +38,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Current weather in the Dynamic Island uses your location. / ダイナミックアイランドの天気に現在地を使います。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a custom square icon for an app shortcut. / アプリのショートカットにカスタムアイコンを設定します。</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

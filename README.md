@@ -37,6 +37,14 @@ from any app, and drag them out where they are needed.
   select several to share or delete, or have items leave the tray once taken
   (cut instead of copy).
 - **English and Japanese**, light/dark theme and a highlight colour of your own.
+- **App Drawer (Labs, off by default)** — a full-screen page of shortcuts under
+  the tray, with an empty-state clock and weather. Off, nothing changes. On,
+  add entries for an installed app, a Shortcuts shortcut, a URL scheme, or a
+  web link; picking an installed app is TrollStore-only, the other three kinds
+  work on both builds. Each entry can take a custom icon, and the drawer can
+  have its own background image. The empty state shows the date and, if you
+  allow location, current weather from [Open-Meteo](https://open-meteo.com/)
+  for wherever you are — or pick a region by hand instead of sharing location.
 
 ## Release notes
 
