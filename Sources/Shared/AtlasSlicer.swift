@@ -15,12 +15,21 @@ enum AtlasSlicer {
     /// it. A strip whose width is not a whole multiple of `count` -- which
     /// would mean it was built for a different list -- is refused rather
     /// than sliced at an offset.
-    /// The `index`-th tile, taking the tile count from the strip itself
-    /// (square tiles, so width / height). For a tray strip that may have the
+    /// Every square tile of the strip, decoded once, the count taken from
+    /// the strip itself (width / height) -- a tray strip may have the
     /// drawer's icons appended after the tray's own tiles.
-    static func tile(_ atlas: Data?, index: Int) -> UIImage? {
-        guard let atlas, let image = UIImage(data: atlas)?.cgImage, image.height > 0 else { return nil }
-        return tile(atlas, index: index, count: image.width / image.height)
+    ///
+    /// For the widget: call this once per render, never per tile. Decoding
+    /// the whole strip for each tile (twice, in 1.7.0 Nightly 4) pushed the
+    /// Live Activity past its memory/time limit, and the system then drew
+    /// the entire island as grey placeholders.
+    static func tiles(_ atlas: Data?) -> [UIImage] {
+        guard let atlas, let image = UIImage(data: atlas)?.cgImage,
+              image.height > 0, image.width % image.height == 0 else { return [] }
+        let side = image.height
+        return (0..<(image.width / side)).compactMap { i in
+            image.cropping(to: CGRect(x: side * i, y: 0, width: side, height: side)).map(UIImage.init(cgImage:))
+        }
     }
 
     static func tile(_ atlas: Data?, index: Int, count: Int) -> UIImage? {

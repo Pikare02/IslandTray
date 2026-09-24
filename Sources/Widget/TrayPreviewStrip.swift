@@ -15,6 +15,8 @@ struct TrayPreviewStrip: View {
     var side: CGFloat = 36
 
     var body: some View {
+        // Decoded once per render; see `AtlasSlicer.tiles`.
+        let tiles = AtlasSlicer.tiles(atlas)
         HStack(spacing: 6) {
             ForEach(Array(previews.enumerated()), id: \.element.id) { index, preview in
                 // Each tile opens its own item's preview, over the
@@ -24,7 +26,7 @@ struct TrayPreviewStrip: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
                             .fill(.white.opacity(0.14))
-                        if let image = thumbnail(for: preview, at: index) {
+                        if let image = thumbnail(for: preview, at: index, tiles) {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
@@ -52,9 +54,9 @@ struct TrayPreviewStrip: View {
         }
     }
 
-    private func thumbnail(for preview: TrayContentState.Preview, at index: Int) -> UIImage? {
+    private func thumbnail(for preview: TrayContentState.Preview, at index: Int, _ tiles: [UIImage]) -> UIImage? {
         containerThumbnail(for: preview)
-            ?? (preview.hasThumbnail ? AtlasSlicer.tile(atlas, index: index) : nil)
+            ?? (preview.hasThumbnail && tiles.indices.contains(index) ? tiles[index] : nil)
     }
 
     private func containerThumbnail(for preview: TrayContentState.Preview) -> UIImage? {

@@ -42,7 +42,9 @@ files attached on GitHub.
   weather refresh).
 - Sharper drawer icons in the island: the sharpest JPEG that fits is picked
   (fewer icons or hidden names leave room for more detail). Nightly 4 sent
-  HEIC, which the Lock Screen and island drew as blank tiles.
+  HEIC and decoded the icon strip again for every tile, which pushed the
+  Live Activity past its limits: the whole island and Lock Screen showed grey
+  placeholders. The strip is now decoded once per render.
 - Turning app names off in the drawer settings now hides them in the island
   too, and the icons get bigger.
 - Drawer: long-press an icon and drag it to rearrange; ↑↓ sorts by name,

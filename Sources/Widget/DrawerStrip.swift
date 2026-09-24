@@ -19,12 +19,13 @@ struct DrawerStrip: View {
     private var maxSide: CGFloat { showsNames ? side : side * 1.3 }
 
     var body: some View {
+        let tiles = AtlasSlicer.tiles(atlas)
         HStack(spacing: 6) {
             ForEach(Array(slots.enumerated()), id: \.offset) { index, slot in
                 if let url = URL(string: slot.launch) {
-                    Link(destination: url) { tile(slot.name) { iconImage(index) } }
+                    Link(destination: url) { tile(slot.name) { iconImage(index, tiles) } }
                 } else {
-                    tile(slot.name) { iconImage(index) }
+                    tile(slot.name) { iconImage(index, tiles) }
                 }
             }
         }
@@ -44,8 +45,9 @@ struct DrawerStrip: View {
         .frame(maxWidth: maxSide)
     }
 
-    @ViewBuilder private func iconImage(_ index: Int) -> some View {
-        if slots[index].hasIcon, let ui = AtlasSlicer.tile(atlas, index: atlasOffset + index) {
+    @ViewBuilder private func iconImage(_ index: Int, _ tiles: [UIImage]) -> some View {
+        if slots[index].hasIcon, tiles.indices.contains(atlasOffset + index) {
+            let ui = tiles[atlasOffset + index]
             Image(uiImage: ui).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
         } else {
             Image(systemName: slots[index].symbol).font(.title3).foregroundStyle(.white)

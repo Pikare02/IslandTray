@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import IslandTray
 
@@ -49,5 +50,16 @@ final class DrawerSortTests: XCTestCase {
         XCTAssertEqual(DrawerShortcut.sorted(items, by: .oldest).map(\.displayName), ["A", "a2", "c", "b"])
         XCTAssertEqual(DrawerShortcut.sorted(items, by: .newest).map(\.displayName), ["b", "c", "A", "a2"])
         XCTAssertEqual(DrawerShortcut.sorted(items, by: .name).map(\.order), [0, 1, 2, 3])
+    }
+}
+
+final class AtlasSlicerTests: XCTestCase {
+    func testTilesDecodesEverySquare() {
+        let f = UIGraphicsImageRendererFormat(); f.scale = 1
+        let strip = UIGraphicsImageRenderer(size: CGSize(width: 30, height: 10), format: f).image { ctx in
+            UIColor.red.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 10, height: 10))
+        }
+        XCTAssertEqual(AtlasSlicer.tiles(strip.jpegData(compressionQuality: 0.5)).count, 3)
+        XCTAssertTrue(AtlasSlicer.tiles(nil).isEmpty)
     }
 }
