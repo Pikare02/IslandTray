@@ -45,6 +45,14 @@ struct TraySettings {
         static let skippedUpdateVersion = "skippedUpdateVersion"
         static let insistsOnImportantUpdates = "insistsOnImportantUpdates"
         static let cloudSyncEnabled = "cloudSyncEnabled"
+        static let appDrawerEnabled = "appDrawerEnabled"
+        static let showAppNames = "showAppNames"
+        static let drawerBackgroundHex = "drawerBackgroundHex"
+        static let temperatureUnit = "temperatureUnit"
+        static let weatherLocationMode = "weatherLocationMode"
+        static let weatherManualLat = "weatherManualLat"
+        static let weatherManualLon = "weatherManualLon"
+        static let weatherManualName = "weatherManualName"
     }
 
     /// The suite everything here reads, exposed so `@AppStorage` can watch the
@@ -151,5 +159,49 @@ struct TraySettings {
     var cloudSyncEnabled: Bool {
         get { defaults.object(forKey: Keys.cloudSyncEnabled) as? Bool ?? false }
         nonmutating set { defaults.set(newValue, forKey: Keys.cloudSyncEnabled) }
+    }
+
+    /// Whether the empty-state date/weather + app drawer is active. Defaults
+    /// to `false`: off is byte-for-byte the current behavior.
+    var appDrawerEnabled: Bool {
+        get { defaults.object(forKey: Keys.appDrawerEnabled) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.appDrawerEnabled) }
+    }
+
+    /// Whether the drawer draws each app's name under its icon. Default `true`.
+    var showAppNames: Bool {
+        get { defaults.object(forKey: Keys.showAppNames) as? Bool ?? true }
+        nonmutating set { defaults.set(newValue, forKey: Keys.showAppNames) }
+    }
+
+    /// Full-screen drawer background colour, hex like `AccentColor`. Default black.
+    var drawerBackgroundHex: String {
+        get { defaults.string(forKey: Keys.drawerBackgroundHex) ?? "000000" }
+        nonmutating set { defaults.set(newValue, forKey: Keys.drawerBackgroundHex) }
+    }
+
+    /// "c" or "f". Default Celsius.
+    var temperatureUnit: String {
+        get { defaults.string(forKey: Keys.temperatureUnit) ?? "c" }
+        nonmutating set { defaults.set(newValue, forKey: Keys.temperatureUnit) }
+    }
+
+    /// "auto" (current location) or "manual" (pinned coordinates). Default auto.
+    var weatherLocationMode: String {
+        get { defaults.string(forKey: Keys.weatherLocationMode) ?? "auto" }
+        nonmutating set { defaults.set(newValue, forKey: Keys.weatherLocationMode) }
+    }
+
+    var weatherManualLat: Double? {
+        get { defaults.object(forKey: Keys.weatherManualLat) as? Double }
+        nonmutating set { defaults.set(newValue, forKey: Keys.weatherManualLat) }
+    }
+    var weatherManualLon: Double? {
+        get { defaults.object(forKey: Keys.weatherManualLon) as? Double }
+        nonmutating set { defaults.set(newValue, forKey: Keys.weatherManualLon) }
+    }
+    var weatherManualName: String? {
+        get { defaults.string(forKey: Keys.weatherManualName) }
+        nonmutating set { defaults.set(newValue, forKey: Keys.weatherManualName) }
     }
 }
