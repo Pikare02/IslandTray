@@ -43,6 +43,7 @@
 "drawer.name" = "名前";
 "drawer.open" = "アプリドロワーを開く";
 "drawer.pickApp" = "アプリを選ぶ";
+"drawer.removeBackgroundImage" = "背景画像を削除";
 "drawer.shortcutName" = "ショートカット名";
 "drawer.showNames" = "アプリ名を表示";
 "drawer.title" = "アプリドロワー";
