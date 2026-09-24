@@ -247,11 +247,11 @@ struct SetupGuideView: View {
             Text(L.s("settings.accent"))
 
             swatches(AccentColor.common)
-            if !AccentColor.recents.isEmpty {
+            if !AccentColor.recents().isEmpty {
                 Text(L.s("settings.accent.recent"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                swatches(AccentColor.recents)
+                swatches(AccentColor.recents())
             }
 
             HStack {
@@ -342,9 +342,18 @@ struct LabsSettingsView: View {
     @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var drawerBackgroundHex = "000000"
     /// The system picker's side of `drawerBackgroundHex`, same split as `customColor`/`accent`.
     @State private var drawerBgColor = Color.black
-    @State private var geocodeFailed = false
     @State private var backgroundItem: PhotosPickerItem?
     @State private var hasBackgroundImage = DrawerStore.shared.backgroundImageURL != nil
+    @State private var showingMapPicker = false
+    /// The just-picked background image, awaiting crop; `nil` closes the cropper.
+    @State private var backgroundCropImage: UIImage?
+
+    /// The drawer background fills the screen (`scaledToFill`), so the crop
+    /// window matches the screen's portrait ratio.
+    private static var backgroundAspect: CGFloat {
+        let s = UIScreen.main.bounds.size
+        return min(s.width, s.height) / max(s.width, s.height)
+    }
 
     var body: some View {
         List {
@@ -366,17 +375,25 @@ struct LabsSettingsView: View {
                         Text("°C").tag("c")
                         Text("°F").tag("f")
                     }
+                    .onChange(of: temperatureUnit) { _, _ in
+                        Task { await TrayActivityController.shared.syncFromStore() }
+                    }
                     Picker(L.s("drawer.settings.location"), selection: $weatherLocationMode) {
                         Text(L.s("drawer.settings.auto")).tag("auto")
                         Text(L.s("drawer.settings.manual")).tag("manual")
                     }
+                    .onChange(of: weatherLocationMode) { _, _ in
+                        Task { await TrayActivityController.shared.syncFromStore() }
+                    }
                     if weatherLocationMode == "manual" {
-                        TextField(L.s("drawer.settings.city"), text: $manualCityName)
-                            .onSubmit { geocodeManualCity() }
-                        if geocodeFailed {
-                            Text(L.s("drawer.settings.cityFailed"))
-                                .font(.footnote)
-                                .foregroundStyle(.red)
+                        Button { showingMapPicker = true } label: {
+                            HStack {
+                                Label(L.s("drawer.settings.pickOnMap"), systemImage: "mappin.and.ellipse")
+                                Spacer()
+                                if !manualCityName.isEmpty {
+                                    Text(manualCityName).foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
                     drawerBackgroundRow
@@ -398,44 +415,70 @@ struct LabsSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: backgroundItem) { _, item in
             Task {
-                if let data = try? await item?.loadTransferable(type: Data.self) {
-                    DrawerStore.shared.writeBackgroundImage(data)
-                    hasBackgroundImage = true
+                if let data = try? await item?.loadTransferable(type: Data.self),
+                   let ui = UIImage(data: data) {
+                    backgroundCropImage = ui
                 }
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { backgroundCropImage != nil },
+            set: { if !$0 { backgroundCropImage = nil } })) {
+            if let ui = backgroundCropImage {
+                ImageCropView(image: ui, aspect: Self.backgroundAspect, outputMaxDimension: 1600) { cropped in
+                    if let data = cropped.jpegData(compressionQuality: 0.85) {
+                        DrawerStore.shared.writeBackgroundImage(data)
+                        hasBackgroundImage = true
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingMapPicker) {
+            MapLocationPicker(initial: currentManualCoordinate) { name in
+                manualCityName = name
+                Task { await TrayActivityController.shared.syncFromStore() }
             }
         }
     }
 
+    /// The pinned coordinate, if one is stored, for the map picker to open on.
+    private var currentManualCoordinate: CLLocationCoordinate2D? {
+        let s = TraySettings()
+        guard let lat = s.weatherManualLat, let lon = s.weatherManualLon else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+
     /// Same swatches-plus-system-picker shape as `accentRow`, over
-    /// `drawerBackgroundHex` instead of `accent`. No recents list: that is
-    /// specific to the app-wide accent, not this one background.
+    /// `drawerBackgroundHex` instead of `accent`, with its own recents list.
     private var drawerBackgroundRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L.s("drawer.background"))
-            HStack(spacing: 10) {
-                ForEach(AccentColor.common, id: \.self) { hex in
-                    Button {
-                        chooseDrawerBackground(hex)
-                    } label: {
-                        Circle()
-                            .fill(AccentColor.color(forHex: hex) ?? .clear)
-                            .frame(width: 28, height: 28)
-                            .overlay {
-                                if hex.caseInsensitiveCompare(drawerBackgroundHex) == .orderedSame {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption.bold())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer(minLength: 0)
+            bgSwatches(AccentColor.backgroundSwatches)
+            if !AccentColor.recents(key: AccentColor.backgroundRecentsKey).isEmpty {
+                Text(L.s("settings.accent.recent"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                bgSwatches(AccentColor.recents(key: AccentColor.backgroundRecentsKey))
             }
-            ColorPicker(L.s("settings.accent.custom"), selection: $drawerBgColor, supportsOpacity: false)
-                .onChange(of: drawerBgColor) { _, picked in
-                    chooseDrawerBackground(AccentColor.hex(for: picked))
+            HStack {
+                ColorPicker(L.s("settings.accent.custom"), selection: $drawerBgColor, supportsOpacity: false)
+                    .onChange(of: drawerBgColor) { _, picked in
+                        // Ignore the programmatic sync in `onAppear`: only a
+                        // real pick (a colour different from the stored one)
+                        // should apply and clear the image.
+                        let hex = AccentColor.hex(for: picked)
+                        if hex.caseInsensitiveCompare(drawerBackgroundHex) != .orderedSame {
+                            chooseDrawerBackground(hex)
+                        }
+                    }
+                // Shown whenever the background is not the default black (a
+                // colour or an image); resets both back to black.
+                if drawerBackgroundHex.caseInsensitiveCompare("000000") != .orderedSame || hasBackgroundImage {
+                    Button(L.s("settings.accent.default")) { resetDrawerBackground() }
+                        .font(.footnote)
+                        .buttonStyle(.bordered)
                 }
+            }
         }
         .padding(.vertical, 4)
         .onAppear {
@@ -443,28 +486,49 @@ struct LabsSettingsView: View {
         }
     }
 
-    private func chooseDrawerBackground(_ hex: String) {
-        drawerBackgroundHex = hex
-        drawerBgColor = AccentColor.color(forHex: hex) ?? .black
+    /// Back to the default: drops any background image and sets black.
+    private func resetDrawerBackground() {
+        DrawerStore.shared.writeBackgroundImage(nil)
+        hasBackgroundImage = false
+        drawerBackgroundHex = "000000"
+        drawerBgColor = .black
     }
 
-    /// Resolves the typed city to coordinates and stores them for
-    /// `WeatherProvider` to read; failure just leaves the previous pin (if
-    /// any) in place, flagged by `geocodeFailed`.
-    private func geocodeManualCity() {
-        let name = manualCityName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        CLGeocoder().geocodeAddressString(name) { placemarks, _ in
-            DispatchQueue.main.async {
-                guard let coordinate = placemarks?.first?.location?.coordinate else {
-                    geocodeFailed = true
-                    return
+    private func bgSwatches(_ hexes: [String]) -> some View {
+        HStack(spacing: 10) {
+            ForEach(hexes, id: \.self) { hex in
+                Button {
+                    chooseDrawerBackground(hex)
+                } label: {
+                    Circle()
+                        .fill(AccentColor.color(forHex: hex) ?? .clear)
+                        .frame(width: 28, height: 28)
+                        // A stroke so black reads as a swatch, not a hole in
+                        // the dark settings background.
+                        .overlay { Circle().stroke(.white.opacity(0.15), lineWidth: 1) }
+                        .overlay {
+                            if hex.caseInsensitiveCompare(drawerBackgroundHex) == .orderedSame {
+                                Image(systemName: "checkmark")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.white)
+                            }
+                        }
                 }
-                geocodeFailed = false
-                TraySettings().weatherManualLat = coordinate.latitude
-                TraySettings().weatherManualLon = coordinate.longitude
-                TraySettings().weatherManualName = name
+                .buttonStyle(.plain)
             }
+            Spacer(minLength: 0)
         }
+    }
+
+    private func chooseDrawerBackground(_ hex: String) {
+        // A colour replaces any background image; otherwise the image (which
+        // wins over the colour in the drawer) would keep showing.
+        if hasBackgroundImage {
+            DrawerStore.shared.writeBackgroundImage(nil)
+            hasBackgroundImage = false
+        }
+        drawerBackgroundHex = hex
+        AccentColor.remember(hex, key: AccentColor.backgroundRecentsKey)
+        drawerBgColor = AccentColor.color(forHex: hex) ?? .black
     }
 }

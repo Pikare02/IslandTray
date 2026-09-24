@@ -80,7 +80,7 @@ struct DrawerAddSheet: View {
             }
             .fullScreenCover(isPresented: Binding(get: { cropping != nil }, set: { if !$0 { cropping = nil } })) {
                 if let image = cropping {
-                    SquareCropView(image: image) { iconData = $0.jpegData(compressionQuality: 0.85) }
+                    ImageCropView(image: image) { iconData = $0.jpegData(compressionQuality: 0.85) }
                 }
             }
         }

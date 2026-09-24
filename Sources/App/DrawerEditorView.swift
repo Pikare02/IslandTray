@@ -16,6 +16,12 @@ struct DrawerEditorView: View {
     // `@AppStorage(AccentColor.key…)`); `TraySettings.Keys` is private.
     @AppStorage("showAppNames", store: TraySettings.store) private var showNames = true
     @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var bgHex = "000000"
+    /// Bumped by `DrawerStore.writeBackgroundImage`; drives the async reload
+    /// below so a new background shows at once instead of on the next appear.
+    @AppStorage("drawerBackgroundVersion", store: TraySettings.store) private var bgVersion = 0
+    /// The decoded background, loaded off the main thread and cached so the
+    /// grid does not re-decode the (up to 1600px) JPEG on every render.
+    @State private var bgImage: UIImage?
     @Environment(\.openURL) private var openURL
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
@@ -72,6 +78,7 @@ struct DrawerEditorView: View {
         }
         // The grid is always drawn on a dark background, so its bar text must be light.
         .environment(\.colorScheme, .dark)
+        .task(id: bgVersion) { await loadBackground() }
         .sheet(isPresented: $adding) {
             DrawerAddSheet { new in add(new) }
         }
@@ -122,13 +129,21 @@ struct DrawerEditorView: View {
 
     private var background: some View {
         Group {
-            if let url = DrawerStore.shared.backgroundImageURL,
-               let data = try? Data(contentsOf: url), let ui = UIImage(data: data) {
-                Image(uiImage: ui).resizable().scaledToFill()
+            if let bgImage {
+                Image(uiImage: bgImage).resizable().scaledToFill()
             } else {
                 AccentColor.color(forHex: bgHex) ?? Color.black
             }
         }
+    }
+
+    /// Decodes the background file off the main thread; `nil` when none is set
+    /// (then the colour shows). Keyed on `bgVersion` via `.task(id:)`.
+    private func loadBackground() async {
+        guard let url = DrawerStore.shared.backgroundImageURL else { bgImage = nil; return }
+        bgImage = await Task.detached(priority: .userInitiated) {
+            (try? Data(contentsOf: url)).flatMap(UIImage.init(data:))
+        }.value
     }
 
     /// Installed apps go through the private launcher; everything else is a URL.

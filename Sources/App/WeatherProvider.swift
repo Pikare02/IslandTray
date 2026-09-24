@@ -9,7 +9,11 @@ actor WeatherProvider {
 
     struct Reading: Codable {
         let symbol: String
-        let tempText: String
+        /// Raw Celsius, not a formatted string: the display unit is applied
+        /// where the state is built, so toggling °C/°F re-renders the cached
+        /// reading without a re-fetch. (Older caches stored a `tempText`
+        /// string; those simply fail to decode and trigger one fresh fetch.)
+        let celsius: Double
         let fetched: Date
     }
 
@@ -64,10 +68,9 @@ actor WeatherProvider {
         ]
         let (data, _) = try await URLSession.shared.data(from: c.url!)
         let m = try WeatherFormat.OpenMeteo.parse(data)
-        let settings = TraySettings()
         return Reading(
             symbol: WeatherFormat.symbol(forWMO: m.code),
-            tempText: WeatherFormat.temperature(celsius: m.temperatureC, unit: settings.temperatureUnit),
+            celsius: m.temperatureC,
             fetched: Date()
         )
     }

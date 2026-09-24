@@ -7,7 +7,10 @@ import SwiftUI
 /// means the app's own blue, which is what `nil` tint gives.
 enum AccentColor {
     static let key = "accent"
-    private static let recentsKey = "accentRecents"
+    static let recentsKey = "accentRecents"
+    /// A separate recents list for the drawer background, so background picks
+    /// do not mingle with accent picks.
+    static let backgroundRecentsKey = "drawerBackgroundRecents"
     private static let recentsLimit = 8
 
     /// A handful to tap without thinking. Deliberately short: a wall of
@@ -16,6 +19,11 @@ enum AccentColor {
     static let common = [
         "007AFF", "34C759", "FF9500", "FF3B30", "AF52DE", "FF2D55", "5AC8FA", "8E8E93"
     ]
+
+    /// Drawer-background swatches: the accent set plus black, which is the
+    /// default background but is not an accent option. Black first so the
+    /// default is the first tap back after trying another colour.
+    static let backgroundSwatches = ["000000"] + common
 
     static func color(forHex hex: String) -> Color? {
         var value: UInt64 = 0
@@ -39,16 +47,17 @@ enum AccentColor {
         return String(format: "%02X%02X%02X", clamp(r), clamp(g), clamp(b))
     }
 
-    static var recents: [String] {
-        TraySettings.store.stringArray(forKey: recentsKey) ?? []
+    static func recents(key: String = recentsKey) -> [String] {
+        TraySettings.store.stringArray(forKey: key) ?? []
     }
 
     /// Most recent first, without duplicates, so the list stays short and the
-    /// last few choices are always the first few swatches.
-    static func remember(_ hex: String) {
+    /// last few choices are always the first few swatches. `key` selects which
+    /// list (accent or drawer background).
+    static func remember(_ hex: String, key: String = recentsKey) {
         guard color(forHex: hex) != nil else { return }
-        var list = recents.filter { $0.caseInsensitiveCompare(hex) != .orderedSame }
+        var list = recents(key: key).filter { $0.caseInsensitiveCompare(hex) != .orderedSame }
         list.insert(hex.uppercased(), at: 0)
-        TraySettings.store.set(Array(list.prefix(recentsLimit)), forKey: recentsKey)
+        TraySettings.store.set(Array(list.prefix(recentsLimit)), forKey: key)
     }
 }

@@ -47,7 +47,9 @@
 "drawer.settings.cityFailed" = "Couldn't find that city";
 "drawer.settings.enable" = "App Drawer";
 "drawer.settings.location" = "Weather Location";
-"drawer.settings.manual" = "Set a City";
+"drawer.settings.manual" = "Pin on Map";
+"drawer.settings.pickOnMap" = "Choose on Map";
+"drawer.settings.pinTitle" = "Pin Location";
 "drawer.settings.title" = "App Drawer";
 "drawer.settings.lockScreen" = "Always show drawer on Lock Screen";
 "drawer.settings.unit" = "Temperature Unit";
