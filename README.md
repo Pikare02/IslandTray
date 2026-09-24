@@ -52,6 +52,12 @@ Each version's full notes, with its `.ipa` files, are on its GitHub release page
 
 | Version | Highlights |
 |---|---|
+| [1.7.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.7.0) | App Drawer (Labs): a full-screen drawer of shortcuts under the tray, with a clock-and-weather empty state |
+| [1.6.2](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.2) | iCloud Sync reflects another device's changes sooner |
+| [1.6.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.1) | Clearer setup guide; Status sits right after Appearance |
+| [1.6.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.0) | iCloud Sync becomes a regular feature; settings reordered |
+| [1.5.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.5.0) | New setting to keep reminding about important updates; dragging out of the clipboard board never removes the item |
+| [1.4.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.4.0) | Dynamic Island feedback replaces the "Added" dialog; search reads inside items (text and image OCR); shortcuts remember "Always Allow" |
 | [1.3.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.1) | Folders come in more reliably and through the share-sheet shortcut; failed drops say why |
 | [1.3.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0) | Folders go into the tray and come out as folders |
 | [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | Copy from the clipboard board (tap the name, swipe right, or long-press); the island follows the share-sheet shortcut at once |
