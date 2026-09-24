@@ -8,6 +8,13 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.8.1] — 2026-09-25
+
+### Weather
+- Changing the weather location (pinning a new spot, or switching between
+  current location and a pin) now refreshes the Dynamic Island right away. It
+  used to keep showing the old location's temperature for up to half an hour.
+
 ## [1.8.0] — 2026-09-25
 
 ### Labs — App Drawer
