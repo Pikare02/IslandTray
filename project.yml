@@ -15,13 +15,18 @@ settings:
   base:
     # The one place the version is set; every Info.plist reads these.
     MARKETING_VERSION: "1.7.0"
-    CURRENT_PROJECT_VERSION: "16"
+    CURRENT_PROJECT_VERSION: "17"
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+packages:
+  libwebp:
+    url: https://github.com/SDWebImage/libwebp-Xcode
+    exactVersion: 1.6.0
 
 targets:
   IslandTray:
@@ -50,6 +55,9 @@ targets:
     dependencies:
       - target: IslandTrayWidget
       - target: IslandTrayShare
+      # Encodes the drawer's icon strip as WebP (ImageIO decodes WebP but
+      # cannot write it). App only: the widget decodes with ImageIO.
+      - package: libwebp
 
   IslandTrayWidget:
     type: app-extension

@@ -1,3 +1,8 @@
+// App target only; the widget compiles this file (for TrayActivityController)
+// but never encodes, so it goes without the library and the JPEG fallback.
+#if canImport(libwebp)
+import libwebp
+#endif
 import QuickLookThumbnailing
 import UIKit
 
@@ -100,16 +105,22 @@ actor ThumbnailService {
     func drawerAtlas(for images: [UIImage?], side: Int = atlasTile,
                      quality: CGFloat = atlasQuality) async -> TrayContentState.Atlas? {
         guard images.contains(where: { $0 != nil }) else { return nil }
-        return Self.strip(from: images, side: side, quality: quality)
+        return Self.strip(from: images, side: side, quality: quality, webp: true)
     }
 
     /// (tile px, JPEG quality), sharpest first; fewer icons or hidden names
     /// leave room for a sharper tier. JPEG, not HEIC: 1.7.0 Nightly 4 sent
     /// HEIC and the Live Activity drew the tiles blank -- the widget only
     /// reliably decodes JPEG.
+    ///
+    /// WebP, not JPEG or HEIC: measured on six real app icons, JPEG did not
+    /// fit even 48px beside six names, and HEIC (smaller still) went through
+    /// the device's hardware decoder, which drew the Live Activity as grey
+    /// placeholders. WebP decodes in software and fits ~56px on detailed
+    /// icons, more on flat ones.
     static let drawerQualities: [(side: Int, quality: CGFloat)] = [
-        (120, 0.9), (120, 0.75), (96, 0.8), (96, 0.6), (80, 0.6), (72, 0.5), (64, 0.5),
-        (64, 0.35), (56, 0.35), (48, 0.3), (48, 0.2), (40, 0.2),
+        (120, 0.8), (96, 0.75), (96, 0.55), (80, 0.55), (80, 0.4), (72, 0.45), (72, 0.35),
+        (64, 0.6), (64, 0.45), (64, 0.3), (56, 0.3), (56, 0.2), (48, 0.2), (40, 0.2),
     ]
 
     /// The tray page's strip with drawer icons appended, for a tray state
@@ -146,7 +157,7 @@ actor ThumbnailService {
     /// compressed, and the widget draws the SF Symbol over that slot anyway
     /// (`Preview.hasThumbnail` is false for it).
     private static func strip(from tiles: [UIImage?], side: Int = atlasTile,
-                              quality: CGFloat = atlasQuality) -> TrayContentState.Atlas? {
+                              quality: CGFloat = atlasQuality, webp: Bool = false) -> TrayContentState.Atlas? {
         guard !tiles.isEmpty else { return nil }
         let side = CGFloat(side)
         let format = UIGraphicsImageRendererFormat.preferred()
@@ -170,8 +181,53 @@ actor ThumbnailService {
                 context.cgContext.restoreGState()
             }
         }
-        guard let jpeg = strip.jpegData(compressionQuality: quality) else { return nil }
+        guard let jpeg = (webp ? webpData(strip, quality: quality) : nil)
+                ?? strip.jpegData(compressionQuality: quality) else { return nil }
         return TrayContentState.Atlas(jpeg: jpeg, filled: tiles.map { $0 != nil })
+    }
+
+    /// Lossy WebP via libwebp, tuned for small images: slowest/best method
+    /// and sharp RGB->YUV so thin edges keep their colour.
+    private static func webpData(_ image: UIImage, quality: CGFloat) -> Data? {
+        #if canImport(libwebp)
+        guard let cg = image.cgImage, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let w = cg.width, h = cg.height, stride = w * 4
+        var rgbx = [UInt8](repeating: 0, count: stride * h)
+        let drawn = rgbx.withUnsafeMutableBytes { buf -> Bool in
+            guard let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                      bytesPerRow: stride, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            return true
+        }
+        guard drawn else { return nil }
+
+        var config = WebPConfig()
+        guard WebPConfigInit(&config) != 0 else { return nil }
+        config.quality = Float(quality * 100)
+        config.method = 6
+        config.use_sharp_yuv = 1
+
+        var picture = WebPPicture()
+        guard WebPPictureInit(&picture) != 0 else { return nil }
+        picture.width = Int32(w)
+        picture.height = Int32(h)
+        guard WebPPictureImportRGBX(&picture, rgbx, Int32(stride)) != 0 else { return nil }
+        defer { WebPPictureFree(&picture) }
+
+        var writer = WebPMemoryWriter()
+        WebPMemoryWriterInit(&writer)
+        defer { WebPMemoryWriterClear(&writer) }
+        let ok = withUnsafeMutablePointer(to: &writer) { writerPtr -> Bool in
+            picture.writer = WebPMemoryWrite
+            picture.custom_ptr = UnsafeMutableRawPointer(writerPtr)
+            return WebPEncode(&config, &picture) != 0
+        }
+        guard ok, let mem = writer.mem else { return nil }
+        return Data(bytes: mem, count: writer.size)
+        #else
+        return nil
+        #endif
     }
 
     /// The rect to draw `size` into so it covers `slot` without distortion.

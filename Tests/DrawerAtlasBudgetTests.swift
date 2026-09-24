@@ -25,8 +25,16 @@ final class DrawerAtlasBudgetTests: XCTestCase {
             let atlas = await ThumbnailService.shared.drawerAtlas(for: images, side: q.side, quality: q.quality)
             let state = TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas, view: .drawer, count: 0)
             print("tier \(q.side)px q\(q.quality): jpeg=\(atlas?.jpeg.count ?? -1) \(state.encodedByteCount)B atlas=\(state.atlas != nil)")
-            if state.atlas != nil { chosen = q.side; break }
+            if let fitted = state.atlas {
+                chosen = q.side
+                // WebP ("RIFF....WEBP"), and it decodes back into six tiles
+                // the way the widget reads it.
+                XCTAssertEqual(String(decoding: fitted.prefix(4), as: UTF8.self), "RIFF")
+                XCTAssertEqual(String(decoding: fitted.dropFirst(8).prefix(4), as: UTF8.self), "WEBP")
+                XCTAssertEqual(AtlasSlicer.tiles(fitted).count, 6)
+                break
+            }
         }
-        XCTAssertGreaterThan(chosen, 0)
+        XCTAssertGreaterThan(chosen, 48)
     }
 }
