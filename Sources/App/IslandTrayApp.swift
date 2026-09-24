@@ -11,9 +11,17 @@ struct IslandTrayApp: App {
         WindowGroup {
             TrayView()
                 .preferredColorScheme(Self.scheme(theme))
-                .onOpenURL { _ in
-                    // The Live Activity's only deep link brings the tray forward
-                    // so a drag in flight can be dropped. Nothing else to do.
+                .onOpenURL { url in
+                    switch LaunchRouter.route(url) {
+                    case .drawer:
+                        NotificationCenter.default.post(name: .openDrawer, object: nil)
+                    case .launch(let id):
+                        LaunchRouter.performLaunch(id)
+                    case .drop, .ignore:
+                        // drop just needs the app foregrounded, which already happened;
+                        // ignore covers unknown/malformed links.
+                        break
+                    }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
