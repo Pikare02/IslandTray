@@ -12,15 +12,29 @@ struct TrayView: View {
     @Environment(\.openURL) private var openURL
     /// A newer release found on launch, offered once per launch.
     @State private var availableUpdate: UpdateChecker.Update?
+    /// Which tab is up; the island's "more" link switches to the drawer.
+    @State private var tab = "tray"
+    /// Labs: the drawer tab only exists while the feature is on.
+    @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
+    /// A tray item the island asked to preview, until the tray board opens it.
+    @State private var openRequest: UUID?
 
     var body: some View {
-        TabView {
-            BoardView(board: .tray, model: model)
+        TabView(selection: $tab) {
+            if appDrawerEnabled {
+                DrawerEditorView()
+                    .tabItem { Label(L.s("drawer.title"), systemImage: "square.grid.3x3") }
+                    .tag("drawer")
+            }
+            BoardView(board: .tray, model: model, openRequest: $openRequest)
                 .tabItem { Label(L.s("tray.title"), systemImage: "tray") }
+                .tag("tray")
             BoardView(board: .clipboard, model: model)
                 .tabItem { Label(L.s("clipboard.title"), systemImage: "list.clipboard") }
+                .tag("clipboard")
             BoardView(board: nil, model: model)
                 .tabItem { Label(L.s("search.title"), systemImage: "magnifyingglass") }
+                .tag("search")
         }
         // One tint for the whole app, applied where everything inherits it.
         .tint(AccentColor.color(forHex: accent))
@@ -76,6 +90,7 @@ struct TrayView: View {
                    insisting: settings.insistsOnImportantUpdates
                ) {
                 availableUpdate = update
+                await UpdateNotifier.notifyIfNeeded(update)
             }
         }
         .task {
@@ -107,6 +122,16 @@ struct TrayView: View {
         .onReceive(NotificationCenter.default.publisher(for: TrayStore.didChangeFromIntentNotification)) { _ in
             model.reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
+            if appDrawerEnabled { tab = "drawer" }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openTray)) { _ in tab = "tray" }
+        .onReceive(NotificationCenter.default.publisher(for: .openTrayItem)) { note in
+            guard let id = note.object as? UUID else { return }
+            tab = "tray"
+            openRequest = id
+        }
+        .onChange(of: appDrawerEnabled) { _, on in if !on && tab == "drawer" { tab = "tray" } }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
             // tray now: the receiving app has finished copying by the time the
@@ -149,6 +174,8 @@ struct BoardView: View {
     /// whatever the query and the scope pick out of both.
     let board: TrayBoard?
     let model: TrayModel
+    /// Set by the island's thumbnail links; the tray board previews it.
+    @Binding var openRequest: UUID?
 
     @State private var showsSetupGuide = false
     @State private var filter = TrayFilter()
@@ -166,9 +193,10 @@ struct BoardView: View {
     /// as a grid of thumbnails, while a clipboard reads as a timeline.
     @AppStorage private var layoutRaw: String
 
-    init(board: TrayBoard?, model: TrayModel) {
+    init(board: TrayBoard?, model: TrayModel, openRequest: Binding<UUID?> = .constant(nil)) {
         self.board = board
         self.model = model
+        _openRequest = openRequest
         _layoutRaw = AppStorage(
             wrappedValue: board == .tray ? TrayLayout.grid.rawValue : TrayLayout.list.rawValue,
             "layout.\(board?.rawValue ?? "search")",
@@ -251,7 +279,7 @@ struct BoardView: View {
                         }
                     } else {
                         Button { showsSetupGuide = true } label: {
-                            Image(systemName: "gearshape")
+                            Label(L.s("settings.title"), systemImage: "gearshape")
                         }
                     }
                 }
@@ -268,6 +296,11 @@ struct BoardView: View {
                 }
             }
             .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
+            // Re-tried when the items change: on a cold launch the link
+            // arrives before the tray has been read off disk.
+            .onChange(of: openRequest) { _, _ in openRequested() }
+            .onChange(of: model.items) { _, _ in openRequested() }
+            .onAppear { openRequested() }
             .fullScreenCover(item: $previewing) { item in
                 QuickLookView(url: item.fileURL, name: item.name) { previewing = nil }
                     .ignoresSafeArea()
@@ -300,6 +333,17 @@ struct BoardView: View {
         // claiming a count.
         .onChange(of: items.map(\.id)) { _, ids in
             selection.formIntersection(ids)
+        }
+    }
+
+    private func openRequested() {
+        guard let id = openRequest, let item = model.items.first(where: { $0.id == id }) else { return }
+        openRequest = nil
+        showsSetupGuide = false
+        if model.cloud.isCloudOnly(item.id) {
+            Task { await model.download(item) }
+        } else {
+            previewing = item
         }
     }
 
@@ -359,7 +403,7 @@ struct BoardView: View {
             }
             Toggle(L.s("settings.group"), isOn: $groupsByKind)
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
+            Label(L.s("settings.sort.section"), systemImage: "arrow.up.arrow.down")
         }
     }
 
@@ -369,9 +413,9 @@ struct BoardView: View {
         Button {
             layoutRaw = (layout == .grid ? TrayLayout.list : .grid).rawValue
         } label: {
-            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
+            Label(L.s(layout == .grid ? "layout.list" : "layout.grid"),
+                  systemImage: layout == .grid ? "list.bullet" : "square.grid.2x2")
         }
-        .accessibilityLabel(L.s(layout == .grid ? "layout.list" : "layout.grid"))
     }
 
     private var selectedItems: [TrayItem] {

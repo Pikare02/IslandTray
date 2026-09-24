@@ -8,6 +8,70 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.7.0] — 2026-09-24
+
+### Labs
+- **App Drawer** is a new Labs toggle (off by default; on, nothing else
+  changes about the tray or clipboard). Turn it on and a full-screen drawer of
+  shortcuts sits under the tray. Add an entry for an installed app, a
+  Shortcuts shortcut, a URL scheme, or a web link — picking an installed app
+  is TrollStore-only, the other three kinds work on the free build too. Each
+  entry can carry its own custom icon, and the drawer can have a background
+  image.
+- When the drawer is empty it shows the date and current weather, from
+  [Open-Meteo](https://open-meteo.com/) for your location if you allow it, or
+  a region you pick by hand instead.
+- The drawer is its own tab now, first in the bar (App Drawer · Tray ·
+  Clipboard · Search), shown while the Labs toggle is on. Labs moved to its own
+  page in Settings, just above the import log.
+- The gear on the drawer page now opens that Labs page directly, so every
+  drawer option — names, weather, Lock Screen, background colour and image —
+  lives in one place instead of a separate background-only sheet.
+- Tapping a drawer icon runs it; long-press to edit. Picking a custom icon
+  opens a square crop you can pan and zoom.
+- Fixed: turning the drawer on put an unknown folder into the tray, and after
+  deleting it nothing added to the drawer reached the Dynamic Island. The
+  drawer's data no longer lives in the Files-app folder.
+- Island: no stray arrow on an empty tray. With items, the left arrow on the
+  first page opens the drawer and the right arrow comes back. The compact
+  date and weekday are centred.
+- Fixed: tapping a shortcut in the expanded island only opened IslandTray.
+  A Live Activity link always opens its own app, so the app now passes the
+  shortcut's URL on.
+- The left arrow into the drawer now always shows on the tray's first page
+  while the drawer is on — before, it vanished when the tray's thumbnails
+  left no room for the drawer's data, or the drawer had no shortcuts yet.
+- The drawer arrow switches the island at once (it no longer waits on a
+  weather refresh).
+- Sharper drawer icons in the island. On the TrollStore build (shared App
+  Group) the icons are written as full-resolution files the island reads
+  directly, free of the 4 KB content limit. On the AltStore build they
+  travel inside that limit as the sharpest JPEG that fits. (Nightly 4/5
+  sent HEIC, which the device drew as grey placeholders.)
+- Fixed (Nightly 4): the whole island and Lock Screen showed grey
+  placeholders. The widget decoded the icon strip again for every tile; it
+  now decodes it once per render.
+- Turning app names off in the drawer settings now hides them in the island
+  too, and the icons get bigger.
+- Drawer: long-press an icon and drag it to rearrange; ↑↓ sorts by name,
+  oldest or newest added.
+- The island's drawer has no "…" tile any more: tap its empty space to open
+  the drawer tab (on the tray face, the tray tab).
+- Tapping a tray thumbnail in the island (or on the Lock Screen) opens that
+  item's preview in the app.
+- New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity
+  shows the drawer's first six icons whatever the tray holds.
+
+### Toolbar
+- In a narrow window (iPad Slide Over) the toolbar buttons that do not fit
+  appear in the overflow menu with their names.
+
+### Updates
+- Turning on *Keep reminding about important updates* now also sends a
+  one-time system notification the first time an important update is found,
+  in addition to the launch alert. Off is unchanged: told once, no
+  notification.
+
 ## [1.6.2] — 2026-09-24
 
 ### iCloud Sync

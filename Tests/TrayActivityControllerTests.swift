@@ -33,27 +33,35 @@ final class TrayActivityControllerTests: XCTestCase {
 
     func testEmptyTrayWithShowWhenEmptyOnStaysUp() {
         XCTAssertEqual(
-            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: true),
+            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: true, appDrawerEnabled: false),
             .show
         )
     }
 
     func testEmptyTrayWithShowWhenEmptyOffEnds() {
         XCTAssertEqual(
-            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: false),
+            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: false, appDrawerEnabled: false),
             .end
         )
     }
 
     func testNonEmptyTrayAlwaysShowsRegardlessOfSetting() {
         XCTAssertEqual(
-            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: true),
+            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: true, appDrawerEnabled: false),
             .show
         )
         XCTAssertEqual(
-            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: false),
+            TrayActivityController.syncDecision(itemCount: 3, showActivityWhenEmpty: false, appDrawerEnabled: false),
             .show,
             "a non-empty tray must show even if the empty-tray setting is off"
+        )
+    }
+
+    func testEmptyTrayWithAppDrawerEnabledStaysUp() {
+        XCTAssertEqual(
+            TrayActivityController.syncDecision(itemCount: 0, showActivityWhenEmpty: false, appDrawerEnabled: true),
+            .show,
+            "the drawer needs the island up even with an empty tray and the setting off"
         )
     }
 }

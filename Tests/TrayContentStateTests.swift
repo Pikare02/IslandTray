@@ -274,4 +274,35 @@ final class TrayContentStatePagingTests: XCTestCase {
         )
         XCTAssertEqual(decoded.page, 0)
     }
+
+    func testWithDrawerFallsBackToSymbolsWhenCombinedAtlasTooBig() throws {
+        let slots = (0..<6).map {
+            TrayContentState.DrawerSlot(symbol: "globe", name: "S\($0)", launch: "https://a.b/\($0)", hasIcon: true)
+        }
+        let tray = TrayContentState.countOnly(count: 3)
+
+        let small = TrayContentState.Atlas(jpeg: Data(count: 100), filled: Array(repeating: true, count: 6))
+        let fits = tray.withDrawer(slots, combined: small, lockDrawer: true)
+        XCTAssertEqual(fits.atlas, small.jpeg)
+        XCTAssertTrue(fits.drawer?.allSatisfy(\.hasIcon) == true)
+
+        let huge = TrayContentState.Atlas(jpeg: Data(count: 5000), filled: Array(repeating: true, count: 6))
+        let degraded = tray.withDrawer(slots, combined: huge, lockDrawer: true)
+        XCTAssertNil(degraded.atlas)
+        XCTAssertEqual(degraded.drawer?.count, 6)
+        XCTAssertTrue(degraded.drawer?.allSatisfy { !$0.hasIcon } == true)
+        XCTAssertLessThanOrEqual(degraded.encodedByteCount, TrayContentState.buildBudget)
+
+        let back = try JSONDecoder().decode(TrayContentState.self, from: JSONEncoder().encode(degraded))
+        XCTAssertTrue(back.lockDrawer)
+        XCTAssertTrue(back.drawerAvailable)
+    }
+
+    /// The tray's first-page arrow into the drawer must show even with no
+    /// shortcuts, or when the tray's thumbnails leave no room for slots.
+    func testTrayStateKeepsDrawerArrowWithNoSlots() {
+        let state = TrayContentState.countOnly(count: 2).withDrawer([], combined: nil, lockDrawer: false)
+        XCTAssertTrue(state.drawerAvailable)
+        XCTAssertFalse(TrayContentState.countOnly(count: 2).drawerAvailable)
+    }
 }

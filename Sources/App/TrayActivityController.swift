@@ -34,6 +34,10 @@ actor TrayActivityController {
     /// moving one page.
     private var page = 0
 
+    /// Whether the island is currently showing the app drawer instead of the
+    /// tray strip. Only meaningful while the drawer Labs feature is on.
+    private var drawerView = false
+
     /// The activities this controller treats as its own.
     ///
     /// `Activity.activities` is not a list of visible activities: it also
@@ -75,8 +79,8 @@ actor TrayActivityController {
         case end
     }
 
-    nonisolated static func syncDecision(itemCount: Int, showActivityWhenEmpty: Bool) -> SyncDecision {
-        itemCount > 0 || showActivityWhenEmpty ? .show : .end
+    nonisolated static func syncDecision(itemCount: Int, showActivityWhenEmpty: Bool, appDrawerEnabled: Bool) -> SyncDecision {
+        itemCount > 0 || showActivityWhenEmpty || appDrawerEnabled ? .show : .end
     }
 
     func sync(items: [TrayItem]) async {
@@ -91,7 +95,8 @@ actor TrayActivityController {
         }
         let decision = Self.syncDecision(
             itemCount: items.count,
-            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty,
+            appDrawerEnabled: TraySettings().appDrawerEnabled
         )
         guard decision == .show else {
             await end()
@@ -159,7 +164,8 @@ actor TrayActivityController {
         }
         let decision = Self.syncDecision(
             itemCount: items.count,
-            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty
+            showActivityWhenEmpty: TraySettings().showActivityWhenEmpty,
+            appDrawerEnabled: TraySettings().appDrawerEnabled
         )
         guard decision == .show else {
             await end()
@@ -255,19 +261,104 @@ actor TrayActivityController {
         _ = await update(await pagedState(for: tray))
     }
 
+    /// Flips between the tray strip and the app drawer, then pushes the
+    /// updated state through the existing `update` path. Only meaningful
+    /// while the tray has items -- an empty tray shows the drawer regardless
+    /// of this flag (see `pagedState(for:)`).
+    func toggleDrawer() async {
+        drawerView.toggle()
+        let tray = (try? await loadTray()) ?? []
+        // Cached weather only: waiting on location + network here is what
+        // made the arrow feel dead. A stale reading is refreshed right after.
+        _ = await update(await pagedState(for: tray, fetchWeather: false))
+        if drawerView, let cached = await WeatherProvider.shared.cached(), !WeatherProvider.isStale(cached) { return }
+        if drawerView { _ = await update(await pagedState(for: tray)) }
+    }
+
     /// The state for the page currently being shown, with an atlas built from
     /// exactly the items on it.
     ///
     /// Both halves go through `TrayContentState.items(_:onPage:)` so the
     /// picture and the labels can never describe different items.
-    private func pagedState(for items: [TrayItem]) async -> TrayContentState {
+    ///
+    /// Drawer-aware: an empty tray with the drawer Labs feature on always
+    /// shows the drawer (nothing else to show), and a non-empty tray shows
+    /// it only once the user has flipped `drawerView`. With the feature off
+    /// this is byte-for-byte the pre-drawer paged behavior.
+    private func pagedState(for items: [TrayItem], fetchWeather: Bool = true) async -> TrayContentState {
+        let settings = TraySettings()
+        // An emptied tray forgets the flip, so the next item lands on the tray view.
+        if items.isEmpty { drawerView = false }
+        if settings.appDrawerEnabled, items.isEmpty || drawerView {
+            return await drawerContentState(count: items.count, view: .drawer, settings: settings,
+                                            fetchWeather: fetchWeather)
+        }
+
         page = TrayContentState.clampedPage(page, count: items.count)
         let onPage = TrayContentState.items(items, onPage: page)
-        return TrayContentState.make(
-            from: items,
-            atlas: await ThumbnailService.shared.islandAtlas(for: onPage),
-            page: page
+        let trayAtlas = await ThumbnailService.shared.islandAtlas(for: onPage)
+        let tray = TrayContentState.make(from: items, atlas: trayAtlas, page: page)
+        guard settings.appDrawerEnabled else { return tray }
+
+        // The drawer rides along on the tray state: its slots are what put
+        // the drawer arrow on the first page, and with the Lock Screen
+        // setting on, its icons are what the Lock Screen shows instead.
+        let shortcuts = DrawerStore.shared.load()
+        let slots = DrawerState.slots(from: shortcuts, showNames: settings.showAppNames)
+        let lockDrawer = settings.lockScreenShowsDrawer
+        // Icons only when the Lock Screen draws them: the island's tray view
+        // shows the arrow, not the icons, so they would be spent bytes.
+        var combined: TrayContentState.Atlas?
+        if lockDrawer {
+            let icons = await DrawerState.icons(for: shortcuts)
+            // Shared container: full-resolution files the widget reads
+            // itself, so no drawer bytes in the state at all.
+            if !DrawerIconFiles.write(icons) {
+                combined = await ThumbnailService.shared.combinedAtlas(
+                    tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count, drawer: icons)
+            }
+        }
+        return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer)
+    }
+
+    /// Builds the date/weather + drawer-slots state from what is on disk.
+    /// Weather strings are all inherently tiny (`WeatherFormat.dateText`,
+    /// `WeatherProvider.Reading.tempText`, an SF Symbol name) -- never put an
+    /// unbounded string here, or `makeDrawer`'s floor guarantee stops holding.
+    private func drawerContentState(count: Int, view: TrayContentState.View,
+                                     settings: TraySettings, fetchWeather: Bool = true) async -> TrayContentState {
+        let shortcuts = DrawerStore.shared.load()
+        let slots = DrawerState.slots(from: shortcuts, showNames: settings.showAppNames)
+        let images = await DrawerState.icons(for: shortcuts)
+        let reading = fetchWeather ? await WeatherProvider.shared.current() : await WeatherProvider.shared.cached()
+        let weather = reading.map {
+            TrayContentState.Weather(
+                dateText: WeatherFormat.dateText(Date(), language: settings.language),
+                tempText: $0.tempText, symbol: $0.symbol
+            )
+        } ?? TrayContentState.Weather(
+            dateText: WeatherFormat.dateText(Date(), language: settings.language),
+            tempText: "", symbol: "thermometer"
         )
+        // Shared container: the widget reads full-resolution icon files, and
+        // the state carries no atlas.
+        if DrawerIconFiles.write(images) {
+            return TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: nil,
+                                               view: view, count: count,
+                                               lockDrawer: settings.lockScreenShowsDrawer)
+        }
+        // Otherwise the sharpest strip that still fits: makeDrawer drops an
+        // atlas that does not, so the first state that kept one wins.
+        var state: TrayContentState?
+        for q in ThumbnailService.drawerQualities {
+            let atlas = await ThumbnailService.shared.drawerAtlas(for: images, side: q.side, quality: q.quality)
+            let candidate = TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas,
+                                                        view: view, count: count,
+                                                        lockDrawer: settings.lockScreenShowsDrawer)
+            state = candidate
+            if atlas == nil || candidate.atlas != nil { break }
+        }
+        return state!
     }
 
     // MARK: - Internals

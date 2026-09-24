@@ -14,14 +14,19 @@ configs:
 settings:
   base:
     # The one place the version is set; every Info.plist reads these.
-    MARKETING_VERSION: "1.6.2"
-    CURRENT_PROJECT_VERSION: "15"
+    MARKETING_VERSION: "1.7.0"
+    CURRENT_PROJECT_VERSION: "17"
     SWIFT_VERSION: "6.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     CODE_SIGN_STYLE: Automatic
     GENERATE_INFOPLIST_FILE: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+packages:
+  libwebp:
+    url: https://github.com/SDWebImage/libwebp-Xcode
+    exactVersion: 1.6.0
 
 targets:
   IslandTray:
@@ -43,13 +48,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray
         INFOPLIST_FILE: Resources/App/Info.plist
       configs:
-        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements }
-        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements }
+        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
+        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/App.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
         Free-Debug:   { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/App.entitlements }
         Free-Release: { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/App.entitlements }
     dependencies:
       - target: IslandTrayWidget
       - target: IslandTrayShare
+      # Encodes the drawer's icon strip as WebP (ImageIO decodes WebP but
+      # cannot write it). App only: the widget decodes with ImageIO.
+      - package: libwebp
 
   IslandTrayWidget:
     type: app-extension
@@ -66,15 +74,22 @@ targets:
       # LiveActivityIntent is launched into the app's process -- but it still
       # has to compile here, which is what the two files under it are for.
       - path: Sources/App/TrayPageIntent.swift
+      - path: Sources/App/ToggleDrawerIntent.swift
       - path: Sources/App/TrayActivityController.swift
       - path: Sources/App/ThumbnailService.swift
+      # pagedState(for:) now builds the drawer state too, which pulls these
+      # three in -- still compile-only here, same reasoning as above.
+      - path: Sources/App/DrawerState.swift
+      - path: Sources/App/DrawerStore.swift
+      - path: Sources/App/WeatherProvider.swift
+      - path: Sources/App/InstalledApps.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pikare.islandtray.widget
         INFOPLIST_FILE: Resources/Widget/Info.plist
       configs:
-        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements }
-        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements }
+        Debug:        { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
+        Release:      { CODE_SIGN_ENTITLEMENTS: Entitlements/Paid/Widget.entitlements, SWIFT_ACTIVE_COMPILATION_CONDITIONS: TROLLSTORE }
         Free-Debug:   { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/Widget.entitlements }
         Free-Release: { CODE_SIGN_ENTITLEMENTS: Entitlements/Free/Widget.entitlements }
 

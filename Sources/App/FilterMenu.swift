@@ -51,8 +51,11 @@ struct FilterMenu: View {
             // The same colour as the buttons beside it; a filter in effect
             // shows as a circle around the funnel. Only for what this menu
             // itself sets: typing in the search field is visible in the field.
-            Image(systemName: hasFunnelFilters ? "line.3.horizontal.decrease.circle"
-                                               : "line.3.horizontal.decrease")
+            // A Label, not a bare Image: when the bar is too narrow (iPad
+            // Slide Over) this item collapses into the overflow menu, which
+            // lists it by its title.
+            Label(L.s("filter.title"), systemImage: hasFunnelFilters ? "line.3.horizontal.decrease.circle"
+                                                                     : "line.3.horizontal.decrease")
         }
     }
 

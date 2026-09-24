@@ -1,4 +1,14 @@
 import SwiftUI
+import UserNotifications
+
+/// Lets the important-update notification's banner show even though the
+/// launch-time check that schedules it runs while the app is foreground --
+/// without this, UNUserNotificationCenter suppresses a foreground banner.
+final class NotificationForeground: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async
+        -> UNNotificationPresentationOptions { [.banner, .sound] }
+}
 
 @main
 struct IslandTrayApp: App {
@@ -6,14 +16,34 @@ struct IslandTrayApp: App {
     /// At the window, not on a view inside it, so sheets and the preview
     /// inherit the choice rather than each having to be told.
     @AppStorage("theme", store: TraySettings.store) private var theme = ""
+    /// Held so it isn't deallocated the instant `init()` returns -- the
+    /// delegate property on `UNUserNotificationCenter` is weak.
+    private let notificationForeground = NotificationForeground()
+
+    init() {
+        UNUserNotificationCenter.current().delegate = notificationForeground
+    }
 
     var body: some Scene {
         WindowGroup {
             TrayView()
                 .preferredColorScheme(Self.scheme(theme))
-                .onOpenURL { _ in
-                    // The Live Activity's only deep link brings the tray forward
-                    // so a drag in flight can be dropped. Nothing else to do.
+                .onOpenURL { url in
+                    switch LaunchRouter.route(url) {
+                    case .drawer:
+                        NotificationCenter.default.post(name: .openDrawer, object: nil)
+                    case .launch(let id):
+                        LaunchRouter.performLaunch(id)
+                    case .open(let id):
+                        NotificationCenter.default.post(name: .openTrayItem, object: id)
+                    case .external(let url):
+                        UIApplication.shared.open(url)
+                    case .drop:
+                        // The tray face of the island (or a drop) lands on the tray tab.
+                        NotificationCenter.default.post(name: .openTray, object: nil)
+                    case .ignore:
+                        break
+                    }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
