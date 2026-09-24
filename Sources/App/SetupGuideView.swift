@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import PhotosUI
 import SwiftUI
 
 struct SetupGuideView: View {
@@ -327,8 +328,9 @@ struct SetupGuideView: View {
 }
 
 /// Labs: features still being tried out, one level below the settings so
-/// their switches do not crowd the ones everyone uses.
-private struct LabsSettingsView: View {
+/// their switches do not crowd the ones everyone uses. Also reached straight
+/// from the app-drawer page's gear, so its drawer options live in one place.
+struct LabsSettingsView: View {
     // Literal keys, matching the convention `DrawerEditorView` already uses
     // for these same App Group keys (`TraySettings.Keys` is private).
     @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
@@ -341,6 +343,8 @@ private struct LabsSettingsView: View {
     /// The system picker's side of `drawerBackgroundHex`, same split as `customColor`/`accent`.
     @State private var drawerBgColor = Color.black
     @State private var geocodeFailed = false
+    @State private var backgroundItem: PhotosPickerItem?
+    @State private var hasBackgroundImage = DrawerStore.shared.backgroundImageURL != nil
 
     var body: some View {
         List {
@@ -376,6 +380,15 @@ private struct LabsSettingsView: View {
                         }
                     }
                     drawerBackgroundRow
+                    PhotosPicker(L.s("drawer.backgroundImage"), selection: $backgroundItem, matching: .images)
+                    if hasBackgroundImage {
+                        Button(role: .destructive) {
+                            DrawerStore.shared.writeBackgroundImage(nil)
+                            hasBackgroundImage = false
+                        } label: {
+                            Text(L.s("drawer.removeBackgroundImage"))
+                        }
+                    }
                 }
             } header: {
                 Text(L.s("drawer.settings.title"))
@@ -383,6 +396,14 @@ private struct LabsSettingsView: View {
         }
         .navigationTitle(L.s("settings.labs"))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: backgroundItem) { _, item in
+            Task {
+                if let data = try? await item?.loadTransferable(type: Data.self) {
+                    DrawerStore.shared.writeBackgroundImage(data)
+                    hasBackgroundImage = true
+                }
+            }
+        }
     }
 
     /// Same swatches-plus-system-picker shape as `accentRow`, over

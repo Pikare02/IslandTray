@@ -1,4 +1,3 @@
-import PhotosUI
 import SwiftUI
 
 /// The app drawer tab: a scrolling 6-column grid of shortcuts, its
@@ -9,7 +8,7 @@ struct DrawerEditorView: View {
     @State private var shortcuts: [DrawerShortcut] = DrawerStore.shared.load()
     @State private var adding = false
     @State private var editing: DrawerShortcut?
-    @State private var showingBackgroundSettings = false
+    @State private var showingSettings = false
     /// The shortcut being dragged; the grid rearranges live as it passes
     /// over other cells, and saves once it is dropped.
     @State private var dragging: DrawerShortcut?
@@ -66,7 +65,7 @@ struct DrawerEditorView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingBackgroundSettings = true } label: { Label(L.s("drawer.background"), systemImage: "gearshape") }
+                    Button { showingSettings = true } label: { Label(L.s("settings.labs"), systemImage: "gearshape") }
                 }
             }
             .navigationTitle(L.s("drawer.title"))
@@ -79,8 +78,15 @@ struct DrawerEditorView: View {
         .sheet(item: $editing) { s in
             DrawerAddSheet(existing: s) { updated in update(updated) }
         }
-        .sheet(isPresented: $showingBackgroundSettings) {
-            DrawerBackgroundSettingsSheet(showNames: $showNames, bgHex: $bgHex)
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack {
+                LabsSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(L.s("common.done")) { showingSettings = false }
+                        }
+                    }
+            }
         }
     }
 
@@ -187,83 +193,5 @@ private struct ReorderDrop: DropDelegate {
         dragging = nil
         onDrop()
         return true
-    }
-}
-
-/// Background colour/image and the name-label toggle, reached from the
-/// drawer's gear icon. Kept as one small sheet rather than folded into the
-/// main grid screen, which is busy enough already.
-private struct DrawerBackgroundSettingsSheet: View {
-    @Binding var showNames: Bool
-    @Binding var bgHex: String
-    @State private var customColor = Color.black
-    @State private var backgroundItem: PhotosPickerItem?
-    @State private var hasBackgroundImage = DrawerStore.shared.backgroundImageURL != nil
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Toggle(L.s("drawer.showNames"), isOn: $showNames)
-                        // The island only redraws when told to.
-                        .onChange(of: showNames) { _, _ in
-                            Task { await TrayActivityController.shared.syncFromStore() }
-                        }
-                }
-                Section {
-                    swatches
-                    ColorPicker(L.s("settings.accent.custom"), selection: $customColor, supportsOpacity: false)
-                        .onChange(of: customColor) { _, picked in bgHex = AccentColor.hex(for: picked) }
-                } header: {
-                    Text(L.s("drawer.background"))
-                }
-                Section {
-                    PhotosPicker(L.s("drawer.backgroundImage"), selection: $backgroundItem, matching: .images)
-                    if hasBackgroundImage {
-                        Button(role: .destructive) {
-                            DrawerStore.shared.writeBackgroundImage(nil)
-                            hasBackgroundImage = false
-                        } label: {
-                            Text(L.s("drawer.removeBackgroundImage"))
-                        }
-                    }
-                }
-            }
-            .navigationTitle(L.s("drawer.background"))
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button(L.s("common.done")) { dismiss() } }
-            }
-            .onAppear { customColor = AccentColor.color(forHex: bgHex) ?? .black }
-            .onChange(of: backgroundItem) { _, item in
-                Task {
-                    if let data = try? await item?.loadTransferable(type: Data.self) {
-                        DrawerStore.shared.writeBackgroundImage(data)
-                        hasBackgroundImage = true
-                    }
-                }
-            }
-        }
-    }
-
-    private var swatches: some View {
-        HStack {
-            ForEach(AccentColor.common, id: \.self) { hex in
-                Button {
-                    bgHex = hex
-                    customColor = AccentColor.color(forHex: hex) ?? .black
-                } label: {
-                    Circle()
-                        .fill(AccentColor.color(forHex: hex) ?? .clear)
-                        .frame(width: 28, height: 28)
-                        .overlay {
-                            if hex.caseInsensitiveCompare(bgHex) == .orderedSame {
-                                Circle().strokeBorder(.primary, lineWidth: 2)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }

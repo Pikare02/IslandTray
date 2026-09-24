@@ -24,6 +24,9 @@ files attached on GitHub.
 - The drawer is its own tab now, first in the bar (App Drawer · Tray ·
   Clipboard · Search), shown while the Labs toggle is on. Labs moved to its own
   page in Settings, just above the import log.
+- The gear on the drawer page now opens that Labs page directly, so every
+  drawer option — names, weather, Lock Screen, background colour and image —
+  lives in one place instead of a separate background-only sheet.
 - Tapping a drawer icon runs it; long-press to edit. Picking a custom icon
   opens a square crop you can pan and zoom.
 - Fixed: turning the drawer on put an unknown folder into the tray, and after
