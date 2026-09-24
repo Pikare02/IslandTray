@@ -71,7 +71,7 @@ struct TrayContentState: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent, atlas, page, added
+        case count, recent, atlas, page, added, weather, drawer, view
     }
 
     /// What a shortcut just put in, shown with a check while the island is
@@ -80,6 +80,26 @@ struct TrayContentState: Codable, Hashable {
         let count: Int
         let board: TrayBoard
     }
+
+    struct Weather: Codable, Hashable {
+        let dateText: String
+        let tempText: String
+        let symbol: String
+    }
+
+    struct DrawerSlot: Codable, Hashable {
+        let symbol: String
+        let name: String
+        /// A URL string the widget wraps in a `Link`.
+        let launch: String
+        /// Whether this slot's atlas tile holds a real icon.
+        let hasIcon: Bool
+    }
+
+    enum View: String, Codable { case tray, drawer }
+
+    /// Maximum drawer slots shown on the island.
+    static let maxSlots = 6
 
     let count: Int
     let recent: [Preview]
@@ -99,21 +119,38 @@ struct TrayContentState: Codable, Hashable {
     /// Set only for the moment after a shortcut adds something; see
     /// `TrayActivityController.announce(_:)`.
     let added: Added?
+    /// Weather shown above the drawer, or `nil` outside `view == .drawer`.
+    let weather: Weather?
+    /// Shortcut slots shown by the drawer, capped to `maxSlots`, or `nil`
+    /// outside `view == .drawer`.
+    let drawer: [DrawerSlot]?
+    /// Which face the island is showing. Tray states never set `weather` or
+    /// `drawer`; only `makeDrawer(...)` does.
+    let view: View
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
     /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
-    private init(count: Int, recent: [Preview], atlas: Data?, page: Int = 0, added: Added? = nil) {
+    private init(
+        count: Int, recent: [Preview], atlas: Data?, page: Int = 0, added: Added? = nil,
+        weather: Weather? = nil, drawer: [DrawerSlot]? = nil, view: View = .tray
+    ) {
         self.count = count
         self.recent = recent
         self.atlas = atlas
         self.page = page
         self.added = added
+        self.weather = weather
+        self.drawer = drawer
+        self.view = view
     }
 
     /// The same state, carrying `added`. A few dozen bytes, which the
     /// headroom `buildBudget` leaves covers.
     func announcing(_ added: Added?) -> TrayContentState {
-        TrayContentState(count: count, recent: recent, atlas: atlas, page: page, added: added)
+        TrayContentState(
+            count: count, recent: recent, atlas: atlas, page: page, added: added,
+            weather: weather, drawer: drawer, view: view
+        )
     }
 
     /// Whether there is a run of items before or after this one.
@@ -158,22 +195,31 @@ struct TrayContentState: Codable, Hashable {
         let decodedAtlas = try? container.decodeIfPresent(Data.self, forKey: .atlas)
         let decodedPage = (try? container.decodeIfPresent(Int.self, forKey: .page)) ?? 0
         let added = (try? container.decodeIfPresent(Added.self, forKey: .added)) ?? nil
+        let decodedWeather = (try? container.decodeIfPresent(Weather.self, forKey: .weather)) ?? nil
+        let decodedDrawer = (try? container.decodeIfPresent([DrawerSlot].self, forKey: .drawer))
+            .map { Array($0.prefix(Self.maxSlots)) } ?? nil
+        let decodedView = (try? container.decodeIfPresent(View.self, forKey: .view)) ?? .tray
         let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
         let page = Self.clampedPage(decodedPage, count: decodedCount)
 
         let full = TrayContentState(
-            count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page, added: added
+            count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page, added: added,
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView
         )
         if full.encodedByteCount <= Self.maxEncodedBytes {
             self = full
             return
         }
         let noAtlas = TrayContentState(
-            count: decodedCount, recent: clampedRecent, atlas: nil, page: page, added: added
+            count: decodedCount, recent: clampedRecent, atlas: nil, page: page, added: added,
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView
         )
         self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
             ? noAtlas
-            : TrayContentState(count: decodedCount, recent: [], atlas: nil, page: page, added: added)
+            : TrayContentState(
+                count: decodedCount, recent: [], atlas: nil, page: page, added: added,
+                weather: decodedWeather, drawer: decodedDrawer, view: decodedView
+            )
     }
 
     /// A JPEG strip built for one `make(from:atlas:)` call, plus which of
@@ -231,6 +277,26 @@ struct TrayContentState: Codable, Hashable {
     /// previews) would exceed `maxEncodedBytes`.
     static func countOnly(count: Int) -> TrayContentState {
         TrayContentState(count: count, recent: [], atlas: nil)
+    }
+
+    /// Empty-tray drawer/weather state. `slots` capped to `maxSlots`; the atlas
+    /// (one tile per slot) is dropped whole if the state would exceed budget,
+    /// exactly like `make(from:atlas:)`.
+    static func makeDrawer(weather: Weather?, slots: [DrawerSlot], atlas: Atlas?,
+                           view: View, count: Int) -> TrayContentState {
+        let capped = Array(slots.prefix(maxSlots))
+        let withAtlas = TrayContentState(
+            count: count, recent: [], atlas: atlas?.jpeg, page: 0, added: nil,
+            weather: weather, drawer: capped, view: view
+        )
+        if withAtlas.encodedByteCount <= buildBudget { return withAtlas }
+        let noIcons = capped.map {
+            DrawerSlot(symbol: $0.symbol, name: $0.name, launch: $0.launch, hasIcon: false)
+        }
+        return TrayContentState(
+            count: count, recent: [], atlas: nil, page: 0, added: nil,
+            weather: weather, drawer: noIcons, view: view
+        )
     }
 
     /// `name` capped to `maxNameBytes`, cut in the middle so the extension
