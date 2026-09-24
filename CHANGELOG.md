@@ -40,9 +40,11 @@ files attached on GitHub.
   left no room for the drawer's data, or the drawer had no shortcuts yet.
 - The drawer arrow switches the island at once (it no longer waits on a
   weather refresh).
-- Sharper drawer icons in the island: sent as HEIC, about half the size of a
-  JPEG, at the sharpest quality that fits (fewer icons or hidden names leave
-  room for more detail).
+- Sharper drawer icons in the island. On the TrollStore build (shared App
+  Group) the icons are written as full-resolution files the island reads
+  directly, free of the 4 KB content limit. On the AltStore build they
+  travel inside that limit as the sharpest JPEG that fits. (Nightly 4/5
+  sent HEIC, which the device drew as grey placeholders.)
 - Fixed (Nightly 4): the whole island and Lock Screen showed grey
   placeholders. The widget decoded the icon strip again for every tile; it
   now decodes it once per render.

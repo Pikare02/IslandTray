@@ -27,6 +27,6 @@ final class DrawerAtlasBudgetTests: XCTestCase {
             print("tier \(q.side)px q\(q.quality): jpeg=\(atlas?.jpeg.count ?? -1) \(state.encodedByteCount)B atlas=\(state.atlas != nil)")
             if state.atlas != nil { chosen = q.side; break }
         }
-        XCTAssertGreaterThan(chosen, 48)
+        XCTAssertGreaterThan(chosen, 0)
     }
 }

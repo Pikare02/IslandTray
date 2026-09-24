@@ -308,11 +308,16 @@ actor TrayActivityController {
         let lockDrawer = settings.lockScreenShowsDrawer
         // Icons only when the Lock Screen draws them: the island's tray view
         // shows the arrow, not the icons, so they would be spent bytes.
-        let combined = lockDrawer
-            ? await ThumbnailService.shared.combinedAtlas(
-                tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count,
-                drawer: await DrawerState.icons(for: shortcuts))
-            : nil
+        var combined: TrayContentState.Atlas?
+        if lockDrawer {
+            let icons = await DrawerState.icons(for: shortcuts)
+            // Shared container: full-resolution files the widget reads
+            // itself, so no drawer bytes in the state at all.
+            if !DrawerIconFiles.write(icons) {
+                combined = await ThumbnailService.shared.combinedAtlas(
+                    tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count, drawer: icons)
+            }
+        }
         return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer)
     }
 
@@ -335,8 +340,15 @@ actor TrayActivityController {
             dateText: WeatherFormat.dateText(Date(), language: settings.language),
             tempText: "", symbol: "thermometer"
         )
-        // Sharpest strip that still fits: makeDrawer drops an atlas that
-        // does not, so the first state that kept one wins.
+        // Shared container: the widget reads full-resolution icon files, and
+        // the state carries no atlas.
+        if DrawerIconFiles.write(images) {
+            return TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: nil,
+                                               view: view, count: count,
+                                               lockDrawer: settings.lockScreenShowsDrawer)
+        }
+        // Otherwise the sharpest strip that still fits: makeDrawer drops an
+        // atlas that does not, so the first state that kept one wins.
         var state: TrayContentState?
         for q in ThumbnailService.drawerQualities {
             let atlas = await ThumbnailService.shared.drawerAtlas(for: images, side: q.side, quality: q.quality)
