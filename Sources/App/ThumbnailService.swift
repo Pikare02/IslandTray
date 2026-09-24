@@ -90,6 +90,14 @@ actor ThumbnailService {
         return atlas
     }
 
+    /// Composites drawer icons into one strip the way `islandAtlas` does for
+    /// tray thumbnails. Returns nil when no image is present, so the widget
+    /// falls back to per-slot SF Symbols.
+    func drawerAtlas(for images: [UIImage?]) async -> TrayContentState.Atlas? {
+        guard images.contains(where: { $0 != nil }) else { return nil }
+        return Self.strip(from: images)
+    }
+
     private func islandTile(for item: TrayItem) async -> UIImage? {
         let side = CGFloat(Self.atlasTile)
         let request = QLThumbnailGenerator.Request(
