@@ -109,10 +109,6 @@ actor ThumbnailService {
     /// icons: JPEG could not fit even 48px/0.3 beside six slots and the
     /// weather (2333 bytes before base64), so the icons were always dropped;
     /// HEIC is about half the size (80px/0.3 = 2062).
-    ///
-    /// HEIC decodes heavier than JPEG on device, so the widget must decode
-    /// the strip once per render (`AtlasSlicer.tiles`): Nightly 4 decoded it
-    /// twice per tile and the Live Activity drew as grey placeholders.
     static let drawerQualities: [(side: Int, quality: CGFloat)] = [
         (96, 0.45), (96, 0.3), (80, 0.4), (80, 0.3), (64, 0.35), (64, 0.25), (56, 0.25), (48, 0.2),
     ]
