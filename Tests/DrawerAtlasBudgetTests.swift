@@ -2,10 +2,10 @@ import UIKit
 import XCTest
 @testable import IslandTray
 
-/// Six app-icon-like images (gradient + glyph) with names should get a
-/// sharper strip than the tray's 48px default under the state budget.
+/// Drawer icons must reach the island as an atlas, not be dropped for size:
+/// six app-icon-like images (gradient + glyph) with names still fit a tier.
 final class DrawerAtlasBudgetTests: XCTestCase {
-    func testSixIconsFitAboveTrayResolution() async {
+    func testSixIconsKeepAnAtlas() async {
         let colors: [UIColor] = [.systemBlue, .systemGreen, .systemOrange, .systemPink, .systemPurple, .systemTeal]
         let images: [UIImage?] = colors.enumerated().map { i, c in
             UIGraphicsImageRenderer(size: CGSize(width: 256, height: 256)).image { ctx in
@@ -27,6 +27,6 @@ final class DrawerAtlasBudgetTests: XCTestCase {
             print("tier \(q.side)px q\(q.quality): jpeg=\(atlas?.jpeg.count ?? -1) \(state.encodedByteCount)B atlas=\(state.atlas != nil)")
             if state.atlas != nil { chosen = q.side; break }
         }
-        XCTAssertGreaterThan(chosen, 48)
+        XCTAssertGreaterThan(chosen, 0)
     }
 }

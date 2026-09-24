@@ -40,9 +40,9 @@ files attached on GitHub.
   left no room for the drawer's data, or the drawer had no shortcuts yet.
 - The drawer arrow switches the island at once (it no longer waits on a
   weather refresh).
-- Sharper drawer icons in the island: they are sent as HEIC, about half the
-  size of the JPEG that, beside six names, never fit and fell back to plain
-  symbols.
+- Sharper drawer icons in the island: the sharpest JPEG that fits is picked
+  (fewer icons or hidden names leave room for more detail). Nightly 4 sent
+  HEIC, which the Lock Screen and island drew as blank tiles.
 - Turning app names off in the drawer settings now hides them in the island
   too, and the icons get bigger.
 - Drawer: long-press an icon and drag it to rearrange; ↑↓ sorts by name,
