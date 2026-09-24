@@ -86,4 +86,22 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertEqual(CloudFolder.placeholderTarget(".A.json.icloud"), "A.json")
         XCTAssertNil(CloudFolder.placeholderTarget("A.json"))
     }
+
+    /// A meta entry iCloud has not downloaded yet is counted as present but
+    /// reported as pending, so the poll knows to look again soon instead of
+    /// waiting a full idle interval to read it.
+    func testUndownloadedEntryIsPendingNotReadable() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let folder = CloudFolder(root: temp)
+        try folder.prepare()
+        // How iCloud lists a meta file whose contents are not here yet.
+        let placeholder = folder.metaDirectory.appendingPathComponent(".\(a.uuidString).json.icloud")
+        try Data().write(to: placeholder)
+
+        let listing = try folder.list()
+        XCTAssertEqual(listing.ids, [a])
+        XCTAssertEqual(listing.pendingDownloads, [a])
+        XCTAssertNil(listing.items[a])
+    }
 }

@@ -63,6 +63,10 @@ struct CloudFolder: Sendable {
         var ids: Set<UUID> = []
         var items: [UUID: TrayItem] = [:]
         var tombstones: Set<UUID> = []
+        /// Entries that were still `.icloud` placeholders this pass, so their
+        /// download was only just asked for and cannot be read until a later
+        /// one. A non-empty set means "come back soon" -- see `settling`.
+        var pendingDownloads: Set<UUID> = []
     }
 
     func prepare() throws {
@@ -79,6 +83,7 @@ struct CloudFolder: Sendable {
                 // Not on this device yet. Asked for, and read next pass.
                 guard let id = Self.id(fromMeta: real) else { continue }
                 listing.ids.insert(id)
+                listing.pendingDownloads.insert(id)
                 try? FileManager.default.startDownloadingUbiquitousItem(at: metaDirectory.appendingPathComponent(real))
                 continue
             }
@@ -207,6 +212,9 @@ final class CloudSync {
     private(set) var cloudOnly: [TrayItem] = []
     private(set) var downloading: Set<UUID> = []
     private(set) var isSyncing = false
+    /// The last pass left a download or upload in flight, so the foreground
+    /// poll should come back in seconds rather than a full interval.
+    private(set) var settling = false
     /// Steps done and to do in the pass that is running.
     private(set) var done = 0
     private(set) var total = 0
@@ -328,6 +336,10 @@ final class CloudSync {
         var cloudOnly: [TrayItem] = []
         var synced: Set<UUID> = []
         var pendingUploads = 0
+        /// This pass left something mid-flight -- a download just asked for, or
+        /// an upload iCloud has not sent yet -- so the poll should look again
+        /// in seconds rather than waiting a full idle interval.
+        var settling = false
         var lines: [String] = []
     }
 
@@ -348,6 +360,7 @@ final class CloudSync {
             self.synced = outcome.synced
             cloudOnly = outcome.cloudOnly
             pendingUploads = outcome.pendingUploads
+            settling = outcome.settling
             record(outcome.lines)
             lastSync = Date()
             lastError = nil
@@ -414,6 +427,7 @@ final class CloudSync {
         outcome.synced = inStep
         outcome.cloudOnly = plan.cloudOnly.compactMap { listing.items[$0] }
         outcome.pendingUploads = local.filter { inStep.contains($0.id) && !folder.isUploaded($0) }.count
+        outcome.settling = !listing.pendingDownloads.isEmpty || outcome.pendingUploads > 0
         return outcome
     }
 
