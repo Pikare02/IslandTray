@@ -50,6 +50,12 @@ Dynamic Island がその取っ手になります。作業中に放り込んで�
 
 | バージョン | 主な変更 |
 |---|---|
+| [1.7.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.7.0) | アプリドロワー（ラボ機能）：トレイの下に全画面のショートカット一覧。空のときは時計と天気を表示 |
+| [1.6.2](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.2) | iCloud 同期で別デバイスの変更がより速く反映されるように |
+| [1.6.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.1) | セットアップの案内を分かりやすく。「状態」を「外観」のすぐ下に |
+| [1.6.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.6.0) | iCloud 同期を通常機能に。設定の並びを変更 |
+| [1.5.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.5.0) | 「重要なアップデートを毎回知らせる」設定を追加。クリップボードから取り出しても消えないように |
+| [1.4.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.4.0) | ダイナミックアイランドの表示でダイアログを置き換え。中身も検索（テキストと画像 OCR）。ショートカットが「常に許可」を記憶 |
 | [1.3.1](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.1) | フォルダの取り込みを改善し、共有シートのショートカットにも対応。失敗したドロップは理由を表示 |
 | [1.3.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.3.0) | フォルダをそのままトレイに入れ、フォルダのまま取り出せるように |
 | [1.2.0](https://github.com/Pikare02/IslandTray/releases/tag/v1.2.0) | クリップボードからコピー（名前をタップ・右スワイプ・長押し）。共有シートのショートカットで追加するとアイランドがすぐ更新 |
