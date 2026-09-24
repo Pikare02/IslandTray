@@ -36,6 +36,14 @@ actor WeatherProvider {
         }
     }
 
+    /// Drops the cached reading so the next `current()` refetches. Call when
+    /// the location changes: the cache is not keyed by location, so without
+    /// this a location change keeps showing the old place's temperature until
+    /// the reading goes stale (`maxAge`).
+    func invalidate() {
+        TraySettings.store.removeObject(forKey: Self.cacheKey)
+    }
+
     /// Cached reading if fresh; otherwise fetch, cache, and return it. Returns
     /// the stale cache (or nil) if the fetch fails — never blocks the island.
     func current() async -> Reading? {
