@@ -25,6 +25,7 @@
 "diag.export.failed" = "could not delete: %@";
 "diag.handover.denied" = "handover: background time refused";
 "diag.handover.granted" = "handover: background time granted";
+"drawer.more" = "More";
 "dup.add" = "Add anyway";
 "dup.keep" = "Don't add";
 "dup.many" = "%d files have the same contents as files already in the tray. Add them?";

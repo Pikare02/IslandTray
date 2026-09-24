@@ -49,7 +49,8 @@ struct TrayPreviewStrip: View {
     }
 
     private func thumbnail(for preview: TrayContentState.Preview, at index: Int) -> UIImage? {
-        containerThumbnail(for: preview) ?? atlasTile(at: index, filled: preview.hasThumbnail)
+        containerThumbnail(for: preview)
+            ?? (preview.hasThumbnail ? AtlasSlicer.tile(atlas, index: index, count: previews.count) : nil)
     }
 
     private func containerThumbnail(for preview: TrayContentState.Preview) -> UIImage? {
@@ -57,23 +58,5 @@ struct TrayPreviewStrip: View {
         let url = TrayContainer.thumbsDirectory.appendingPathComponent("\(preview.id).png")
         guard let data = try? Data(contentsOf: url) else { return nil }
         return UIImage(data: data)
-    }
-
-    /// The `index`-th square tile of the strip.
-    ///
-    /// The tile side is derived rather than carried in the content state: the
-    /// strip is always `previews.count` squares wide, so the width alone
-    /// determines it. A strip whose width is not a whole multiple of the
-    /// count -- which would mean it was built for a different preview list --
-    /// is refused rather than sliced at an offset.
-    private func atlasTile(at index: Int, filled: Bool) -> UIImage? {
-        guard filled, let atlas, !previews.isEmpty,
-              let image = UIImage(data: atlas)?.cgImage else { return nil }
-        let tile = image.height
-        guard tile > 0, image.width == tile * previews.count, index < previews.count else { return nil }
-        guard let cropped = image.cropping(
-            to: CGRect(x: tile * index, y: 0, width: tile, height: tile)
-        ) else { return nil }
-        return UIImage(cgImage: cropped)
     }
 }

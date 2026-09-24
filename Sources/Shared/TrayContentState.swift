@@ -157,6 +157,9 @@ struct TrayContentState: Codable, Hashable {
     var hasPreviousPage: Bool { page > 0 }
     var hasNextPage: Bool { (page + 1) * Self.maxPreviews < count }
 
+    /// The drawer can be entered from the tray view when drawer slots exist.
+    var drawerAvailable: Bool { drawer?.isEmpty == false || view == .drawer }
+
     /// The items one page shows, clamped so a page beyond the end shows the
     /// last one rather than nothing.
     ///

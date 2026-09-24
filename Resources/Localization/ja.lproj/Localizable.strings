@@ -25,6 +25,7 @@
 "diag.export.failed" = "削除できず: %@";
 "diag.handover.denied" = "持ち出し: 背景時間不可";
 "diag.handover.granted" = "持ち出し: 背景時間確保";
+"drawer.more" = "もっと見る";
 "dup.add" = "追加する";
 "dup.keep" = "追加しない";
 "dup.many" = "%d 件が、すでにトレイにあるファイルと同じ内容です。追加しますか？";
