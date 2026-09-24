@@ -47,7 +47,9 @@
 "drawer.settings.cityFailed" = "その都市が見つかりませんでした";
 "drawer.settings.enable" = "アプリドロワー";
 "drawer.settings.location" = "天気の場所";
-"drawer.settings.manual" = "都市を指定";
+"drawer.settings.manual" = "地図で指定";
+"drawer.settings.pickOnMap" = "地図で選択";
+"drawer.settings.pinTitle" = "場所をピン";
 "drawer.settings.title" = "アプリドロワー";
 "drawer.settings.lockScreen" = "ロック画面に常にドロワーを表示";
 "drawer.settings.unit" = "気温の単位";

@@ -8,6 +8,25 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.8.0] — 2026-09-25
+
+### Labs — App Drawer
+- The background image can now be framed with a pan-and-zoom crop when you pick
+  it, the same as custom icons.
+- The background colour palette now includes black (the default) and remembers
+  your recent colours, with a “Default” button that resets to black.
+- Picking a background colour now clears any background image, so the colour
+  shows instead of the photo staying on top.
+- Background changes apply immediately instead of after a short delay.
+
+### Weather
+- Switching between °C and °F now converts the temperature at once; it used to
+  keep the old number until the next refresh.
+- Pick the weather location on a map with a pin instead of typing a city name.
+- The Dynamic Island temperature refreshes roughly hourly on its own, without
+  opening the app. (iOS decides the exact timing; a pinned location always
+  updates, auto-location may not in the background.)
+
 ## [1.7.0] — 2026-09-24
 
 ### Labs

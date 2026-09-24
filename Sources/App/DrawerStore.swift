@@ -62,5 +62,9 @@ final class DrawerStore: Sendable {
         let url = dir.appendingPathComponent("background.jpg")
         if let data { try? data.write(to: url, options: .atomic) }
         else { try? FileManager.default.removeItem(at: url) }
+        // The file URL is not observable; bump a counter so views watching it
+        // (@AppStorage "drawerBackgroundVersion") reload the image at once.
+        let store = TraySettings.store
+        store.set(store.integer(forKey: "drawerBackgroundVersion") + 1, forKey: "drawerBackgroundVersion")
     }
 }

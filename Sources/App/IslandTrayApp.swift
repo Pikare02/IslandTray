@@ -1,3 +1,4 @@
+import BackgroundTasks
 import SwiftUI
 import UserNotifications
 
@@ -51,8 +52,30 @@ struct IslandTrayApp: App {
             // eight-hour window resets even if the Shortcuts automation missed.
             if phase == .active {
                 Task { await TrayActivityController.shared.restart() }
+            } else if phase == .background {
+                // Queue the hourly weather refresh; iOS decides the exact time.
+                Self.scheduleWeatherRefresh()
             }
         }
+        // Wakes the app roughly hourly to refresh the island's temperature
+        // without the app being opened. iOS throttles this by usage, so the
+        // hour is a floor, not a guarantee. Auto-location may fail in the
+        // background (when-in-use); a pinned location always resolves.
+        .backgroundTask(.appRefresh(Self.weatherRefreshID)) {
+            await TrayActivityController.shared.syncFromStore()
+            Self.scheduleWeatherRefresh()
+        }
+    }
+
+    static let weatherRefreshID = "com.pikare.islandtray.weather"
+
+    /// Submits the next hourly refresh. Replaces any pending one with the same
+    /// identifier, so calling it on every background transition is safe.
+    /// `nonisolated` so the `@Sendable` background-task closure can call it.
+    nonisolated static func scheduleWeatherRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: weatherRefreshID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 3600)
+        try? BGTaskScheduler.shared.submit(request)
     }
 
     /// `nil` means "whatever the device is set to", which is what SwiftUI

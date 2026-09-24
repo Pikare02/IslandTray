@@ -323,7 +323,7 @@ actor TrayActivityController {
 
     /// Builds the date/weather + drawer-slots state from what is on disk.
     /// Weather strings are all inherently tiny (`WeatherFormat.dateText`,
-    /// `WeatherProvider.Reading.tempText`, an SF Symbol name) -- never put an
+    /// `WeatherFormat.temperature(...)` output, an SF Symbol name) -- never put an
     /// unbounded string here, or `makeDrawer`'s floor guarantee stops holding.
     private func drawerContentState(count: Int, view: TrayContentState.View,
                                      settings: TraySettings, fetchWeather: Bool = true) async -> TrayContentState {
@@ -334,7 +334,8 @@ actor TrayActivityController {
         let weather = reading.map {
             TrayContentState.Weather(
                 dateText: WeatherFormat.dateText(Date(), language: settings.language),
-                tempText: $0.tempText, symbol: $0.symbol
+                tempText: WeatherFormat.temperature(celsius: $0.celsius, unit: settings.temperatureUnit),
+                symbol: $0.symbol
             )
         } ?? TrayContentState.Weather(
             dateText: WeatherFormat.dateText(Date(), language: settings.language),
