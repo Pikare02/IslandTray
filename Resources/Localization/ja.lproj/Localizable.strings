@@ -208,6 +208,8 @@
 "update.open" = "インストールページを開く";
 "update.later" = "あとで";
 "update.skip" = "このバージョンは今後表示しない";
+"update.notify.title" = "重要なアップデート";
+"update.notify.body" = "バージョン %@ が利用できます。";
 "settings.export.deleteOriginal" = "元のファイルも削除する";
 "clipboard.result.added" = "クリップボードに追加されました";
 "clipboard.result.partial" = "%1$d 件をクリップボードに追加しました（%2$d 件は追加できませんでした）";

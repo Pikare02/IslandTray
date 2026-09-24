@@ -1,4 +1,14 @@
 import SwiftUI
+import UserNotifications
+
+/// Lets the important-update notification's banner show even though the
+/// launch-time check that schedules it runs while the app is foreground --
+/// without this, UNUserNotificationCenter suppresses a foreground banner.
+final class NotificationForeground: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async
+        -> UNNotificationPresentationOptions { [.banner, .sound] }
+}
 
 @main
 struct IslandTrayApp: App {
@@ -6,6 +16,13 @@ struct IslandTrayApp: App {
     /// At the window, not on a view inside it, so sheets and the preview
     /// inherit the choice rather than each having to be told.
     @AppStorage("theme", store: TraySettings.store) private var theme = ""
+    /// Held so it isn't deallocated the instant `init()` returns -- the
+    /// delegate property on `UNUserNotificationCenter` is weak.
+    private let notificationForeground = NotificationForeground()
+
+    init() {
+        UNUserNotificationCenter.current().delegate = notificationForeground
+    }
 
     var body: some Scene {
         WindowGroup {

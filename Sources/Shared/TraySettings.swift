@@ -43,6 +43,7 @@ struct TraySettings {
         static let theme = "theme"
         static let checksForUpdates = "checksForUpdates"
         static let skippedUpdateVersion = "skippedUpdateVersion"
+        static let notifiedUpdateVersion = "notifiedUpdateVersion"
         static let insistsOnImportantUpdates = "insistsOnImportantUpdates"
         static let cloudSyncEnabled = "cloudSyncEnabled"
         static let appDrawerEnabled = "appDrawerEnabled"
@@ -143,6 +144,13 @@ struct TraySettings {
     var skippedUpdateVersion: String? {
         get { defaults.string(forKey: Keys.skippedUpdateVersion) }
         nonmutating set { defaults.set(newValue, forKey: Keys.skippedUpdateVersion) }
+    }
+
+    /// The version we already fired a one-time local notification for, so an
+    /// important update notifies once, not every launch. nil = never notified.
+    var notifiedUpdateVersion: String? {
+        get { defaults.string(forKey: Keys.notifiedUpdateVersion) }
+        nonmutating set { defaults.set(newValue, forKey: Keys.notifiedUpdateVersion) }
     }
 
     /// Whether an important update is shown every launch until the app is

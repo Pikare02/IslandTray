@@ -208,6 +208,8 @@
 "update.open" = "Open Install Page";
 "update.later" = "Later";
 "update.skip" = "Don’t Show Again for This Version";
+"update.notify.title" = "Important update";
+"update.notify.body" = "Version %@ is available.";
 "settings.export.deleteOriginal" = "Also delete the original file";
 "clipboard.result.added" = "Added to the clipboard";
 "clipboard.result.partial" = "Added %1$d to the clipboard (%2$d could not be added)";

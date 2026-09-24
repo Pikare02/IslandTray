@@ -80,6 +80,7 @@ struct TrayView: View {
                    insisting: settings.insistsOnImportantUpdates
                ) {
                 availableUpdate = update
+                await UpdateNotifier.notifyIfNeeded(update)
             }
         }
         .task {
