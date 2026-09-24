@@ -44,6 +44,14 @@
 "drawer.open" = "Open App Drawer";
 "drawer.pickApp" = "Choose App";
 "drawer.removeBackgroundImage" = "Remove Background Image";
+"drawer.settings.auto" = "Current Location";
+"drawer.settings.city" = "City";
+"drawer.settings.cityFailed" = "Couldn't find that city";
+"drawer.settings.enable" = "App Drawer";
+"drawer.settings.location" = "Weather Location";
+"drawer.settings.manual" = "Set a City";
+"drawer.settings.title" = "App Drawer (Labs)";
+"drawer.settings.unit" = "Temperature Unit";
 "drawer.shortcutName" = "Shortcut Name";
 "drawer.showNames" = "Show App Names";
 "drawer.title" = "App Drawer";

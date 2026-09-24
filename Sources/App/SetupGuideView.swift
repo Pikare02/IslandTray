@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import SwiftUI
 
@@ -25,11 +26,53 @@ struct SetupGuideView: View {
     /// holds the picker's side of that between the two.
     @State private var customColor = Color.accentColor
     @State private var showDrawer = false
+    // Literal keys, matching the convention `DrawerEditorView` already uses
+    // for these same App Group keys (`TraySettings.Keys` is private).
+    @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
+    @AppStorage("showAppNames", store: TraySettings.store) private var showAppNames = true
+    @AppStorage("temperatureUnit", store: TraySettings.store) private var temperatureUnit = "c"
+    @AppStorage("weatherLocationMode", store: TraySettings.store) private var weatherLocationMode = "auto"
+    @AppStorage("weatherManualName", store: TraySettings.store) private var manualCityName = ""
+    @AppStorage("drawerBackgroundHex", store: TraySettings.store) private var drawerBackgroundHex = "000000"
+    /// The system picker's side of `drawerBackgroundHex`, same split as `customColor`/`accent`.
+    @State private var drawerBgColor = Color.black
+    @State private var geocodeFailed = false
 
     var body: some View {
         NavigationStack {
             List {
                 CloudSettingsSection(model: model)
+
+                Section {
+                    Toggle(L.s("drawer.settings.enable"), isOn: $appDrawerEnabled)
+                        .onChange(of: appDrawerEnabled) { _, _ in
+                            Task { await TrayActivityController.shared.restart() }
+                        }
+                    if appDrawerEnabled {
+                        Toggle(L.s("drawer.showNames"), isOn: $showAppNames)
+                        Picker(L.s("drawer.settings.unit"), selection: $temperatureUnit) {
+                            Text("°C").tag("c")
+                            Text("°F").tag("f")
+                        }
+                        Picker(L.s("drawer.settings.location"), selection: $weatherLocationMode) {
+                            Text(L.s("drawer.settings.auto")).tag("auto")
+                            Text(L.s("drawer.settings.manual")).tag("manual")
+                        }
+                        if weatherLocationMode == "manual" {
+                            TextField(L.s("drawer.settings.city"), text: $manualCityName)
+                                .onSubmit { geocodeManualCity() }
+                            if geocodeFailed {
+                                Text(L.s("drawer.settings.cityFailed"))
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        drawerBackgroundRow
+                        Button(L.s("drawer.open")) { showDrawer = true }
+                    }
+                } header: {
+                    Text(L.s("drawer.settings.title"))
+                }
 
                 Section {
                     LabeledContent(L.s("settings.update.current"), value: UpdateChecker.currentVersion)
@@ -77,12 +120,6 @@ struct SetupGuideView: View {
                             TraySettings().showActivityWhenEmpty = newValue
                             Task { await model.syncActivity() }
                         }
-                    // Only reachable once the island's tray/drawer switch has
-                    // turned the drawer on -- otherwise there is nothing on
-                    // the island for this screen's edits to show up in.
-                    if TraySettings().appDrawerEnabled {
-                        Button(L.s("drawer.open")) { showDrawer = true }
-                    }
                 } header: {
                     Text(L.s("settings.behaviour.section"))
                 } footer: {
@@ -300,6 +337,68 @@ struct SetupGuideView: View {
         accent = hex
         AccentColor.remember(hex)
         customColor = AccentColor.color(forHex: hex) ?? .accentColor
+    }
+
+    /// Same swatches-plus-system-picker shape as `accentRow`, over
+    /// `drawerBackgroundHex` instead of `accent`. No recents list: that is
+    /// specific to the app-wide accent, not this one background.
+    private var drawerBackgroundRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L.s("drawer.background"))
+            HStack(spacing: 10) {
+                ForEach(AccentColor.common, id: \.self) { hex in
+                    Button {
+                        chooseDrawerBackground(hex)
+                    } label: {
+                        Circle()
+                            .fill(AccentColor.color(forHex: hex) ?? .clear)
+                            .frame(width: 28, height: 28)
+                            .overlay {
+                                if hex.caseInsensitiveCompare(drawerBackgroundHex) == .orderedSame {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+            }
+            ColorPicker(L.s("settings.accent.custom"), selection: $drawerBgColor, supportsOpacity: false)
+                .onChange(of: drawerBgColor) { _, picked in
+                    chooseDrawerBackground(AccentColor.hex(for: picked))
+                }
+        }
+        .padding(.vertical, 4)
+        .onAppear {
+            drawerBgColor = AccentColor.color(forHex: drawerBackgroundHex) ?? .black
+        }
+    }
+
+    private func chooseDrawerBackground(_ hex: String) {
+        drawerBackgroundHex = hex
+        drawerBgColor = AccentColor.color(forHex: hex) ?? .black
+    }
+
+    /// Resolves the typed city to coordinates and stores them for
+    /// `WeatherProvider` to read; failure just leaves the previous pin (if
+    /// any) in place, flagged by `geocodeFailed`.
+    private func geocodeManualCity() {
+        let name = manualCityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        CLGeocoder().geocodeAddressString(name) { placemarks, _ in
+            DispatchQueue.main.async {
+                guard let coordinate = placemarks?.first?.location?.coordinate else {
+                    geocodeFailed = true
+                    return
+                }
+                geocodeFailed = false
+                TraySettings().weatherManualLat = coordinate.latitude
+                TraySettings().weatherManualLon = coordinate.longitude
+                TraySettings().weatherManualName = name
+            }
+        }
     }
 
     private func checkForUpdates() async {
