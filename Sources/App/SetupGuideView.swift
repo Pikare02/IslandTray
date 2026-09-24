@@ -24,6 +24,7 @@ struct SetupGuideView: View {
     /// The system picker works in `Color`, the setting is stored as hex; this
     /// holds the picker's side of that between the two.
     @State private var customColor = Color.accentColor
+    @State private var showDrawer = false
 
     var body: some View {
         NavigationStack {
@@ -76,6 +77,12 @@ struct SetupGuideView: View {
                             TraySettings().showActivityWhenEmpty = newValue
                             Task { await model.syncActivity() }
                         }
+                    // Only reachable once the island's tray/drawer switch has
+                    // turned the drawer on -- otherwise there is nothing on
+                    // the island for this screen's edits to show up in.
+                    if TraySettings().appDrawerEnabled {
+                        Button(L.s("drawer.open")) { showDrawer = true }
+                    }
                 } header: {
                     Text(L.s("settings.behaviour.section"))
                 } footer: {
@@ -226,6 +233,7 @@ struct SetupGuideView: View {
                     Button(L.s("common.done")) { dismiss() }
                 }
             }
+            .fullScreenCover(isPresented: $showDrawer) { DrawerEditorView() }
         }
     }
 

@@ -12,6 +12,10 @@ struct TrayView: View {
     @Environment(\.openURL) private var openURL
     /// A newer release found on launch, offered once per launch.
     @State private var availableUpdate: UpdateChecker.Update?
+    /// Opened from the island's drawer/tray toggle deep link. A separate
+    /// cover from `BoardView`'s `previewing` one -- different screen,
+    /// different state, so the two never fight over which is presented.
+    @State private var showDrawer = false
 
     var body: some View {
         TabView {
@@ -107,6 +111,8 @@ struct TrayView: View {
         .onReceive(NotificationCenter.default.publisher(for: TrayStore.didChangeFromIntentNotification)) { _ in
             model.reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in showDrawer = true }
+        .fullScreenCover(isPresented: $showDrawer) { DrawerEditorView() }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
             // tray now: the receiving app has finished copying by the time the
