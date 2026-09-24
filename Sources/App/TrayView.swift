@@ -16,6 +16,8 @@ struct TrayView: View {
     @State private var tab = "tray"
     /// Labs: the drawer tab only exists while the feature is on.
     @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
+    /// A tray item the island asked to preview, until the tray board opens it.
+    @State private var openRequest: UUID?
 
     var body: some View {
         TabView(selection: $tab) {
@@ -24,7 +26,7 @@ struct TrayView: View {
                     .tabItem { Label(L.s("drawer.title"), systemImage: "square.grid.3x3") }
                     .tag("drawer")
             }
-            BoardView(board: .tray, model: model)
+            BoardView(board: .tray, model: model, openRequest: $openRequest)
                 .tabItem { Label(L.s("tray.title"), systemImage: "tray") }
                 .tag("tray")
             BoardView(board: .clipboard, model: model)
@@ -123,6 +125,11 @@ struct TrayView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
             if appDrawerEnabled { tab = "drawer" }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openTrayItem)) { note in
+            guard let id = note.object as? UUID else { return }
+            tab = "tray"
+            openRequest = id
+        }
         .onChange(of: appDrawerEnabled) { _, on in if !on && tab == "drawer" { tab = "tray" } }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
@@ -166,6 +173,8 @@ struct BoardView: View {
     /// whatever the query and the scope pick out of both.
     let board: TrayBoard?
     let model: TrayModel
+    /// Set by the island's thumbnail links; the tray board previews it.
+    @Binding var openRequest: UUID?
 
     @State private var showsSetupGuide = false
     @State private var filter = TrayFilter()
@@ -183,9 +192,10 @@ struct BoardView: View {
     /// as a grid of thumbnails, while a clipboard reads as a timeline.
     @AppStorage private var layoutRaw: String
 
-    init(board: TrayBoard?, model: TrayModel) {
+    init(board: TrayBoard?, model: TrayModel, openRequest: Binding<UUID?> = .constant(nil)) {
         self.board = board
         self.model = model
+        _openRequest = openRequest
         _layoutRaw = AppStorage(
             wrappedValue: board == .tray ? TrayLayout.grid.rawValue : TrayLayout.list.rawValue,
             "layout.\(board?.rawValue ?? "search")",
@@ -285,6 +295,11 @@ struct BoardView: View {
                 }
             }
             .sheet(isPresented: $showsSetupGuide) { SetupGuideView(model: model) }
+            // Re-tried when the items change: on a cold launch the link
+            // arrives before the tray has been read off disk.
+            .onChange(of: openRequest) { _, _ in openRequested() }
+            .onChange(of: model.items) { _, _ in openRequested() }
+            .onAppear { openRequested() }
             .fullScreenCover(item: $previewing) { item in
                 QuickLookView(url: item.fileURL, name: item.name) { previewing = nil }
                     .ignoresSafeArea()
@@ -317,6 +332,17 @@ struct BoardView: View {
         // claiming a count.
         .onChange(of: items.map(\.id)) { _, ids in
             selection.formIntersection(ids)
+        }
+    }
+
+    private func openRequested() {
+        guard let id = openRequest, let item = model.items.first(where: { $0.id == id }) else { return }
+        openRequest = nil
+        showsSetupGuide = false
+        if model.cloud.isCloudOnly(item.id) {
+            Task { await model.download(item) }
+        } else {
+            previewing = item
         }
     }
 

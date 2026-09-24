@@ -35,6 +35,8 @@ files attached on GitHub.
 - Fixed: tapping a shortcut in the expanded island only opened IslandTray.
   A Live Activity link always opens its own app, so the app now passes the
   shortcut's URL on.
+- Tapping a tray thumbnail in the island (or on the Lock Screen) opens that
+  item's preview in the app.
 - New toggle: *Always show drawer on Lock Screen* — the Lock Screen activity
   shows the drawer's first six icons whatever the tray holds.
 

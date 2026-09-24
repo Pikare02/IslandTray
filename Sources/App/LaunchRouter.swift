@@ -4,6 +4,8 @@ enum LaunchRoute: Equatable {
     case drop
     case drawer
     case launch(UUID)
+    /// A tray thumbnail tapped in the island: preview that item.
+    case open(UUID)
     /// A drawer slot's own URL (web, `shortcuts://`, another app's scheme).
     /// A Live Activity's `Link` always opens this app with the URL rather
     /// than the target, so the app has to pass it on.
@@ -19,11 +21,11 @@ enum LaunchRouter {
         switch url.host {
         case "drop": return .drop
         case "drawer": return .drawer
-        case "launch":
+        case "launch", "open":
             let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
             guard let raw = comps?.queryItems?.first(where: { $0.name == "item" })?.value,
                   let id = UUID(uuidString: raw) else { return .ignore }
-            return .launch(id)
+            return url.host == "open" ? .open(id) : .launch(id)
         default: return .ignore
         }
     }
@@ -48,4 +50,6 @@ enum LaunchRouter {
 
 extension Notification.Name {
     static let openDrawer = Notification.Name("openDrawer")
+    /// `object` is the tray item's UUID.
+    static let openTrayItem = Notification.Name("openTrayItem")
 }

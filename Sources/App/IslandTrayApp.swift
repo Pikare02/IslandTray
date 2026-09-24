@@ -34,6 +34,8 @@ struct IslandTrayApp: App {
                         NotificationCenter.default.post(name: .openDrawer, object: nil)
                     case .launch(let id):
                         LaunchRouter.performLaunch(id)
+                    case .open(let id):
+                        NotificationCenter.default.post(name: .openTrayItem, object: id)
                     case .external(let url):
                         UIApplication.shared.open(url)
                     case .drop, .ignore:

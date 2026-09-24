@@ -17,6 +17,9 @@ struct TrayPreviewStrip: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(Array(previews.enumerated()), id: \.element.id) { index, preview in
+                // Each tile opens its own item's preview, over the
+                // presentation-wide drop link.
+                Link(destination: TrayIDs.openURL(item: preview.id) ?? TrayIDs.dropURL) {
                 VStack(spacing: 2) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -43,6 +46,7 @@ struct TrayPreviewStrip: View {
                         // still narrow enough that four of them fit the
                         // island's bottom region.
                         .frame(width: side * 1.5)
+                }
                 }
             }
         }

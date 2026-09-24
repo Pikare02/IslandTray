@@ -8,6 +8,7 @@ final class LaunchRouterTests: XCTestCase {
         let id = UUID()
         XCTAssertEqual(LaunchRouter.route(URL(string: "islandtray://launch?item=\(id.uuidString)")!), .launch(id))
         XCTAssertEqual(LaunchRouter.route(URL(string: "islandtray://launch?item=notauuid")!), .ignore)
+        XCTAssertEqual(LaunchRouter.route(URL(string: "islandtray://open?item=\(id.uuidString)")!), .open(id))
         XCTAssertEqual(LaunchRouter.route(URL(string: "https://example.com")!), .external(URL(string: "https://example.com")!))
         XCTAssertEqual(LaunchRouter.route(URL(string: "shortcuts://run-shortcut?name=A")!),
                        .external(URL(string: "shortcuts://run-shortcut?name=A")!))
