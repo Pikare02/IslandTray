@@ -19,6 +19,23 @@ final class TrayContentStateDrawerTests: XCTestCase {
         XCTAssertEqual(state.view, .drawer)
     }
 
+    func testDrawerDegradesWhenSlotsTooBig() {
+        // Six slots whose launch URLs are far too big to all fit, even without
+        // an atlas: the state must still come back within the hard cap, with
+        // fewer slots rather than an over-limit payload.
+        let bigURL = "https://example.com/?q=" + String(repeating: "a", count: 900)
+        let slots = (0..<6).map { i in
+            TrayContentState.DrawerSlot(symbol: "app", name: "App\(i)", launch: bigURL, hasIcon: false)
+        }
+        let state = TrayContentState.makeDrawer(
+            weather: .init(dateText: "9/24 木", tempText: "21°", symbol: "sun.max"),
+            slots: slots, atlas: nil, view: .drawer, count: 0
+        )
+        XCTAssertLessThanOrEqual(state.encodedByteCount, TrayContentState.maxEncodedBytes)
+        XCTAssertLessThan(state.drawer?.count ?? 0, 6) // some slots were shed to fit
+        XCTAssertNotNil(state.weather)                 // weather is always retained
+    }
+
     func testDefaultsAbsentWhenTrayState() {
         let state = TrayContentState.make(from: [], atlas: nil)
         XCTAssertNil(state.weather)

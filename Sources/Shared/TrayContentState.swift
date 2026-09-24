@@ -279,24 +279,37 @@ struct TrayContentState: Codable, Hashable {
         TrayContentState(count: count, recent: [], atlas: nil)
     }
 
-    /// Empty-tray drawer/weather state. `slots` capped to `maxSlots`; the atlas
-    /// (one tile per slot) is dropped whole if the state would exceed budget,
-    /// exactly like `make(from:atlas:)`.
+    /// Empty-tray drawer/weather state, kept within the encoded-size cap the
+    /// same way `make(from:atlas:)` is. Slot names are capped like preview names
+    /// (`islandName`); launch URLs are never truncated (a cut URL is a dead
+    /// link), so when even the atlas-dropped state is still too big, whole slots
+    /// are shed from the end until it fits — worst case an empty drawer showing
+    /// only the tiny weather line. `slots` is capped to `maxSlots` first.
     static func makeDrawer(weather: Weather?, slots: [DrawerSlot], atlas: Atlas?,
                            view: View, count: Int) -> TrayContentState {
-        let capped = Array(slots.prefix(maxSlots))
+        let capped = Array(slots.prefix(maxSlots)).map {
+            DrawerSlot(symbol: $0.symbol, name: islandName($0.name), launch: $0.launch, hasIcon: $0.hasIcon)
+        }
         let withAtlas = TrayContentState(
             count: count, recent: [], atlas: atlas?.jpeg, page: 0, added: nil,
             weather: weather, drawer: capped, view: view
         )
         if withAtlas.encodedByteCount <= buildBudget { return withAtlas }
-        let noIcons = capped.map {
-            DrawerSlot(symbol: $0.symbol, name: $0.name, launch: $0.launch, hasIcon: false)
+
+        // Drop the atlas, then shed slots from the end until the symbol-only
+        // state fits under the hard cap. `kept.isEmpty` is the floor: weather
+        // alone is a few dozen bytes and always fits.
+        var kept = capped
+        while true {
+            let candidate = TrayContentState(
+                count: count, recent: [], atlas: nil, page: 0, added: nil,
+                weather: weather,
+                drawer: kept.map { DrawerSlot(symbol: $0.symbol, name: $0.name, launch: $0.launch, hasIcon: false) },
+                view: view
+            )
+            if candidate.encodedByteCount <= maxEncodedBytes || kept.isEmpty { return candidate }
+            kept.removeLast()
         }
-        return TrayContentState(
-            count: count, recent: [], atlas: nil, page: 0, added: nil,
-            weather: weather, drawer: noIcons, view: view
-        )
     }
 
     /// `name` capped to `maxNameBytes`, cut in the middle so the extension
