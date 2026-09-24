@@ -13,7 +13,8 @@ final class WeatherFormatTests: XCTestCase {
 
     func testTemperature() {
         XCTAssertEqual(WeatherFormat.temperature(celsius: 21.4, unit: "c"), "21°")
-        XCTAssertEqual(WeatherFormat.temperature(celsius: 21.4, unit: "f"), "70°")
+        // 21.4°C = 70.52°F, rounds to 71°
+        XCTAssertEqual(WeatherFormat.temperature(celsius: 21.4, unit: "f"), "71°")
     }
 
     func testDateText() {

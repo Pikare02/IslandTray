@@ -21,10 +21,7 @@ enum WeatherFormat {
 
     static func temperature(celsius: Double, unit: String) -> String {
         let value = unit == "f" ? celsius * 9 / 5 + 32 : celsius
-        // ponytail: brief's `.rounded()` gives "71°" for the brief's own
-        // 21.4°C→f test (70.52 rounds up), but the test pins "70°". Truncating
-        // reconciles both this case and the °C case without touching the test.
-        return "\(Int(value))°"
+        return "\(Int(value.rounded()))°"
     }
 
     /// ja: "9/24 木". en (and anything else): "SEP 24 THU".
