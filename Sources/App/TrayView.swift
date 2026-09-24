@@ -89,11 +89,18 @@ struct TrayView: View {
         // tap -- never takes the app out of the foreground, so the scene-phase
         // reload below would not see its item until the next visit.
         // Every change on this device goes up, and while the app is in front
-        // the folder is looked at again every half minute for other devices'.
+        // the folder is looked at again for other devices'. Normally every 15
+        // seconds; but a pass that just asked iCloud for a file cannot read it
+        // until the next one, so while something is still settling it looks
+        // again in a few seconds rather than leaving the change stuck behind a
+        // whole idle interval.
+        // ponytail: fixed 4s while settling; a download iCloud never completes
+        // (offline) keeps it at 4s until foreground ends -- add a retry cap if
+        // that ever shows up as battery drain.
         .task(id: model.items.map(\.id)) { await model.syncCloud() }
         .task(id: scenePhase) {
             while scenePhase == .active, !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(model.cloud.settling ? 4 : 15))
                 await model.syncCloud()
             }
         }

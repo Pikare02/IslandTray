@@ -8,6 +8,15 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.6.2] — 2026-09-24
+
+### iCloud Sync
+- Another device's changes show up faster. While the app is open it now looks
+  at the folder every 15 seconds instead of 30, and the moment it has asked
+  iCloud for a new entry it checks again in a few seconds rather than waiting a
+  whole cycle to read it — so a new item no longer sits behind two full
+  intervals before it appears.
+
 ## [1.6.1] — 2026-09-24
 
 ### Settings
