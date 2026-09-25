@@ -8,6 +8,15 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.8.3] — 2026-09-25
+
+### Labs — App Drawer
+- The “App Drawer” title is back, and now hides and reappears together with the
+  rest of the chrome.
+- Opening the drawer from the Dynamic Island / Live Activity now starts with the
+  chrome already hidden, for a cleaner full-screen view. Opening it from the tab
+  bar still shows the chrome briefly before it fades.
+
 ## [1.8.2] — 2026-09-25
 
 ### Labs — App Drawer
