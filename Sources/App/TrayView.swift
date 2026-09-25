@@ -18,14 +18,19 @@ struct TrayView: View {
     @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
     /// A tray item the island asked to preview, until the tray board opens it.
     @State private var openRequest: UUID?
-    /// True while the last drawer open came from the island/Live Activity, so
-    /// the drawer page can start with its chrome hidden. The drawer clears it.
+    /// Whether the drawer page's chrome (title, top-bar buttons, tab bar) is
+    /// showing. Owned here so navigation decides the starting state and
+    /// incidental re-renders (e.g. an alert appearing) never flip it; the
+    /// drawer itself fades and re-reveals it from there.
+    @State private var drawerChromeVisible = true
+    /// Set the instant an island/Live-Activity open is routed, so the tab
+    /// change below can tell it apart from a tab-bar tap. Consumed there.
     @State private var drawerFromIsland = false
 
     var body: some View {
         TabView(selection: $tab) {
             if appDrawerEnabled {
-                DrawerEditorView(enteredFromIsland: $drawerFromIsland)
+                DrawerEditorView(chromeVisible: $drawerChromeVisible)
                     .tabItem { Label(L.s("drawer.title"), systemImage: "square.grid.3x3") }
                     .tag("drawer")
             }
@@ -126,7 +131,15 @@ struct TrayView: View {
             model.reload()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
-            if appDrawerEnabled { drawerFromIsland = true; tab = "drawer" }
+            if appDrawerEnabled {
+                // Island/Live-Activity open is immersive: hide the chrome now
+                // (covers the case where the drawer tab is already selected, so
+                // the tab change below would not fire), and flag it so a real
+                // tab change is not mistaken for a tab-bar tap.
+                drawerFromIsland = true
+                drawerChromeVisible = false
+                tab = "drawer"
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openTray)) { _ in tab = "tray" }
         .onReceive(NotificationCenter.default.publisher(for: .openTrayItem)) { note in
@@ -135,6 +148,12 @@ struct TrayView: View {
             openRequest = id
         }
         .onChange(of: appDrawerEnabled) { _, on in if !on && tab == "drawer" { tab = "tray" } }
+        .onChange(of: tab) { _, newTab in
+            // A tab-bar tap into the drawer reveals the chrome; an island open
+            // set drawerFromIsland just above and keeps it hidden.
+            guard newTab == "drawer" else { return }
+            if drawerFromIsland { drawerFromIsland = false } else { drawerChromeVisible = true }
+        }
         .onChange(of: scenePhase) { _, phase in
             // Items another app took while we were in the background leave the
             // tray now: the receiving app has finished copying by the time the
