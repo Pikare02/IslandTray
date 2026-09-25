@@ -8,6 +8,13 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.8.2] — 2026-09-25
+
+### Labs — App Drawer
+- The App Drawer page now reads like a home screen: its title is gone, and the
+  top-bar buttons and the tab bar fade away after a few seconds. Tap an empty
+  spot to bring them back.
+
 ## [1.8.1] — 2026-09-25
 
 ### Weather
