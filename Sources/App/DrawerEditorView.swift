@@ -28,6 +28,9 @@ struct DrawerEditorView: View {
     /// Bumping `revealToken` restarts the fade timer via `.task(id:)`.
     @State private var chromeVisible = true
     @State private var revealToken = 0
+    /// Set by the parent when the drawer was opened from the island/Live
+    /// Activity; that entry starts with the chrome already hidden.
+    @Binding var enteredFromIsland: Bool
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
 
@@ -83,10 +86,14 @@ struct DrawerEditorView: View {
                     Button { showingSettings = true } label: { Label(L.s("settings.labs"), systemImage: "gearshape") }
                 }
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            // Rides inside the navigation bar, so it hides and shows with the
+            // rest of the chrome via the `.toolbar(...)` visibility above.
+            .navigationTitle(L.s("drawer.title"))
         }
-        .onAppear { withAnimation { chromeVisible = true } }
+        // Entering from the island/Live Activity starts hidden (immersive);
+        // entering by tapping the tab shows the chrome, then it fades.
+        .onAppear { revealOrHide() }
+        .onChange(of: enteredFromIsland) { _, entered in if entered { revealOrHide() } }
         // Re-runs (cancelling the prior sleep) whenever a tap bumps the token,
         // and once on appear: reveal now, fade after the pause.
         .task(id: revealToken) {
@@ -119,6 +126,17 @@ struct DrawerEditorView: View {
     private func showChrome() {
         withAnimation { chromeVisible = true }
         revealToken &+= 1
+    }
+
+    /// On appear (or a repeat island open): island entry starts hidden, a
+    /// normal tab open reveals the chrome and lets it fade.
+    private func revealOrHide() {
+        if enteredFromIsland {
+            enteredFromIsland = false
+            withAnimation { chromeVisible = false }
+        } else {
+            withAnimation { chromeVisible = true }
+        }
     }
 
     @ViewBuilder private func contextMenu(for s: DrawerShortcut) -> some View {

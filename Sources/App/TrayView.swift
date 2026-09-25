@@ -18,11 +18,14 @@ struct TrayView: View {
     @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
     /// A tray item the island asked to preview, until the tray board opens it.
     @State private var openRequest: UUID?
+    /// True while the last drawer open came from the island/Live Activity, so
+    /// the drawer page can start with its chrome hidden. The drawer clears it.
+    @State private var drawerFromIsland = false
 
     var body: some View {
         TabView(selection: $tab) {
             if appDrawerEnabled {
-                DrawerEditorView()
+                DrawerEditorView(enteredFromIsland: $drawerFromIsland)
                     .tabItem { Label(L.s("drawer.title"), systemImage: "square.grid.3x3") }
                     .tag("drawer")
             }
@@ -123,7 +126,7 @@ struct TrayView: View {
             model.reload()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openDrawer)) { _ in
-            if appDrawerEnabled { tab = "drawer" }
+            if appDrawerEnabled { drawerFromIsland = true; tab = "drawer" }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openTray)) { _ in tab = "tray" }
         .onReceive(NotificationCenter.default.publisher(for: .openTrayItem)) { note in
