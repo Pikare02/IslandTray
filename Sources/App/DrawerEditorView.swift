@@ -23,6 +23,11 @@ struct DrawerEditorView: View {
     /// grid does not re-decode the (up to 1600px) JPEG on every render.
     @State private var bgImage: UIImage?
     @Environment(\.openURL) private var openURL
+    /// The top-bar buttons and the tab bar auto-hide so the grid reads like a
+    /// home screen; a tap on empty space brings them back, then they fade again.
+    /// Bumping `revealToken` restarts the fade timer via `.task(id:)`.
+    @State private var chromeVisible = true
+    @State private var revealToken = 0
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
 
@@ -57,6 +62,10 @@ struct DrawerEditorView: View {
                 }
             }
             .background(background.ignoresSafeArea())
+            // A tap on empty space re-reveals the chrome; the grid's buttons
+            // consume their own taps, so this only fires on the gaps/background.
+            .onTapGesture { showChrome() }
+            .toolbar(chromeVisible ? .visible : .hidden, for: .navigationBar, .tabBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -74,7 +83,16 @@ struct DrawerEditorView: View {
                     Button { showingSettings = true } label: { Label(L.s("settings.labs"), systemImage: "gearshape") }
                 }
             }
-            .navigationTitle(L.s("drawer.title"))
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .onAppear { withAnimation { chromeVisible = true } }
+        // Re-runs (cancelling the prior sleep) whenever a tap bumps the token,
+        // and once on appear: reveal now, fade after the pause.
+        .task(id: revealToken) {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation { chromeVisible = false }
         }
         // The grid is always drawn on a dark background, so its bar text must be light.
         .environment(\.colorScheme, .dark)
@@ -95,6 +113,12 @@ struct DrawerEditorView: View {
                     }
             }
         }
+    }
+
+    /// Reveals the chrome and re-arms the auto-hide timer (via `.task(id:)`).
+    private func showChrome() {
+        withAnimation { chromeVisible = true }
+        revealToken &+= 1
     }
 
     @ViewBuilder private func contextMenu(for s: DrawerShortcut) -> some View {
