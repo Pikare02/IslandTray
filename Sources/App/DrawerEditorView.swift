@@ -25,12 +25,11 @@ struct DrawerEditorView: View {
     @Environment(\.openURL) private var openURL
     /// The top-bar buttons and the tab bar auto-hide so the grid reads like a
     /// home screen; a tap on empty space brings them back, then they fade again.
-    /// Bumping `revealToken` restarts the fade timer via `.task(id:)`.
-    @State private var chromeVisible = true
+    /// Owned by the parent so navigation (an island open vs. a tab tap) sets the
+    /// starting state, and incidental re-renders never flip it. Bumping
+    /// `revealToken` restarts the fade timer via `.task(id:)`.
+    @Binding var chromeVisible: Bool
     @State private var revealToken = 0
-    /// Set by the parent when the drawer was opened from the island/Live
-    /// Activity; that entry starts with the chrome already hidden.
-    @Binding var enteredFromIsland: Bool
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
 
@@ -65,9 +64,12 @@ struct DrawerEditorView: View {
                 }
             }
             .background(background.ignoresSafeArea())
-            // A tap on empty space re-reveals the chrome; the grid's buttons
-            // consume their own taps, so this only fires on the gaps/background.
-            .onTapGesture { showChrome() }
+            // A tap anywhere re-reveals the chrome. `simultaneousGesture` is
+            // what makes a tap register across a ScrollView's empty area (a
+            // plain `.onTapGesture` on a ScrollView does not fire there); it
+            // rides alongside the grid buttons and scrolling, so tiles still
+            // launch and the list still scrolls.
+            .simultaneousGesture(TapGesture().onEnded { showChrome() })
             .toolbar(chromeVisible ? .visible : .hidden, for: .navigationBar, .tabBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -90,12 +92,9 @@ struct DrawerEditorView: View {
             // rest of the chrome via the `.toolbar(...)` visibility above.
             .navigationTitle(L.s("drawer.title"))
         }
-        // Entering from the island/Live Activity starts hidden (immersive);
-        // entering by tapping the tab shows the chrome, then it fades.
-        .onAppear { revealOrHide() }
-        .onChange(of: enteredFromIsland) { _, entered in if entered { revealOrHide() } }
         // Re-runs (cancelling the prior sleep) whenever a tap bumps the token,
-        // and once on appear: reveal now, fade after the pause.
+        // and once on appear: fade after the pause (leaving the parent-set
+        // starting state visible until then).
         .task(id: revealToken) {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
@@ -126,17 +125,6 @@ struct DrawerEditorView: View {
     private func showChrome() {
         withAnimation { chromeVisible = true }
         revealToken &+= 1
-    }
-
-    /// On appear (or a repeat island open): island entry starts hidden, a
-    /// normal tab open reveals the chrome and lets it fade.
-    private func revealOrHide() {
-        if enteredFromIsland {
-            enteredFromIsland = false
-            withAnimation { chromeVisible = false }
-        } else {
-            withAnimation { chromeVisible = true }
-        }
     }
 
     @ViewBuilder private func contextMenu(for s: DrawerShortcut) -> some View {

@@ -8,6 +8,15 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.8.4] — 2026-09-25
+
+### Labs — App Drawer
+- Fixed: opening the drawer from the Dynamic Island / Live Activity now reliably
+  starts with the chrome hidden. An incidental redraw (such as the update prompt
+  appearing) could bring it straight back.
+- Fixed: tapping an empty spot now reliably brings the chrome back. The tap was
+  not registering on the grid’s empty area at all.
+
 ## [1.8.3] — 2026-09-25
 
 ### Labs — App Drawer
