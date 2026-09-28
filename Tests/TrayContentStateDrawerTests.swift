@@ -49,5 +49,30 @@ final class TrayContentStateDrawerTests: XCTestCase {
         let decoded = try JSONDecoder().decode(TrayContentState.self, from: legacy)
         XCTAssertEqual(decoded.view, .tray)
         XCTAssertNil(decoded.weather)
+        XCTAssertFalse(decoded.hideLockScreen)
+    }
+
+    func testMinimalFieldsAndHideLockScreenRoundTrip() throws {
+        // The half-island date/weather choice and the hide-Lock-Screen flag
+        // must survive the encode/decode ActivityKit does across processes.
+        let state = TrayContentState.makeDrawer(
+            weather: .init(dateText: "9/24 木", tempText: "21°", symbol: "sun.max",
+                           dayText: "24", showsWeather: true),
+            slots: [], atlas: nil, view: .drawer, count: 0
+        ).hidingLockScreen(true)
+        let decoded = try JSONDecoder().decode(
+            TrayContentState.self, from: JSONEncoder().encode(state))
+        XCTAssertEqual(decoded.weather?.dayText, "24")
+        XCTAssertEqual(decoded.weather?.showsWeather, true)
+        XCTAssertTrue(decoded.hideLockScreen)
+    }
+
+    func testWeatherDecodeToleratesMissingMinimalFields() throws {
+        // An older activity's Weather has no dayText/showsWeather; they default.
+        let legacy = Data(#"{"count":0,"recent":[],"page":0,"view":"drawer","weather":{"dateText":"SEP 24 THU","tempText":"21°","symbol":"sun.max"}}"#.utf8)
+        let decoded = try JSONDecoder().decode(TrayContentState.self, from: legacy)
+        XCTAssertEqual(decoded.weather?.symbol, "sun.max")
+        XCTAssertEqual(decoded.weather?.dayText, "")
+        XCTAssertEqual(decoded.weather?.showsWeather, false)
     }
 }

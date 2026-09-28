@@ -52,6 +52,9 @@
 "drawer.settings.pinTitle" = "場所をピン";
 "drawer.settings.title" = "アプリドロワー";
 "drawer.settings.lockScreen" = "ロック画面に常にドロワーを表示";
+"drawer.settings.halfIsland" = "ハーフアイランドの表示";
+"drawer.settings.halfIsland.date" = "日付";
+"drawer.settings.halfIsland.weather" = "天気";
 "drawer.settings.unit" = "気温の単位";
 "drawer.shortcutName" = "ショートカット名";
 "drawer.showNames" = "アプリ名を表示";
@@ -85,6 +88,7 @@
 "settings.activity.footer" = "オンにすると、アプリがバックグラウンドで生きている間はトレイが空でもアイランドの表示を続けます。オフにすると、トレイが空になった時点で表示を終了します。";
 "settings.activity.section" = "ライブアクティビティ";
 "settings.activity.showEmpty" = "トレイが空でも表示する";
+"settings.activity.hideLockScreen" = "ロック画面には表示しない";
 "settings.export.footer" = "「トレイから削除」をオンにすると、他のアプリへドラッグして渡した項目はトレイから消えます（切り取り）。オフなら残ります（コピー）。共有シートから渡した場合は、成功したかどうかを iOS が教えてくれないため、つねに残ります。\n\n「元のファイルも削除」をオンにすると、項目を他のアプリへ渡した時点で、取り込み元のファイルを削除します。元のファイルを削除できるのは、ファイルとして受け取ったものだけです。写真アプリから取り込んだものは変換されて届くため、つねにコピーになります。";
 "settings.export.remove" = "取り出したらトレイから削除する";
 "settings.export.section" = "取り出し";

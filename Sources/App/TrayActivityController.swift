@@ -289,16 +289,21 @@ actor TrayActivityController {
         let settings = TraySettings()
         // An emptied tray forgets the flip, so the next item lands on the tray view.
         if items.isEmpty { drawerView = false }
+        // `hidingLockScreen` is applied at every return: this is the single
+        // funnel every displayed state passes through (sync/restart/turnPage/
+        // toggleDrawer/announce all build here), so the setting reaches the
+        // widget without threading it through each state builder.
+        let hideLock = settings.hideLockScreenActivity
         if settings.appDrawerEnabled, items.isEmpty || drawerView {
             return await drawerContentState(count: items.count, view: .drawer, settings: settings,
-                                            fetchWeather: fetchWeather)
+                                            fetchWeather: fetchWeather).hidingLockScreen(hideLock)
         }
 
         page = TrayContentState.clampedPage(page, count: items.count)
         let onPage = TrayContentState.items(items, onPage: page)
         let trayAtlas = await ThumbnailService.shared.islandAtlas(for: onPage)
         let tray = TrayContentState.make(from: items, atlas: trayAtlas, page: page)
-        guard settings.appDrawerEnabled else { return tray }
+        guard settings.appDrawerEnabled else { return tray.hidingLockScreen(hideLock) }
 
         // The drawer rides along on the tray state: its slots are what put
         // the drawer arrow on the first page, and with the Lock Screen
@@ -318,7 +323,7 @@ actor TrayActivityController {
                     tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count, drawer: icons)
             }
         }
-        return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer)
+        return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer).hidingLockScreen(hideLock)
     }
 
     /// Builds the date/weather + drawer-slots state from what is on disk.
@@ -331,15 +336,20 @@ actor TrayActivityController {
         let slots = DrawerState.slots(from: shortcuts, showNames: settings.showAppNames)
         let images = await DrawerState.icons(for: shortcuts)
         let reading = fetchWeather ? await WeatherProvider.shared.current() : await WeatherProvider.shared.cached()
+        let now = Date()
+        let dateText = WeatherFormat.dateText(now, language: settings.language)
+        // Day-of-month for the minimal (half) island, which only fits one glyph.
+        let dayText = "\(Calendar(identifier: .gregorian).component(.day, from: now))"
+        let showsWeather = settings.emptyStateShowsWeather
         let weather = reading.map {
             TrayContentState.Weather(
-                dateText: WeatherFormat.dateText(Date(), language: settings.language),
+                dateText: dateText,
                 tempText: WeatherFormat.temperature(celsius: $0.celsius, unit: settings.temperatureUnit),
-                symbol: $0.symbol
+                symbol: $0.symbol, dayText: dayText, showsWeather: showsWeather
             )
         } ?? TrayContentState.Weather(
-            dateText: WeatherFormat.dateText(Date(), language: settings.language),
-            tempText: "", symbol: "thermometer"
+            dateText: dateText, tempText: "", symbol: "thermometer",
+            dayText: dayText, showsWeather: showsWeather
         )
         // Shared container: the widget reads full-resolution icon files, and
         // the state carries no atlas.

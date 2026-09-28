@@ -52,6 +52,9 @@
 "drawer.settings.pinTitle" = "Pin Location";
 "drawer.settings.title" = "App Drawer";
 "drawer.settings.lockScreen" = "Always show drawer on Lock Screen";
+"drawer.settings.halfIsland" = "Half Island Shows";
+"drawer.settings.halfIsland.date" = "Date";
+"drawer.settings.halfIsland.weather" = "Weather";
 "drawer.settings.unit" = "Temperature Unit";
 "drawer.shortcutName" = "Shortcut Name";
 "drawer.showNames" = "Show App Names";
@@ -85,6 +88,7 @@
 "settings.activity.footer" = "On: the island stays up while the app is alive in the background, even with nothing in the tray. Off: it ends as soon as the tray is empty.";
 "settings.activity.section" = "Live Activity";
 "settings.activity.showEmpty" = "Show even when the tray is empty";
+"settings.activity.hideLockScreen" = "Hide on the Lock Screen";
 "settings.export.footer" = "Remove from the tray: an item dragged into another app leaves the tray (a cut); off, it stays (a copy). An item passed through the share sheet always stays, because iOS does not say whether it succeeded.\n\nAlso delete the original: the file an item was taken in from is deleted once the item is handed to another app. Only things received as files have an original that can be deleted; photos from the Photos app are always copies, because they are converted on the way here.";
 "settings.export.remove" = "Remove from the tray once taken";
 "settings.export.section" = "Taking items out";

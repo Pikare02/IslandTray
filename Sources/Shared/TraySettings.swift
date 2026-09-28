@@ -49,6 +49,8 @@ struct TraySettings {
         static let appDrawerEnabled = "appDrawerEnabled"
         static let showAppNames = "showAppNames"
         static let lockScreenShowsDrawer = "lockScreenShowsDrawer"
+        static let hideLockScreenActivity = "hideLockScreenActivity"
+        static let emptyStateShowsWeather = "emptyStateShowsWeather"
         static let drawerBackgroundHex = "drawerBackgroundHex"
         static let temperatureUnit = "temperatureUnit"
         static let weatherLocationMode = "weatherLocationMode"
@@ -189,6 +191,23 @@ struct TraySettings {
     var lockScreenShowsDrawer: Bool {
         get { defaults.object(forKey: Keys.lockScreenShowsDrawer) as? Bool ?? false }
         nonmutating set { defaults.set(newValue, forKey: Keys.lockScreenShowsDrawer) }
+    }
+
+    /// Whether the Lock Screen shows no Live Activity at all. Default `false`.
+    /// The Dynamic Island is unaffected. The widget never reads this; the app
+    /// carries it in the content state (`hideLockScreen`).
+    var hideLockScreenActivity: Bool {
+        get { defaults.object(forKey: Keys.hideLockScreenActivity) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.hideLockScreenActivity) }
+    }
+
+    /// Whether the minimal (half) island shows the weather symbol instead of
+    /// the date, when the tray is empty and the drawer feature is on. Default
+    /// `false` (date). The widget never reads this; the app carries it in the
+    /// content state (`Weather.showsWeather`).
+    var emptyStateShowsWeather: Bool {
+        get { defaults.object(forKey: Keys.emptyStateShowsWeather) as? Bool ?? false }
+        nonmutating set { defaults.set(newValue, forKey: Keys.emptyStateShowsWeather) }
     }
 
     /// Full-screen drawer background colour, hex like `AccentColor`. Default black.
