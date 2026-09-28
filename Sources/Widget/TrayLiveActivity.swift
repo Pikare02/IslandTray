@@ -107,8 +107,20 @@ struct TrayLiveActivity: Widget {
                         .font(.caption.monospacedDigit())
                 }
             } minimal: {
-                Text("\(context.state.count)")
-                    .font(.caption2.monospacedDigit())
+                // The half island: a single tiny circle shown when IslandTray
+                // shares the Dynamic Island with another app. In the empty-tray
+                // drawer state it shows the chosen date or weather, not the tray
+                // count -- a bare "0" here was the bug.
+                if let w = context.state.weather {
+                    if w.showsWeather {
+                        Image(systemName: w.symbol).font(.system(size: 12))
+                    } else {
+                        Text(w.dayText).font(.caption2.monospacedDigit())
+                    }
+                } else {
+                    Text("\(context.state.count)")
+                        .font(.caption2.monospacedDigit())
+                }
             }
             // A tap outside any button or tile: the drawer face opens the
             // app's drawer tab, the tray face its tray tab.
@@ -160,7 +172,12 @@ struct TrayLiveActivity: Widget {
     }
 
     @ViewBuilder private func lockScreen(_ state: TrayContentState) -> some View {
-        if state.lockDrawer, let slots = state.drawer, !slots.isEmpty {
+        if state.hideLockScreen {
+            // Setting: no Lock Screen presentation. ActivityKit still keeps an
+            // active activity's banner container, so collapse it to nothing
+            // rather than draw the tray. The Dynamic Island is unaffected.
+            Color.clear.frame(height: 0)
+        } else if state.lockDrawer, let slots = state.drawer, !slots.isEmpty {
             // Labs setting: the drawer's first six, whatever the tray holds.
             DrawerStrip(slots: slots, atlas: state.atlas, side: 38,
                         atlasOffset: state.view == .drawer ? 0 : state.recent.count)

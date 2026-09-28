@@ -8,6 +8,19 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.0] — 2026-09-28
+
+### Live Activity
+- New setting to hide the Live Activity on the Lock Screen entirely. The Dynamic
+  Island keeps working; only the Lock Screen presentation is removed.
+
+### Labs — App Drawer
+- Fixed: when the Dynamic Island is shared with another app, IslandTray's half
+  (the small circle) showed the tray count “0” instead of the date or weather
+  while the tray was empty. It now shows the empty-state face.
+- New setting to choose whether that half island shows the date or the weather.
+  Default: date.
+
 ## [1.8.4] — 2026-09-25
 
 ### Labs — App Drawer

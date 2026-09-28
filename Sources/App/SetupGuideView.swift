@@ -8,6 +8,7 @@ struct SetupGuideView: View {
     let model: TrayModel
 
     @State private var showActivityWhenEmpty = TraySettings().showActivityWhenEmpty
+    @State private var hideLockScreenActivity = TraySettings().hideLockScreenActivity
     /// Held in state, not read straight from `DropDiagnostics` in the body:
     /// it is plain UserDefaults with nothing to observe, so clearing it left
     /// the old lines on screen until the sheet was closed and reopened.
@@ -76,6 +77,11 @@ struct SetupGuideView: View {
                     Toggle(L.s("settings.activity.showEmpty"), isOn: $showActivityWhenEmpty)
                         .onChange(of: showActivityWhenEmpty) { _, newValue in
                             TraySettings().showActivityWhenEmpty = newValue
+                            Task { await model.syncActivity() }
+                        }
+                    Toggle(L.s("settings.activity.hideLockScreen"), isOn: $hideLockScreenActivity)
+                        .onChange(of: hideLockScreenActivity) { _, newValue in
+                            TraySettings().hideLockScreenActivity = newValue
                             Task { await model.syncActivity() }
                         }
                 } header: {
@@ -336,6 +342,7 @@ struct LabsSettingsView: View {
     @AppStorage("appDrawerEnabled", store: TraySettings.store) private var appDrawerEnabled = false
     @AppStorage("showAppNames", store: TraySettings.store) private var showAppNames = true
     @AppStorage("lockScreenShowsDrawer", store: TraySettings.store) private var lockScreenShowsDrawer = false
+    @AppStorage("emptyStateShowsWeather", store: TraySettings.store) private var emptyStateShowsWeather = false
     @AppStorage("temperatureUnit", store: TraySettings.store) private var temperatureUnit = "c"
     @AppStorage("weatherLocationMode", store: TraySettings.store) private var weatherLocationMode = "auto"
     @AppStorage("weatherManualName", store: TraySettings.store) private var manualCityName = ""
@@ -371,6 +378,13 @@ struct LabsSettingsView: View {
                         .onChange(of: lockScreenShowsDrawer) { _, _ in
                             Task { await TrayActivityController.shared.syncFromStore() }
                         }
+                    Picker(L.s("drawer.settings.halfIsland"), selection: $emptyStateShowsWeather) {
+                        Text(L.s("drawer.settings.halfIsland.date")).tag(false)
+                        Text(L.s("drawer.settings.halfIsland.weather")).tag(true)
+                    }
+                    .onChange(of: emptyStateShowsWeather) { _, _ in
+                        Task { await TrayActivityController.shared.syncFromStore() }
+                    }
                     Picker(L.s("drawer.settings.unit"), selection: $temperatureUnit) {
                         Text("°C").tag("c")
                         Text("°F").tag("f")

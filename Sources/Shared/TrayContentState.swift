@@ -71,7 +71,7 @@ struct TrayContentState: Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case count, recent, atlas, page, added, weather, drawer, view, lockDrawer
+        case count, recent, atlas, page, added, weather, drawer, view, lockDrawer, hideLockScreen
     }
 
     /// What a shortcut just put in, shown with a check while the island is
@@ -85,6 +85,42 @@ struct TrayContentState: Codable, Hashable {
         let dateText: String
         let tempText: String
         let symbol: String
+        /// Compact day-of-month for the minimal (half) island, e.g. "28": that
+        /// presentation is a tiny circle with room for one glyph, not the full
+        /// `dateText`.
+        let dayText: String
+        /// Whether the minimal (half) island shows the weather symbol instead
+        /// of `dayText`. The compact and expanded faces always show both; only
+        /// the half circle has to choose, and this is the user's choice.
+        let showsWeather: Bool
+
+        /// New fields default so existing call sites (and tests) that build a
+        /// `Weather` from date/temp/symbol keep compiling.
+        init(dateText: String, tempText: String, symbol: String,
+             dayText: String = "", showsWeather: Bool = false) {
+            self.dateText = dateText
+            self.tempText = tempText
+            self.symbol = symbol
+            self.dayText = dayText
+            self.showsWeather = showsWeather
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case dateText, tempText, symbol, dayText, showsWeather
+        }
+
+        /// Tolerant like `TrayContentState.init(from:)`: an activity started by
+        /// an older build is still on screen after an update and its `Weather`
+        /// lacks `dayText`/`showsWeather`; those default rather than throw, so
+        /// the weather face keeps rendering until the next state replaces it.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            dateText = (try? c.decode(String.self, forKey: .dateText)) ?? ""
+            tempText = (try? c.decode(String.self, forKey: .tempText)) ?? ""
+            symbol = (try? c.decode(String.self, forKey: .symbol)) ?? "thermometer"
+            dayText = (try? c.decodeIfPresent(String.self, forKey: .dayText)) ?? ""
+            showsWeather = (try? c.decodeIfPresent(Bool.self, forKey: .showsWeather)) ?? false
+        }
     }
 
     struct DrawerSlot: Codable, Hashable {
@@ -134,12 +170,17 @@ struct TrayContentState: Codable, Hashable {
     /// `recent.count` tiles first, then one per drawer slot. The widget
     /// derives the tile count from the strip itself (`AtlasSlicer`).
     let lockDrawer: Bool
+    /// The Lock Screen shows no presentation at all -- a blank, collapsed
+    /// banner. The Dynamic Island still works. Set from the app's setting via
+    /// `hidingLockScreen(_:)`; the widget never reads defaults directly.
+    let hideLockScreen: Bool
 
     /// Restricted so `maxPreviews` can never be bypassed by direct construction.
     /// Build a `TrayContentState` via `make(from:atlas:)` or `countOnly(count:)`.
     private init(
         count: Int, recent: [Preview], atlas: Data?, page: Int = 0, added: Added? = nil,
-        weather: Weather? = nil, drawer: [DrawerSlot]? = nil, view: View = .tray, lockDrawer: Bool = false
+        weather: Weather? = nil, drawer: [DrawerSlot]? = nil, view: View = .tray, lockDrawer: Bool = false,
+        hideLockScreen: Bool = false
     ) {
         self.count = count
         self.recent = recent
@@ -150,6 +191,7 @@ struct TrayContentState: Codable, Hashable {
         self.drawer = drawer
         self.view = view
         self.lockDrawer = lockDrawer
+        self.hideLockScreen = hideLockScreen
     }
 
     /// The same state, carrying `added`. A few dozen bytes, which the
@@ -157,7 +199,19 @@ struct TrayContentState: Codable, Hashable {
     func announcing(_ added: Added?) -> TrayContentState {
         TrayContentState(
             count: count, recent: recent, atlas: atlas, page: page, added: added,
-            weather: weather, drawer: drawer, view: view, lockDrawer: lockDrawer
+            weather: weather, drawer: drawer, view: view, lockDrawer: lockDrawer,
+            hideLockScreen: hideLockScreen
+        )
+    }
+
+    /// The same state with the Lock Screen hidden flag set. Applied once at the
+    /// single funnel every displayed state passes through, so the many builders
+    /// (`make`, `makeDrawer`, `withDrawer`, `countOnly`) need not each carry it.
+    func hidingLockScreen(_ hide: Bool) -> TrayContentState {
+        TrayContentState(
+            count: count, recent: recent, atlas: atlas, page: page, added: added,
+            weather: weather, drawer: drawer, view: view, lockDrawer: lockDrawer,
+            hideLockScreen: hide
         )
     }
 
@@ -213,12 +267,14 @@ struct TrayContentState: Codable, Hashable {
             .map { Array($0.prefix(Self.maxSlots)) } ?? nil
         let decodedView = (try? container.decodeIfPresent(View.self, forKey: .view)) ?? .tray
         let lockDrawer = (try? container.decodeIfPresent(Bool.self, forKey: .lockDrawer)) ?? false
+        let hideLockScreen = (try? container.decodeIfPresent(Bool.self, forKey: .hideLockScreen)) ?? false
         let clampedRecent = Array(decodedRecent.prefix(Self.maxPreviews))
         let page = Self.clampedPage(decodedPage, count: decodedCount)
 
         let full = TrayContentState(
             count: decodedCount, recent: clampedRecent, atlas: decodedAtlas, page: page, added: added,
-            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer,
+            hideLockScreen: hideLockScreen
         )
         if full.encodedByteCount <= Self.maxEncodedBytes {
             self = full
@@ -226,13 +282,15 @@ struct TrayContentState: Codable, Hashable {
         }
         let noAtlas = TrayContentState(
             count: decodedCount, recent: clampedRecent, atlas: nil, page: page, added: added,
-            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
+            weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer,
+            hideLockScreen: hideLockScreen
         )
         self = noAtlas.encodedByteCount <= Self.maxEncodedBytes
             ? noAtlas
             : TrayContentState(
                 count: decodedCount, recent: [], atlas: nil, page: page, added: added,
-                weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer
+                weather: decodedWeather, drawer: decodedDrawer, view: decodedView, lockDrawer: lockDrawer,
+                hideLockScreen: hideLockScreen
             )
     }
 
