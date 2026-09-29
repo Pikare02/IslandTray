@@ -24,6 +24,12 @@ final class WeatherFormatTests: XCTestCase {
         XCTAssertEqual(WeatherFormat.dateText(date, language: "en"), "SEP 24 THU")
     }
 
+    func testMonthDay() {
+        var comps = DateComponents(); comps.year = 2026; comps.month = 9; comps.day = 30
+        let date = Calendar(identifier: .gregorian).date(from: comps)!
+        XCTAssertEqual(WeatherFormat.monthDay(date), "9/30")
+    }
+
     func testParseOpenMeteo() throws {
         let json = Data(#"{"current_weather":{"temperature":18.3,"weathercode":61}}"#.utf8)
         let m = try WeatherFormat.OpenMeteo.parse(json)

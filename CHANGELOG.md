@@ -8,6 +8,15 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.1] — 2026-09-29
+
+### Labs — App Drawer
+- Fixed: the half island (the small circle when the Dynamic Island is shared
+  with another app) showed a bare day-of-month such as “30”; it now shows the
+  month too, “9/30”.
+- Fixed: in weather mode the half island showed only the weather icon; the
+  temperature now sits under the icon, matching the compact face.
+
 ## [1.9.0] — 2026-09-28
 
 ### Live Activity

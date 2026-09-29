@@ -338,8 +338,9 @@ actor TrayActivityController {
         let reading = fetchWeather ? await WeatherProvider.shared.current() : await WeatherProvider.shared.cached()
         let now = Date()
         let dateText = WeatherFormat.dateText(now, language: settings.language)
-        // Day-of-month for the minimal (half) island, which only fits one glyph.
-        let dayText = "\(Calendar(identifier: .gregorian).component(.day, from: now))"
+        // Month/day for the minimal (half) island, e.g. "9/30" -- a bare
+        // day-of-month read as an unlabelled number.
+        let dayText = WeatherFormat.monthDay(now)
         let showsWeather = settings.emptyStateShowsWeather
         let weather = reading.map {
             TrayContentState.Weather(
