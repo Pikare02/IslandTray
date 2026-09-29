@@ -37,6 +37,13 @@ jobs:
         run: |
           ./scripts/make-ipa.sh Release
           ./scripts/make-ipa.sh Free-Release
+          # Name the assets the way the install page (docs/index.html) links to
+          # them: Release carries the App Group (TrollStore), Free-Release does
+          # not (AltStore/SideStore). The install page's download URLs and
+          # altstore:// deep links point at these exact filenames.
+          version="${GITHUB_REF_NAME#v}"
+          mv build/IslandTray-Release.ipa "build/IslandTray-$version-TrollStore.ipa"
+          mv build/IslandTray-Free-Release.ipa "build/IslandTray-$version-AltStore.ipa"
 
       # Pull this version's section out of the changelog for the release body.
       # Falls back to a one-liner if the heading is not found, so a missing
@@ -59,5 +66,5 @@ jobs:
         with:
           body_path: release-notes.md
           files: |
-            build/IslandTray-Release.ipa
-            build/IslandTray-Free-Release.ipa
+            build/IslandTray-*-TrollStore.ipa
+            build/IslandTray-*-AltStore.ipa
