@@ -1,0 +1,63 @@
+# Builds the sideloadable .ipa files on a macOS runner and publishes them to a
+# GitHub release. Runs when a version tag (v*) is pushed: tag the release commit
+# on main and push the tag, and the two unsigned .ipa files are built, verified
+# by scripts/make-ipa.sh, and attached to the release automatically.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# The release step creates a release and uploads assets, which needs write
+# access to repository contents.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+
+      # SWIFT_VERSION is 6.0 (project.yml), so pin a matching stable Xcode
+      # rather than whatever the runner defaults to.
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # make-ipa.sh runs `xcodegen generate` when xcodegen is on PATH, so the
+      # committed project.yml is the source of truth for the build.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build the .ipa files
+        run: |
+          ./scripts/make-ipa.sh Release
+          ./scripts/make-ipa.sh Free-Release
+
+      # Pull this version's section out of the changelog for the release body.
+      # Falls back to a one-liner if the heading is not found, so a missing
+      # entry never fails the release.
+      - name: Extract release notes
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
+            flag && /^## \[/         { exit }
+            flag                     { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "See the changelog for what changed in this release." > release-notes.md
+          fi
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            build/IslandTray-Release.ipa
+            build/IslandTray-Free-Release.ipa
