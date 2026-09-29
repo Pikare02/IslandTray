@@ -8,6 +8,13 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.2] — 2026-09-30
+
+### Localization
+- New: a full Korean (한국어) localization. Pick it under Settings →
+  Language, or leave the language on “System” and it follows a Korean
+  device automatically.
+
 ## [1.9.1] — 2026-09-29
 
 ### Labs — App Drawer
