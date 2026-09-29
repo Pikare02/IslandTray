@@ -8,6 +8,13 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.3] — 2026-09-30
+
+### Fixed
+- The app had no launch screen, so on device iOS drew it in a scaled-up
+  legacy canvas — everything looked oversized and low-resolution. It now
+  renders at the device’s native resolution.
+
 ## [1.9.2] — 2026-09-30
 
 ### Localization
