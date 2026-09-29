@@ -107,15 +107,21 @@ struct TrayLiveActivity: Widget {
                         .font(.caption.monospacedDigit())
                 }
             } minimal: {
-                // The half island: a single tiny circle shown when IslandTray
-                // shares the Dynamic Island with another app. In the empty-tray
-                // drawer state it shows the chosen date or weather, not the tray
-                // count -- a bare "0" here was the bug.
+                // The half island: a tiny circle shown when IslandTray shares
+                // the Dynamic Island with another app. In the empty-tray drawer
+                // state it shows the chosen date or weather, not the tray count
+                // -- a bare "0" here was the bug. Two stacked lines fit the same
+                // way the compact trailing face fits its icon over the temp, so
+                // the date reads "9/30" (not a bare "30") and the weather keeps
+                // its temperature under the icon.
                 if let w = context.state.weather {
                     if w.showsWeather {
-                        Image(systemName: w.symbol).font(.system(size: 12))
+                        VStack(spacing: -2) {
+                            Image(systemName: w.symbol).font(.system(size: 11))
+                            Text(w.tempText).font(.system(size: 8, weight: .medium).monospacedDigit())
+                        }
                     } else {
-                        Text(w.dayText).font(.caption2.monospacedDigit())
+                        Text(w.dayText).font(.system(size: 10, weight: .semibold).monospacedDigit())
                     }
                 } else {
                     Text("\(context.state.count)")

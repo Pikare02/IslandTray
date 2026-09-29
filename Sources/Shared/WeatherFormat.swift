@@ -24,6 +24,14 @@ enum WeatherFormat {
         return "\(Int(value.rounded()))°"
     }
 
+    /// Compact month/day for the minimal (half) island, e.g. "9/30". Small
+    /// enough for the tiny circle, but still names the month so it is not
+    /// mistaken for a bare day-of-month.
+    static func monthDay(_ date: Date) -> String {
+        let cal = Calendar(identifier: .gregorian)
+        return "\(cal.component(.month, from: date))/\(cal.component(.day, from: date))"
+    }
+
     /// ja: "9/24 木". en (and anything else): "SEP 24 THU".
     static func dateText(_ date: Date, language: String?) -> String {
         var cal = Calendar(identifier: .gregorian)
