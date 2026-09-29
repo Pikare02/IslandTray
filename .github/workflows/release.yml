@@ -52,13 +52,17 @@ jobs:
         id: notes
         run: |
           version="${GITHUB_REF_NAME#v}"
+          # The install page link goes at the very top of every release's
+          # notes -- it is how people pick a sideloader and reach the .ipa.
+          printf '%s\n\n' '📲 **[Install page — pick your sideloader / インストールページ](https://pikare02.github.io/IslandTray/)**' > release-notes.md
           awk -v ver="$version" '
             $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
             flag && /^## \[/         { exit }
             flag                     { print }
-          ' CHANGELOG.md > release-notes.md
-          if [ ! -s release-notes.md ]; then
-            echo "See the changelog for what changed in this release." > release-notes.md
+          ' CHANGELOG.md >> release-notes.md
+          # Only the header line present means no changelog section was found.
+          if [ "$(wc -l < release-notes.md)" -le 2 ]; then
+            echo "See the changelog for what changed in this release." >> release-notes.md
           fi
 
       - name: Publish the release
