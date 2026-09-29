@@ -108,6 +108,7 @@ struct SetupGuideView: View {
                         Text(L.s("settings.language.system")).tag("")
                         // Each in its own language, the way iOS lists them.
                         Text("日本語").tag("ja")
+                        Text("한국어").tag("ko")
                         Text("English").tag("en")
                     }
                     Picker(L.s("settings.theme"), selection: $theme) {

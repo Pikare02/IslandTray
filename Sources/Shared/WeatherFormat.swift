@@ -32,13 +32,15 @@ enum WeatherFormat {
         return "\(cal.component(.month, from: date))/\(cal.component(.day, from: date))"
     }
 
-    /// ja: "9/24 木". en (and anything else): "SEP 24 THU".
+    /// ja: "9/24 木". ko: "9/24 목". en (and anything else): "SEP 24 THU".
     static func dateText(_ date: Date, language: String?) -> String {
         var cal = Calendar(identifier: .gregorian)
         let month = cal.component(.month, from: date)
         let day = cal.component(.day, from: date)
-        if language == "ja" {
-            let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+        if language == "ja" || language == "ko" {
+            let weekdays = language == "ko"
+                ? ["일", "월", "화", "수", "목", "금", "토"]
+                : ["日", "月", "火", "水", "木", "金", "土"]
             let w = cal.component(.weekday, from: date) - 1
             return "\(month)/\(day) \(weekdays[w])"
         }

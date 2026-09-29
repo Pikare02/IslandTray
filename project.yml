@@ -41,6 +41,8 @@ targets:
         buildPhase: resources
       - path: Resources/Localization/ja.lproj
         buildPhase: resources
+      - path: Resources/Localization/ko.lproj
+        buildPhase: resources
       - path: Resources/Shortcuts
         buildPhase: resources
     settings:
@@ -68,6 +70,8 @@ targets:
       - path: Resources/Localization/en.lproj
         buildPhase: resources
       - path: Resources/Localization/ja.lproj
+        buildPhase: resources
+      - path: Resources/Localization/ko.lproj
         buildPhase: resources
       # The island's page buttons construct this intent, so the widget has
       # to know the type. Its `perform()` only ever runs in the app -- a
@@ -107,6 +111,8 @@ targets:
       - path: Resources/Localization/en.lproj
         buildPhase: resources
       - path: Resources/Localization/ja.lproj
+        buildPhase: resources
+      - path: Resources/Localization/ko.lproj
         buildPhase: resources
     settings:
       base:
