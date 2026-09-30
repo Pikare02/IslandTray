@@ -38,7 +38,9 @@ enum DrawerIconFiles {
         for slot in 0..<TrayContentState.maxSlots {
             let target = url(slot: slot)
             if slot < images.count, let image = images[slot], let data = squared(image).jpegData(compressionQuality: quality) {
-                try? data.write(to: target, options: .atomic)
+                // Lock-screen-readable so the widget can read the icon while the
+                // device is locked (see TrayContainer).
+                try? data.write(to: target, options: [.atomic, TrayContainer.lockScreenReadableWrite])
             } else {
                 try? FileManager.default.removeItem(at: target)
             }

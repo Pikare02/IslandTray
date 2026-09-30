@@ -410,7 +410,10 @@ final class TrayStore: Sendable {
                 items = self.presentable(items)
                 // Atomic so a crash mid-write cannot leave truncated JSON. There
                 // are no file presenters here that would need an in-place write.
-                try JSONEncoder.tray.encode(TrayMetadata(items: items)).write(to: url, options: .atomic)
+                // Lock-screen-readable so the Live Activity's background refresh
+                // can read it while the device is locked (see TrayContainer).
+                try JSONEncoder.tray.encode(TrayMetadata(items: items))
+                    .write(to: url, options: [.atomic, TrayContainer.lockScreenReadableWrite])
                 written = items
             } catch {
                 bodyError = error

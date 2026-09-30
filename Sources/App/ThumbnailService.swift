@@ -264,6 +264,8 @@ actor ThumbnailService {
         try? FileManager.default.createDirectory(
             at: TrayContainer.thumbsDirectory, withIntermediateDirectories: true
         )
-        try? data.write(to: item.thumbnailURL, options: .atomic)
+        // Lock-screen-readable so the Lock Screen presentation can read the
+        // photo thumbnail while the device is locked (see TrayContainer).
+        try? data.write(to: item.thumbnailURL, options: [.atomic, TrayContainer.lockScreenReadableWrite])
     }
 }

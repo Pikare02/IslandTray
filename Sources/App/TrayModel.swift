@@ -83,6 +83,11 @@ final class TrayModel {
     /// On an ordinary launch there is nothing to correct and syncing here
     /// would only duplicate `restart()`, so this is conditional.
     func start(migratingFrom oldRoot: URL = TrayContainer.localRoot) async {
+        // Heal files an earlier build wrote under a protection class that made
+        // them unreadable while locked, so the Live Activity's background
+        // refresh and the Lock Screen thumbnails stop failing. Runs here
+        // because launch is foreground (unlocked), where the reads succeed.
+        TrayContainer.relaxProtectionForLockScreenReads()
         let migrated = await migrateIfNeeded(from: oldRoot)
         reload()
         if migrated { await syncActivity() }
