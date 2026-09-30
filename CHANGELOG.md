@@ -8,6 +8,19 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.6] — 2026-09-30
+
+### Fixed
+- On the AltStore / SideStore build, the Lock Screen app-drawer icons could
+  revert to plain SF Symbol link glyphs a short while after they appeared,
+  whenever the tray held an item. Those builds carry the drawer icons inside
+  the Live Activity content state as an atlas, and the combined tray+drawer
+  atlas was a JPEG — at that byte cost it overran ActivityKit’s 4096-byte
+  state limit as soon as a tray item was present, so `withDrawer` shed every
+  drawer icon to its symbol. The combined atlas is now WebP, like the
+  empty-tray drawer atlas already was (about half the bytes), so the icons fit
+  and stay.
+
 ## [1.9.5] — 2026-09-30
 
 ### Fixed
