@@ -8,6 +8,16 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.4] — 2026-09-30
+
+### Labs — App Drawer
+- The half island (the small circle when the Dynamic Island is shared with
+  another app) now shows the weekday under the date — “9/30” over “목” —
+  matching the way weather mode stacks the temperature under its icon.
+- The island date now follows the language the app is shown in when the
+  language setting is “System”: a Korean device gets “9/30 목” (Korean
+  weekday) instead of the English “SEP 30 THU”.
+
 ## [1.9.3] — 2026-09-30
 
 ### Fixed
