@@ -33,12 +33,17 @@ enum WeatherFormat {
     }
 
     /// ja: "9/24 木". ko: "9/24 목". en (and anything else): "SEP 24 THU".
+    /// `language` is the app's explicit choice ("en"/"ja"/"ko"); when it is nil
+    /// or empty ("System"), the date follows the language the app is actually
+    /// displayed in, so a Korean device on "System" still gets "9/24 목".
     static func dateText(_ date: Date, language: String?) -> String {
-        var cal = Calendar(identifier: .gregorian)
+        let cal = Calendar(identifier: .gregorian)
         let month = cal.component(.month, from: date)
         let day = cal.component(.day, from: date)
-        if language == "ja" || language == "ko" {
-            let weekdays = language == "ko"
+        let code = (language?.isEmpty == false ? language : Bundle.main.preferredLocalizations.first)
+            .map { String($0.prefix(2)) } ?? "en"
+        if code == "ja" || code == "ko" {
+            let weekdays = code == "ko"
                 ? ["일", "월", "화", "수", "목", "금", "토"]
                 : ["日", "月", "火", "水", "木", "金", "土"]
             let w = cal.component(.weekday, from: date) - 1

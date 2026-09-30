@@ -85,9 +85,9 @@ struct TrayContentState: Codable, Hashable {
         let dateText: String
         let tempText: String
         let symbol: String
-        /// Compact month/day for the minimal (half) island, e.g. "9/28": that
-        /// presentation is a tiny circle with no room for the weekday the full
-        /// `dateText` carries.
+        /// Compact month/day for the minimal (half) island, e.g. "9/28". The
+        /// half circle stacks this over the weekday (taken from `dateText`),
+        /// the same way it stacks the weather icon over the temperature.
         let dayText: String
         /// Whether the minimal (half) island shows the weather symbol instead
         /// of `dayText`. The compact and expanded faces always show both; only

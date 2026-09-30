@@ -112,8 +112,9 @@ struct TrayLiveActivity: Widget {
                 // state it shows the chosen date or weather, not the tray count
                 // -- a bare "0" here was the bug. Two stacked lines fit the same
                 // way the compact trailing face fits its icon over the temp, so
-                // the date reads "9/30" (not a bare "30") and the weather keeps
-                // its temperature under the icon.
+                // the date reads "9/30" over its weekday ("목"/"木"/"THU"), and
+                // the weather keeps its temperature under the icon. The weekday
+                // is the last space-separated piece of dateText ("9/30 목").
                 if let w = context.state.weather {
                     if w.showsWeather {
                         VStack(spacing: -2) {
@@ -121,7 +122,11 @@ struct TrayLiveActivity: Widget {
                             Text(w.tempText).font(.system(size: 8, weight: .medium).monospacedDigit())
                         }
                     } else {
-                        Text(w.dayText).font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        VStack(spacing: -2) {
+                            Text(w.dayText).font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            Text(w.dateText.split(separator: " ").last.map(String.init) ?? "")
+                                .font(.system(size: 8, weight: .medium))
+                        }
                     }
                 } else {
                     Text("\(context.state.count)")
