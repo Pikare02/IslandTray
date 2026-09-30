@@ -8,6 +8,20 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.9.5] — 2026-09-30
+
+### Fixed
+- “Can’t read the tray: items.json … you don’t have permission”: the tray’s
+  files were written under a protection class that could leave them
+  unreadable while the device is locked, so the Live Activity’s background
+  refresh failed to read them. They are now written so they stay readable
+  once the device has been unlocked once since boot.
+- Photo thumbnails were blank on the Lock Screen for the same reason (other
+  items were fine because they draw an icon that needs no file). Thumbnails
+  and drawer icons now stay readable while locked too.
+- The fix is re-applied to files earlier builds already wrote, so it takes
+  effect on the next launch without waiting for anything to change.
+
 ## [1.9.4] — 2026-09-30
 
 ### Labs — App Drawer
