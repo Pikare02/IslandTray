@@ -127,13 +127,20 @@ actor ThumbnailService {
     /// that also carries the drawer (`TrayContentState.withDrawer`). The tray
     /// tiles are sliced back out of `tray` rather than regenerated. `nil` when
     /// no drawer slot has an image -- the tray atlas alone is then enough.
+    ///
+    /// WebP, like `drawerAtlas` and unlike the tray's own `islandAtlas`: this
+    /// strip carries the tray tiles *and* the six drawer tiles, so at the tray
+    /// atlas's JPEG cost it overran the 4096-byte state budget the moment the
+    /// tray held an item, and `withDrawer` then shed every drawer icon to SF
+    /// Symbols on the Lock Screen. WebP is ~a third the bytes, so the same
+    /// tiles fit at the same 48px.
     func combinedAtlas(tray: TrayContentState.Atlas?, trayCount: Int, drawer: [UIImage?]) async -> TrayContentState.Atlas? {
         guard drawer.contains(where: { $0 != nil }) else { return nil }
         let trayTiles: [UIImage?] = (0..<trayCount).map { i in
             guard let tray, tray.filled.indices.contains(i), tray.filled[i] else { return nil }
             return AtlasSlicer.tile(tray.jpeg, index: i, count: trayCount)
         }
-        return Self.strip(from: trayTiles + drawer)
+        return Self.strip(from: trayTiles + drawer, webp: true)
     }
 
     private func islandTile(for item: TrayItem) async -> UIImage? {
