@@ -103,6 +103,11 @@ struct DrawerEditorView: View {
         // The grid is always drawn on a dark background, so its bar text must be light.
         .environment(\.colorScheme, .dark)
         .task(id: bgVersion) { await loadBackground() }
+        // Another device's edit landed through the sync folder; a save from
+        // the copy held here would otherwise put the old drawer back.
+        .onReceive(NotificationCenter.default.publisher(for: DrawerStore.didSyncNotification)) { _ in
+            shortcuts = DrawerStore.shared.load()
+        }
         .sheet(isPresented: $adding) {
             DrawerAddSheet { new in add(new) }
         }

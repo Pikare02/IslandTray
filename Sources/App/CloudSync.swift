@@ -149,7 +149,7 @@ struct CloudFolder: Sendable {
 
     /// A coordinated look at the directory, which is what makes iCloud
     /// refresh a listing it has not fetched in a while.
-    private func names(in directory: URL) throws -> [String] {
+    func names(in directory: URL) throws -> [String] {
         var result: [String] = []
         var failure: Error?
         var coordinatorError: NSError?
@@ -179,7 +179,7 @@ struct CloudFolder: Sendable {
         item.id == id && item.ext.count <= 16 && item.ext.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
     }
 
-    private static func coordinatedRead(_ url: URL) throws -> Data {
+    static func coordinatedRead(_ url: URL) throws -> Data {
         var data: Data?
         var failure: Error?
         var coordinatorError: NSError?
@@ -190,7 +190,7 @@ struct CloudFolder: Sendable {
         return data ?? Data()
     }
 
-    private static func coordinatedWrite(
+    static func coordinatedWrite(
         _ url: URL, _ options: NSFileCoordinator.WritingOptions, _ body: (URL) throws -> Void
     ) throws {
         var failure: Error?
@@ -234,11 +234,13 @@ final class CloudSync {
     }
 
     private let store: TrayStore
+    private let drawer: DrawerStore
     private let defaults: UserDefaults
     private var rerun = false
 
-    init(store: TrayStore, defaults: UserDefaults = .standard) {
+    init(store: TrayStore, drawer: DrawerStore = .shared, defaults: UserDefaults = .standard) {
         self.store = store
+        self.drawer = drawer
         self.defaults = defaults
         isOn = TraySettings().cloudSyncEnabled
         folderName = resolveFolder()?.lastPathComponent
@@ -339,17 +341,20 @@ final class CloudSync {
         /// an upload iCloud has not sent yet -- so the poll should look again
         /// in seconds rather than waiting a full idle interval.
         var settling = false
+        /// The folder's drawer replaced this device's.
+        var drawerChanged = false
         var lines: [String] = []
     }
 
     private func pass() async -> Bool {
         let synced = self.synced
         let store = self.store
+        let drawer = self.drawer
         done = 0
         total = 0
         do {
             guard let outcome = try await withFolder({ folder in
-                try await Self.run(folder: folder, store: store, synced: synced) { done, total in
+                try await Self.run(folder: folder, store: store, drawer: drawer, synced: synced) { done, total in
                     await MainActor.run { self.done = done; self.total = total }
                 }
             }) else {
@@ -357,6 +362,9 @@ final class CloudSync {
                 return false
             }
             self.synced = outcome.synced
+            if outcome.drawerChanged {
+                NotificationCenter.default.post(name: DrawerStore.didSyncNotification, object: nil)
+            }
             cloudOnly = outcome.cloudOnly
             pendingUploads = outcome.pendingUploads
             settling = outcome.settling
@@ -375,6 +383,7 @@ final class CloudSync {
     private nonisolated static func run(
         folder: CloudFolder,
         store: TrayStore,
+        drawer: DrawerStore,
         synced: Set<UUID>,
         progress: @Sendable (Int, Int) async -> Void
     ) async throws -> Outcome {
@@ -427,6 +436,30 @@ final class CloudSync {
         outcome.cloudOnly = plan.cloudOnly.compactMap { listing.items[$0] }
         outcome.pendingUploads = local.filter { inStep.contains($0.id) && !folder.isUploaded($0) }.count
         outcome.settling = !listing.pendingDownloads.isEmpty || outcome.pendingUploads > 0
+
+        // The drawer rides on the same pass. Its failure is a log line, not
+        // the tray's: nothing above depends on it.
+        do {
+            let drawerListing = try folder.listDrawer()
+            if drawerListing.pending { outcome.settling = true }
+            switch DrawerSyncStep.decide(local: drawer.modifiedAt, remote: drawerListing.document?.modifiedAt) {
+            case .upload:
+                // The stamp read above, not a new one: a fresh stamp would
+                // outrun an edit made during this pass.
+                let stamp = drawer.modifiedAt ?? Date()
+                try folder.uploadDrawer(from: drawer, at: stamp)
+                outcome.lines.append(L.s("cloud.log.drawerUploaded"))
+            case .adopt:
+                try folder.adoptDrawer(drawerListing.document!, into: drawer)
+                outcome.changed = true
+                outcome.drawerChanged = true
+                outcome.lines.append(L.s("cloud.log.drawerDownloaded"))
+            case .none:
+                break
+            }
+        } catch {
+            outcome.lines.append(L.s("cloud.log.failed", L.s("cloud.log.drawer"), error.localizedDescription))
+        }
         return outcome
     }
 
