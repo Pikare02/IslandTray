@@ -8,6 +8,19 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.12.0] — 2026-10-04
+
+### Added
+- **The App Drawer syncs through iCloud Drive too.** With sync on, the
+  drawer's shortcuts, their custom icons and the background image go through
+  the same sync folder as the tray, with no extra setup. The drawer is one
+  list, so the device that edited it last wins; the Sync Details log shows
+  when it was uploaded or taken from another device.
+
+### Fixed
+- On iPad, the app can now be resized freely in Split View, Slide Over and
+  Stage Manager instead of being held at a fixed window size.
+
 ## [1.11.0] — 2026-10-03
 
 ### Changed
