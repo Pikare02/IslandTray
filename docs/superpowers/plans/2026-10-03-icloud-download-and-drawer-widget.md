@@ -539,7 +539,10 @@ enum DrawerSnapshot {
     @discardableResult
     static func record(_ state: TrayContentState, at url: URL = url) -> Change {
         let fm = FileManager.default
-        guard let payload = payload(for: state), let data = try? JSONEncoder().encode(payload) else {
+        // sortedKeys: the unchanged check compares bytes, so the encoding must be stable.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let payload = payload(for: state), let data = try? encoder.encode(payload) else {
             // Drawer turned off: the widget must not keep showing one.
             guard !state.drawerAvailable, fm.fileExists(atPath: url.path) else { return .unchanged }
             try? fm.removeItem(at: url)
