@@ -66,6 +66,25 @@ final class DrawerSnapshotTests: XCTestCase {
         XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.count, 3)
     }
 
+    /// Shedding takes slots from the end, so a shorter run of the same
+    /// slots is the budget's doing, not the user's.
+    func testATrayStateWithAPrefixOfTheSlotsIsIgnored() {
+        let full = TrayContentState.makeDrawer(
+            weather: nil, slots: [slot(0), slot(1), slot(2)],
+            atlas: .init(jpeg: Data([1, 2, 3]), filled: [true, true, true]),
+            view: .drawer, count: 0
+        )
+        XCTAssertEqual(DrawerSnapshot.record(full, at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: [slot(0), slot(1)]), at: url), .unchanged)
+        XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.count, 3)
+    }
+
+    func testADrawerStateReplacesWhatATrayStateRecorded() {
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: [slot(0)]), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.map(\.hasIcon), [true, true])
+    }
+
     func testATrayStateWithNoSlotsIsIgnored() {
         XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
         XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: []), at: url), .unchanged)

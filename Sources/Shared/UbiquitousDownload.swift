@@ -77,8 +77,13 @@ enum UbiquitousDownload {
     /// contents only became visible once it arrived) are asked for too.
     static func waitUntilDownloaded(_ url: URL, deadline: Date, poll: TimeInterval) throws {
         var asked = Set<URL>()
+        // The root is the one URL reused on every pass; its resource values
+        // can be served from a cache, so a status that has moved on since
+        // the last pass would be read as unchanged.
+        var root = url
         while true {
-            let missing = pending(in: url, assumingUbiquitous: true)
+            root.removeAllCachedResourceValues()
+            let missing = pending(in: root, assumingUbiquitous: true)
             if missing.isEmpty { return }
             for item in missing where asked.insert(item).inserted {
                 // A refusal is not reported here: an item that never

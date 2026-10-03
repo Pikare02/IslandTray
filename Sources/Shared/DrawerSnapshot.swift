@@ -54,15 +54,17 @@ enum DrawerSnapshot {
             return .removed
         }
         // A tray state carries the drawer only as far as its own tiles leave
-        // room: icons only with the Lock Screen drawer on, and slots shed to
-        // nothing when the state runs out of bytes. What a drawer state
-        // recorded stays unless the drawer's make-up changed, or the tray
-        // state has more icons than what is on disk. It also keeps the
-        // tray's own thumbnails from rewriting this file on every change.
+        // room: icons only with the Lock Screen drawer on, and slots shed
+        // from the end -- down to nothing -- when the state runs out of
+        // bytes. What a drawer state recorded stays unless the drawer's
+        // make-up changed (a shorter run of the same slots is a cut, not a
+        // change), or the tray state has more icons than what is on disk.
+        // It also keeps the tray's own thumbnails from rewriting this file
+        // on every change.
         if state.view != .drawer {
             if payload.slots.isEmpty { return .unchanged }
             if let existing = load(from: url),
-               existing.slots.map(Self.identity) == payload.slots.map(Self.identity),
+               existing.slots.map(Self.identity).starts(with: payload.slots.map(Self.identity)),
                existing.slots.filter(\.hasIcon).count >= payload.slots.filter(\.hasIcon).count {
                 return .unchanged
             }
