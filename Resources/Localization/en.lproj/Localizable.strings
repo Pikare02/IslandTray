@@ -252,3 +252,4 @@
 "cloud.footer.on" = "Turning sync off or choosing another folder deletes nothing, on this device or in the folder. Deleting an item deletes it on every device.";
 "cloud.toggle" = "Sync through iCloud Drive";
 "cloud.footer.disabled" = "Off: the tray and clipboard stay on this device only. On: they are shared with your other devices through a folder in iCloud Drive.";
+"cloud.downloadTimedOut" = "%@ never finished downloading from iCloud";

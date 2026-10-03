@@ -252,3 +252,4 @@
 "cloud.footer.on" = "동기화를 끄거나 다른 폴더를 선택해도 이 기기와 폴더 어디에서도 아무것도 삭제되지 않습니다. 항목을 삭제하면 모든 기기에서 삭제됩니다.";
 "cloud.toggle" = "iCloud Drive로 동기화";
 "cloud.footer.disabled" = "끔: 트레이와 클립보드가 이 기기에만 저장됩니다. 켬: iCloud Drive 폴더를 통해 다른 기기와 공유됩니다.";
+"cloud.downloadTimedOut" = "%@의 iCloud 다운로드가 끝나지 않았습니다";

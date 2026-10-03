@@ -164,8 +164,7 @@ struct CloudFolder: Sendable {
 
     /// `.X.icloud` is how iCloud lists a file it has not downloaded.
     static func placeholderTarget(_ name: String) -> String? {
-        guard name.hasPrefix("."), name.hasSuffix(".icloud") else { return nil }
-        return String(name.dropFirst().dropLast(".icloud".count))
+        UbiquitousDownload.placeholderTarget(name)
     }
 
     private static func id(fromMeta name: String) -> UUID? {

@@ -252,3 +252,4 @@
 "cloud.footer.on" = "同期をオフにしたり別のフォルダを選んだりしても、このデバイスとフォルダのどちらからも何も削除されません。項目を削除すると、すべてのデバイスから削除されます。";
 "cloud.toggle" = "iCloud Drive で同期";
 "cloud.footer.disabled" = "オフ: トレイとクリップボードはこのデバイスだけに保存されます。オン: iCloud Drive のフォルダを通して他のデバイスと共有されます。";
+"cloud.downloadTimedOut" = "%@ の iCloud からのダウンロードが終わりませんでした";
