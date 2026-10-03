@@ -8,10 +8,12 @@ import XCTest
 @MainActor
 final class LaunchDrawerSlotIntentTests: XCTestCase {
     func testPerformHandsTheURLToTheApp() async throws {
+        // Our own scheme with an unknown host: the host app's window routes
+        // it to `.ignore`, so the test never sends the host to another app.
         let posted = expectation(forNotification: .launchDrawerSlot, object: nil) { note in
-            (note.object as? URL)?.scheme == "shortcuts"
+            (note.object as? URL)?.host == "test"
         }
-        _ = try await LaunchDrawerSlotIntent(launch: "shortcuts://run-shortcut?name=X").perform()
+        _ = try await LaunchDrawerSlotIntent(launch: "islandtray://test").perform()
         await fulfillment(of: [posted], timeout: 1)
         // Whoever listened took it; a later listener finds nothing, so the
         // launch runs once.

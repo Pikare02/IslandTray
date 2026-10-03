@@ -50,4 +50,37 @@ final class LockScreenDrawerIconsTests: XCTestCase {
             + "atlas kept=\(state.atlas != nil), drawer icons kept=\(kept)/6")
         XCTAssertEqual(kept, 6, "Lock Screen drawer dropped its icons -> shows SF Symbols instead")
     }
+
+    /// The worst case for the tray state: a full page of four tray tiles,
+    /// nine slots with long launch URLs, and the combined atlas carrying the
+    /// island's six icons. The six must survive -- the tray state is what
+    /// the island sits on whenever the tray has anything in it.
+    func testLockScreenDrawerKeepsSixIconsWithAFullTrayAndNineSlots() async {
+        let trayTiles: [UIImage?] = (0..<4).map { i in
+            UIGraphicsImageRenderer(size: CGSize(width: 48, height: 48)).image { ctx in
+                [UIColor.systemRed, .systemBlue, .systemGreen, .systemOrange][i].setFill()
+                ctx.fill(CGRect(x: 0, y: 0, width: 48, height: 48))
+                UIImage(systemName: "photo")?.withTintColor(.white).draw(in: CGRect(x: 8, y: 8, width: 32, height: 32))
+            }
+        }
+        // A four-tile strip built the way the drawer's is; stands in for `islandAtlas`.
+        let trayAtlas = await ThumbnailService.shared.drawerAtlas(for: trayTiles, side: 48, quality: 0.3)!
+        let drawer: [UIImage?] = (0..<9).map { icon($0) }
+        let slots = (0..<9).map { i -> TrayContentState.DrawerSlot in
+            let name = "アプリのショートカット\(i)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
+            return .init(symbol: "globe", name: "アプリ \(i)", launch: "shortcuts://run-shortcut?name=\(name)", hasIcon: true)
+        }
+        let tray = TrayContentState.make(from: (0..<4).map { item("photo\($0).jpeg") }, atlas: trayAtlas, page: 0)
+        // The real path: `pagedState` hands the island's six icons to the
+        // combined-atlas ladder.
+        let state = await TrayActivityController.fittedTrayState(
+            tray: tray, trayAtlas: trayAtlas, slots: slots,
+            icons: Array(drawer.prefix(TrayContentState.islandSlots)), lockDrawer: true)
+
+        let kept = state.drawer?.filter(\.hasIcon).count ?? 0
+        print("full tray + nine slots: atlas=\(state.atlas?.count ?? -1)B, state=\(state.encodedByteCount)B, "
+            + "slots=\(state.drawer?.count ?? 0), icons kept=\(kept)")
+        XCTAssertLessThanOrEqual(state.encodedByteCount, TrayContentState.maxEncodedBytes)
+        XCTAssertEqual(kept, TrayContentState.islandSlots, "Lock Screen drawer dropped its icons -> shows SF Symbols instead")
+    }
 }

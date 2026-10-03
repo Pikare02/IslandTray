@@ -1,6 +1,7 @@
 import ActivityKit
 import Foundation
 import OSLog
+import UIKit
 
 /// Owns the tray's Live Activity.
 ///
@@ -313,7 +314,6 @@ actor TrayActivityController {
         let lockDrawer = settings.lockScreenShowsDrawer
         // Icons only when the Lock Screen draws them: the island's tray view
         // shows the arrow, not the icons, so they would be spent bytes.
-        var combined: TrayContentState.Atlas?
         if lockDrawer {
             let icons = await DrawerState.icons(for: shortcuts)
             // Shared container: full-resolution files the widget reads
@@ -321,12 +321,36 @@ actor TrayActivityController {
             if !DrawerIconFiles.write(icons) {
                 // Only the icons the island draws: tray tiles plus all nine
                 // drawer tiles would outgrow the state and shed every icon.
-                combined = await ThumbnailService.shared.combinedAtlas(
-                    tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count,
-                    drawer: Array(icons.prefix(TrayContentState.islandSlots)))
+                return await Self.fittedTrayState(
+                    tray: tray, trayAtlas: tray.atlas == nil ? nil : trayAtlas, slots: slots,
+                    icons: Array(icons.prefix(TrayContentState.islandSlots)), lockDrawer: lockDrawer
+                ).hidingLockScreen(hideLock)
             }
         }
-        return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer).hidingLockScreen(hideLock)
+        return tray.withDrawer(slots, combined: nil, lockDrawer: lockDrawer).hidingLockScreen(hideLock)
+    }
+
+    /// The tray state carrying the drawer with as many of `icons` as the
+    /// budget allows: the combined strip is tried down `combinedQualities`
+    /// until every icon survives `withDrawer`, and the rung that kept the
+    /// most wins otherwise. Static and internal so a test can run it on a
+    /// full tray page and nine slots.
+    static func fittedTrayState(
+        tray: TrayContentState, trayAtlas: TrayContentState.Atlas?, slots: [TrayContentState.DrawerSlot],
+        icons: [UIImage?], lockDrawer: Bool
+    ) async -> TrayContentState {
+        let wanted = icons.filter { $0 != nil }.count
+        var best: TrayContentState?
+        var bestKept = -1
+        for q in ThumbnailService.combinedQualities {
+            let combined = await ThumbnailService.shared.combinedAtlas(
+                tray: trayAtlas, trayCount: tray.recent.count, drawer: icons, side: q.side, quality: q.quality)
+            let state = tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer)
+            let kept = state.drawer?.filter(\.hasIcon).count ?? 0
+            if kept > bestKept { (best, bestKept) = (state, kept) }
+            if kept >= wanted { break }
+        }
+        return best ?? tray.withDrawer(slots, combined: nil, lockDrawer: lockDrawer)
     }
 
     /// Builds the date/weather + drawer-slots state from what is on disk.
@@ -362,16 +386,32 @@ actor TrayActivityController {
                                                view: view, count: count,
                                                lockDrawer: settings.lockScreenShowsDrawer)
         }
-        // Otherwise the sharpest strip that still fits: makeDrawer drops an
-        // atlas that does not, so the first state that kept one wins.
+        return await Self.fittedDrawerState(images: images, slots: slots, weather: weather, view: view,
+                                            count: count, lockDrawer: settings.lockScreenShowsDrawer)
+    }
+
+    /// The sharpest icon strip that still fits the state: `makeDrawer` drops
+    /// an atlas that does not, so the first rung of `drawerQualities` that
+    /// kept one wins. When no rung fits all the icons -- nine slots with long
+    /// launch URLs leave little room -- the strip is cut to the six the
+    /// island draws and the ladder is walked again; the widget then shows
+    /// symbols for the rest rather than everything falling to symbols.
+    ///
+    /// Static and internal so a test can run the real ladder on real icons.
+    static func fittedDrawerState(
+        images: [UIImage?], slots: [TrayContentState.DrawerSlot], weather: TrayContentState.Weather?,
+        view: TrayContentState.View, count: Int, lockDrawer: Bool
+    ) async -> TrayContentState {
         var state: TrayContentState?
-        for q in ThumbnailService.drawerQualities {
-            let atlas = await ThumbnailService.shared.drawerAtlas(for: images, side: q.side, quality: q.quality)
-            let candidate = TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas,
-                                                        view: view, count: count,
-                                                        lockDrawer: settings.lockScreenShowsDrawer)
-            state = candidate
-            if atlas == nil || candidate.atlas != nil { break }
+        for icons in [images, Array(images.prefix(TrayContentState.islandSlots))] {
+            for q in ThumbnailService.drawerQualities {
+                let atlas = await ThumbnailService.shared.drawerAtlas(for: icons, side: q.side, quality: q.quality)
+                let candidate = TrayContentState.makeDrawer(weather: weather, slots: slots, atlas: atlas,
+                                                            view: view, count: count, lockDrawer: lockDrawer)
+                state = candidate
+                if atlas == nil || candidate.atlas != nil { break }
+            }
+            if state?.atlas != nil || images.count <= TrayContentState.islandSlots { break }
         }
         return state!
     }

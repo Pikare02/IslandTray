@@ -37,4 +37,32 @@ final class DrawerAtlasBudgetTests: XCTestCase {
         }
         XCTAssertGreaterThan(chosen, 48)
     }
+
+    /// Nine icons and nine slots with long, percent-encoded launch URLs --
+    /// the most a drawer state carries. The real ladder must keep an atlas:
+    /// all nine tiles, or at least the island's six.
+    func testNineIconsKeepAnAtlasThroughTheLadder() async {
+        let images: [UIImage?] = (0..<9).map { i in
+            UIGraphicsImageRenderer(size: CGSize(width: 256, height: 256)).image { ctx in
+                let c: UIColor = [.systemBlue, .systemGreen, .systemOrange, .systemPink, .systemPurple,
+                                  .systemTeal, .systemRed, .systemIndigo, .systemYellow][i]
+                let g = CGGradient(colorsSpace: nil, colors: [c.cgColor, UIColor.black.cgColor] as CFArray, locations: nil)!
+                ctx.cgContext.drawLinearGradient(g, start: .zero, end: CGPoint(x: 256, y: 256), options: [])
+                UIImage(systemName: "star.fill")?.withTintColor(.white).draw(in: CGRect(x: 64, y: 64, width: 128, height: 128))
+            }
+        }
+        let slots = (0..<9).map { i -> TrayContentState.DrawerSlot in
+            let name = "アプリのショートカット\(i)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
+            return .init(symbol: "globe", name: "アプリ \(i)", launch: "shortcuts://run-shortcut?name=\(name)", hasIcon: true)
+        }
+        let weather = TrayContentState.Weather(dateText: "9/24 木", tempText: "21°", symbol: "sun.max")
+        let state = await TrayActivityController.fittedDrawerState(
+            images: images, slots: slots, weather: weather, view: .drawer, count: 0, lockDrawer: false
+        )
+        print("nine slots: \(state.encodedByteCount)B, atlas=\(state.atlas?.count ?? -1)B, slots=\(state.drawer?.count ?? 0)")
+        XCTAssertLessThanOrEqual(state.encodedByteCount, TrayContentState.maxEncodedBytes)
+        XCTAssertEqual(state.drawer?.count, 9, "slots were shed")
+        let tiles = state.atlas.map(AtlasSlicer.tiles) ?? []
+        XCTAssertGreaterThanOrEqual(tiles.count, TrayContentState.islandSlots, "drawer fell back to SF Symbols")
+    }
 }

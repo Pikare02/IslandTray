@@ -3,6 +3,10 @@ import WidgetKit
 
 /// What the drawer widget's edit sheet (long-press, Edit Widget) offers:
 /// how many of the drawer's icons to show.
+///
+/// These strings resolve through the extension's Localizable.strings in the
+/// device language -- the system draws this sheet, so the app's own
+/// language setting (`L.s`) does not reach it.
 struct DrawerWidgetConfigurationIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "widget.drawer.name"
     static let description = IntentDescription("widget.drawer.desc")

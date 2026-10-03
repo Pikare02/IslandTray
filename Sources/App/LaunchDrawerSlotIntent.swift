@@ -13,6 +13,9 @@ import Foundation
 struct LaunchDrawerSlotIntent: AppIntent {
     static let title: LocalizedStringResource = "ドロワーの項目を開く"
     static let openAppWhenRun: Bool = true
+    /// Widget plumbing, not a Shortcuts action: it would otherwise be
+    /// offered there with a bare URL field.
+    static let isDiscoverable: Bool = false
 
     @Parameter(title: "URL")
     var launch: String

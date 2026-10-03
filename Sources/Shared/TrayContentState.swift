@@ -392,22 +392,27 @@ struct TrayContentState: Codable, Hashable {
     /// page's drawer arrow and, with `lockDrawer`, the Lock Screen's icons.
     ///
     /// `combined` is a strip of this state's tray tiles followed by one tile
-    /// per slot. Tried first; if it does not fit, the state keeps its own
-    /// tray atlas with symbol-only slots, shedding slots from the end until
-    /// it fits -- the tray's own thumbnails are never given up for the drawer.
+    /// per slot the island draws. Tried first, shedding slots from the end
+    /// (the ones past the island's six carry no tile and go first) until it
+    /// fits; only then does the state fall back to its own tray atlas with
+    /// symbol-only slots, shedding again -- the tray's own thumbnails are
+    /// never given up for the drawer.
     func withDrawer(_ slots: [DrawerSlot], combined: Atlas?, lockDrawer: Bool) -> TrayContentState {
         let capped = Array(slots.prefix(Self.maxSlots))
         if let combined {
             let offset = recent.count
-            let iconned = capped.enumerated().map { i, slot in
+            var iconned = capped.enumerated().map { i, slot in
                 DrawerSlot(symbol: slot.symbol, name: Self.islandName(slot.name), launch: slot.launch,
                            hasIcon: combined.filled.indices.contains(offset + i) && combined.filled[offset + i])
             }
-            let state = TrayContentState(
-                count: count, recent: recent, atlas: combined.jpeg, page: page, added: added,
-                drawer: iconned, view: view, lockDrawer: lockDrawer
-            )
-            if state.encodedByteCount <= Self.buildBudget { return state }
+            while !iconned.isEmpty {
+                let state = TrayContentState(
+                    count: count, recent: recent, atlas: combined.jpeg, page: page, added: added,
+                    drawer: iconned, view: view, lockDrawer: lockDrawer
+                )
+                if state.encodedByteCount <= Self.buildBudget { return state }
+                iconned.removeLast()
+            }
         }
         var kept = capped.map {
             DrawerSlot(symbol: $0.symbol, name: Self.islandName($0.name), launch: $0.launch, hasIcon: false)
