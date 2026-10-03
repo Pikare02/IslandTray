@@ -5,8 +5,9 @@ import WidgetKit
 /// from `DrawerSnapshot` -- whatever the Live Activity was last given.
 ///
 /// Medium is the island's own row: six tiles, each a `Link`. Small and the
-/// Lock Screen families take a single tap target (WidgetKit allows no
-/// `Link` there), so they show the first icons and open the app's drawer.
+/// rectangular Lock Screen widget take a single tap target (WidgetKit allows
+/// no `Link` there), so they show the first icons and open the app's drawer.
+/// The circular Lock Screen widget is only a launcher glyph for that drawer.
 struct DrawerWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: DrawerSnapshot.widgetKind, provider: Provider()) { entry in
@@ -44,6 +45,7 @@ struct DrawerWidget: Widget {
 
 struct DrawerWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
     let payload: DrawerSnapshot.Payload?
 
     private var isAccessory: Bool {
@@ -52,12 +54,17 @@ struct DrawerWidgetView: View {
 
     var body: some View {
         Group {
-            if let payload, !payload.slots.isEmpty {
+            if family == .accessoryCircular {
+                launcherGlyph
+            } else if let payload, !payload.slots.isEmpty {
                 content(payload)
             } else {
                 empty
             }
         }
+        // The Home Screen tile is always near-black, so resolve `.secondary`
+        // and `.primary` against dark even in Light appearance.
+        .environment(\.colorScheme, isAccessory ? colorScheme : .dark)
         // The Lock Screen draws its own vibrant material behind accessories;
         // the Home Screen gets the island's black.
         .containerBackground(for: .widget) {
@@ -70,16 +77,18 @@ struct DrawerWidgetView: View {
         case .systemMedium:
             DrawerStrip(slots: payload.slots, atlas: payload.atlas, side: 56, atlasOffset: payload.atlasOffset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .accessoryCircular:
-            ZStack {
-                AccessoryWidgetBackground()
-                Image(systemName: "square.grid.2x2.fill").font(.title3)
-            }
-            .widgetURL(TrayIDs.drawerURL)
         default:
             grid(payload, columns: family == .systemSmall ? 2 : 4)
                 .widgetURL(TrayIDs.drawerURL)
         }
+    }
+
+    private var launcherGlyph: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            Image(systemName: "square.grid.2x2.fill").font(.title3)
+        }
+        .widgetURL(TrayIDs.drawerURL)
     }
 
     /// The first four slots as tiles with no names: a glance, and one tap
