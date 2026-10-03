@@ -254,3 +254,6 @@
 "cloud.footer.disabled" = "オフ: トレイとクリップボードはこのデバイスだけに保存されます。オン: iCloud Drive のフォルダを通して他のデバイスと共有されます。";
 "cloud.downloadTimedOut" = "%@ の iCloud からのダウンロードが終わりませんでした";
 "banner.importing" = "取り込み中…";
+"widget.drawer.name" = "アプリドロワー";
+"widget.drawer.desc" = "アイランドのアプリドロワーをホーム画面とロック画面に。";
+"widget.drawer.empty" = "アプリドロワーをオンにして、アイランドを一度更新してください";

@@ -254,3 +254,6 @@
 "cloud.footer.disabled" = "끔: 트레이와 클립보드가 이 기기에만 저장됩니다. 켬: iCloud Drive 폴더를 통해 다른 기기와 공유됩니다.";
 "cloud.downloadTimedOut" = "%@의 iCloud 다운로드가 끝나지 않았습니다";
 "banner.importing" = "가져오는 중…";
+"widget.drawer.name" = "앱 서랍";
+"widget.drawer.desc" = "아일랜드의 앱 서랍을 홈 화면과 잠금 화면에.";
+"widget.drawer.empty" = "앱 서랍을 켜고 아일랜드를 한 번 갱신하세요";

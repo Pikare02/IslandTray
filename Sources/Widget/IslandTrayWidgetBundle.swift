@@ -5,5 +5,6 @@ import WidgetKit
 struct IslandTrayWidgetBundle: WidgetBundle {
     var body: some Widget {
         TrayLiveActivity()
+        DrawerWidget()
     }
 }
