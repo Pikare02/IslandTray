@@ -8,6 +8,22 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.11.0] — 2026-10-03
+
+### Changed
+- **App Drawer widgets** are now a grid of square tiles filled from the top
+  left with as many apps as the drawer has — up to nine (small: 3×3, medium:
+  5×2, Lock Screen rectangle: one row of four), names hidden.
+- Long-press the widget and choose *Edit Widget* to set how many icons it
+  shows (1–9).
+- Every tile opens its app. Medium tiles open the target directly; on the
+  small widget and the Lock Screen rectangle, where iOS allows only one link
+  per widget, a tap goes through IslandTray for a moment and then opens the
+  target.
+- The island itself still shows the first six drawer apps; the seventh to
+  ninth ride along for the widgets. Right after updating, those three may
+  show plain symbols until the island has drawn the drawer once.
+
 ## [1.10.0] — 2026-10-03
 
 ### Added
