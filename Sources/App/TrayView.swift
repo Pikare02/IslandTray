@@ -309,6 +309,17 @@ struct BoardView: View {
             .safeAreaInset(edge: .bottom) { if isSelecting { selectionBar } }
             .safeAreaInset(edge: .bottom) { CloudStatusBar(cloud: model.cloud) }
             .safeAreaInset(edge: .bottom) {
+                if model.isImporting {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(L.s("banner.importing")).font(.footnote)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity)
+                    .background(.thinMaterial)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
                 if let banner = model.banner {
                     Text(banner)
                         .font(.footnote)

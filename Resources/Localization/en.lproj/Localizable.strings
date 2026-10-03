@@ -253,3 +253,4 @@
 "cloud.toggle" = "Sync through iCloud Drive";
 "cloud.footer.disabled" = "Off: the tray and clipboard stay on this device only. On: they are shared with your other devices through a folder in iCloud Drive.";
 "cloud.downloadTimedOut" = "%@ never finished downloading from iCloud";
+"banner.importing" = "Taking in…";

@@ -7,6 +7,10 @@ import UIKit
 final class TrayModel {
     var items: [TrayItem] = []
     var banner: String?
+    /// True while a drop (or an accepted duplicate) is being copied in. A
+    /// source still in iCloud can take a while to arrive, and nothing else
+    /// on screen moves until it has.
+    var isImporting = false
 
     /// The tray on disk. Defaulted to the shared singleton, which is what the
     /// app always uses; a parameter only so `start(migratingFrom:)` can be
@@ -167,6 +171,8 @@ final class TrayModel {
     }
 
     func ingest(_ providers: [NSItemProvider]) async {
+        isImporting = true
+        defer { isImporting = false }
         let result = await DropReceiver.ingest(providers: providers)
         pendingDuplicates += result.duplicates
         await returnToTray(result.duplicates)
@@ -240,6 +246,8 @@ final class TrayModel {
 
     /// Adds the held-back files after all.
     func addPendingDuplicates() async {
+        isImporting = true
+        defer { isImporting = false }
         let staged = pendingDuplicates
         pendingDuplicates = []
         await returnToTray(staged)
