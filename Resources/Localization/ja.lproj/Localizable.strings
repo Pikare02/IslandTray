@@ -257,3 +257,4 @@
 "widget.drawer.name" = "アプリドロワー";
 "widget.drawer.desc" = "アイランドのアプリドロワーをホーム画面とロック画面に。";
 "widget.drawer.empty" = "アプリドロワーをオンにして、アイランドを一度更新してください";
+"widget.count.title" = "表示するアイコン数";

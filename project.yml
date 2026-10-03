@@ -79,6 +79,9 @@ targets:
       # has to compile here, which is what the two files under it are for.
       - path: Sources/App/TrayPageIntent.swift
       - path: Sources/App/ToggleDrawerIntent.swift
+      # The drawer widget's tiles run this one (openAppWhenRun, so it too
+      # performs in the app).
+      - path: Sources/App/LaunchDrawerSlotIntent.swift
       - path: Sources/App/TrayActivityController.swift
       - path: Sources/App/ThumbnailService.swift
       # pagedState(for:) now builds the drawer state too, which pulls these

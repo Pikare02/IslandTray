@@ -29,28 +29,19 @@ struct IslandTrayApp: App {
         WindowGroup {
             TrayView()
                 .preferredColorScheme(Self.scheme(theme))
-                .onOpenURL { url in
-                    switch LaunchRouter.route(url) {
-                    case .drawer:
-                        NotificationCenter.default.post(name: .openDrawer, object: nil)
-                    case .launch(let id):
-                        LaunchRouter.performLaunch(id)
-                    case .open(let id):
-                        NotificationCenter.default.post(name: .openTrayItem, object: id)
-                    case .external(let url):
-                        UIApplication.shared.open(url)
-                    case .drop:
-                        // The tray face of the island (or a drop) lands on the tray tab.
-                        NotificationCenter.default.post(name: .openTray, object: nil)
-                    case .ignore:
-                        break
-                    }
+                .onOpenURL { url in handle(url) }
+                // A widget tile that cannot be a `Link` opens the app with
+                // its URL through an intent; the URL arrives here.
+                .onReceive(NotificationCenter.default.publisher(for: .launchDrawerSlot)) { _ in
+                    if let url = LaunchDrawerSlotIntent.takePending() { handle(url) }
                 }
         }
         .onChange(of: scenePhase) { _, phase in
             // Restart the Live Activity whenever the app comes forward, so the
             // eight-hour window resets even if the Shortcuts automation missed.
             if phase == .active {
+                // A cold start can run the intent before the window listens.
+                if let url = LaunchDrawerSlotIntent.takePending() { handle(url) }
                 Task { await TrayActivityController.shared.restart() }
             } else if phase == .background {
                 // Queue the hourly weather refresh; iOS decides the exact time.
@@ -64,6 +55,26 @@ struct IslandTrayApp: App {
         .backgroundTask(.appRefresh(Self.weatherRefreshID)) {
             await TrayActivityController.shared.syncFromStore()
             Self.scheduleWeatherRefresh()
+        }
+    }
+
+    /// Where every URL handed to the app ends up: an island link, a widget
+    /// tile, a document opened into the app.
+    private func handle(_ url: URL) {
+        switch LaunchRouter.route(url) {
+        case .drawer:
+            NotificationCenter.default.post(name: .openDrawer, object: nil)
+        case .launch(let id):
+            LaunchRouter.performLaunch(id)
+        case .open(let id):
+            NotificationCenter.default.post(name: .openTrayItem, object: id)
+        case .external(let url):
+            UIApplication.shared.open(url)
+        case .drop:
+            // The tray face of the island (or a drop) lands on the tray tab.
+            NotificationCenter.default.post(name: .openTray, object: nil)
+        case .ignore:
+            break
         }
     }
 

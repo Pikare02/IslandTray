@@ -134,8 +134,12 @@ struct TrayContentState: Codable, Hashable {
 
     enum View: String, Codable { case tray, drawer }
 
-    /// Maximum drawer slots shown on the island.
-    static let maxSlots = 6
+    /// Maximum drawer slots a state carries: what the Home/Lock Screen
+    /// widgets can show. The island itself draws only `islandSlots` of them.
+    static let maxSlots = 9
+    /// How many of `drawer` the island's own row draws. Six is what its
+    /// expanded region fits; the rest ride along for the widgets.
+    static let islandSlots = 6
 
     let count: Int
     let recent: [Preview]

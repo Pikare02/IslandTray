@@ -36,6 +36,21 @@ final class TrayContentStateDrawerTests: XCTestCase {
         XCTAssertNotNil(state.weather)                 // weather is always retained
     }
 
+    /// The widgets show up to nine; the island draws the first six of them.
+    func testNineSlotsAreCarriedAndTheIslandDrawsSix() throws {
+        XCTAssertEqual(TrayContentState.maxSlots, 9)
+        XCTAssertEqual(TrayContentState.islandSlots, 6)
+        let state = TrayContentState.makeDrawer(
+            weather: .init(dateText: "9/24 木", tempText: "21°", symbol: "sun.max"),
+            slots: (0..<10).map(slot), atlas: nil, view: .drawer, count: 0
+        )
+        XCTAssertEqual(state.drawer?.count, 9) // capped at nine, the tenth is dropped
+        XCTAssertLessThanOrEqual(state.encodedByteCount, TrayContentState.maxEncodedBytes)
+        // And nine survive the trip through ActivityKit's encoding.
+        let decoded = try JSONDecoder().decode(TrayContentState.self, from: JSONEncoder().encode(state))
+        XCTAssertEqual(decoded.drawer?.map(\.name), (0..<9).map { "App\($0)" })
+    }
+
     func testDefaultsAbsentWhenTrayState() {
         let state = TrayContentState.make(from: [], atlas: nil)
         XCTAssertNil(state.weather)

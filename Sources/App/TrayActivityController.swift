@@ -319,8 +319,11 @@ actor TrayActivityController {
             // Shared container: full-resolution files the widget reads
             // itself, so no drawer bytes in the state at all.
             if !DrawerIconFiles.write(icons) {
+                // Only the icons the island draws: tray tiles plus all nine
+                // drawer tiles would outgrow the state and shed every icon.
                 combined = await ThumbnailService.shared.combinedAtlas(
-                    tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count, drawer: icons)
+                    tray: tray.atlas == nil ? nil : trayAtlas, trayCount: tray.recent.count,
+                    drawer: Array(icons.prefix(TrayContentState.islandSlots)))
             }
         }
         return tray.withDrawer(slots, combined: combined, lockDrawer: lockDrawer).hidingLockScreen(hideLock)

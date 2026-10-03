@@ -45,7 +45,8 @@ struct TrayLiveActivity: Widget {
                     // and how the drawer is switched to and from.
                     if context.state.view == .drawer, let slots = context.state.drawer {
                         HStack(spacing: 4) {
-                            DrawerStrip(slots: slots, atlas: context.state.atlas, side: 44)
+                            DrawerStrip(slots: Array(slots.prefix(TrayContentState.islandSlots)),
+                                        atlas: context.state.atlas, side: 44)
                                 .frame(maxWidth: .infinity)
                             // The drawer sits to the left of the tray, so the
                             // way back is a right arrow -- and with an empty
@@ -194,7 +195,7 @@ struct TrayLiveActivity: Widget {
             Color.clear.frame(height: 0)
         } else if state.lockDrawer, let slots = state.drawer, !slots.isEmpty {
             // Labs setting: the drawer's first six, whatever the tray holds.
-            DrawerStrip(slots: slots, atlas: state.atlas, side: 38,
+            DrawerStrip(slots: Array(slots.prefix(TrayContentState.islandSlots)), atlas: state.atlas, side: 38,
                         atlasOffset: state.view == .drawer ? 0 : state.recent.count)
                 .frame(maxWidth: .infinity)
                 .padding(14)

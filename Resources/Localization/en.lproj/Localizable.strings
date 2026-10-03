@@ -257,3 +257,4 @@
 "widget.drawer.name" = "App Drawer";
 "widget.drawer.desc" = "The island's app drawer, on your Home and Lock Screen.";
 "widget.drawer.empty" = "Turn on the app drawer and refresh the island once";
+"widget.count.title" = "Icons shown";
