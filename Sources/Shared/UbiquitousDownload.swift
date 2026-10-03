@@ -21,18 +21,29 @@ enum UbiquitousDownload {
     /// `.X.icloud` is how iCloud lists a file it has not downloaded.
     static func placeholderTarget(_ name: String) -> String? {
         guard name.hasPrefix("."), name.hasSuffix(".icloud") else { return nil }
-        return String(name.dropFirst().dropLast(".icloud".count))
+        // A file literally named `.icloud` has no target.
+        let target = String(name.dropFirst().dropLast(".icloud".count))
+        guard !target.isEmpty else { return nil }
+        return target
     }
 
     private static let keys: Set<URLResourceKey> = [
         .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey, .isDirectoryKey,
     ]
 
+    private static func isUbiquitous(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]))?.isUbiquitousItem == true
+    }
+
     /// The real URLs of every item at or under `url` that is not on this
-    /// device yet. Empty for anything outside iCloud.
+    /// device yet. Empty when `url` itself is not in iCloud: a local folder
+    /// can hold old `.X.icloud` stubs that will never turn into files.
+    /// `assumingUbiquitous` skips that root check for a caller that has
+    /// already made it (or a test walking a local fixture).
     ///
     /// Hidden files are walked: the placeholders are hidden files.
-    static func pending(in url: URL) -> [URL] {
+    static func pending(in url: URL, assumingUbiquitous: Bool = false) -> [URL] {
+        guard assumingUbiquitous || isUbiquitous(url) else { return [] }
         var urls = [url]
         if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
            let walker = FileManager.default.enumerator(
@@ -56,18 +67,32 @@ enum UbiquitousDownload {
     }
 
     /// Asks iCloud for everything `pending(in:)` lists and waits until the
-    /// list is empty. Items that appear while waiting (a folder whose
-    /// contents only became visible once it arrived) are asked for too.
+    /// list is empty. Returns at once for anything outside iCloud.
     static func ensureDownloaded(_ url: URL, timeout: TimeInterval = 120, poll: TimeInterval = 0.5) throws {
-        let deadline = Date().addingTimeInterval(timeout)
+        guard isUbiquitous(url) else { return }
+        try waitUntilDownloaded(url, deadline: Date().addingTimeInterval(timeout), poll: poll)
+    }
+
+    /// The wait loop. Items that appear while waiting (a folder whose
+    /// contents only became visible once it arrived) are asked for too.
+    static func waitUntilDownloaded(_ url: URL, deadline: Date, poll: TimeInterval) throws {
         var asked = Set<URL>()
         while true {
-            let missing = pending(in: url)
+            let missing = pending(in: url, assumingUbiquitous: true)
             if missing.isEmpty { return }
             for item in missing where asked.insert(item).inserted {
                 // A refusal is not reported here: an item that never
                 // arrives is what the deadline below names.
                 try? FileManager.default.startDownloadingUbiquitousItem(at: item)
+            }
+            // An offline device or a refused download should fail the drop
+            // now, not after two minutes of "taking in...". A placeholder's
+            // real URL may not exist yet; that reads as no error.
+            for item in missing {
+                if let error = (try? item.resourceValues(forKeys: [.ubiquitousItemDownloadingErrorKey]))?
+                    .ubiquitousItemDownloadingError {
+                    throw error
+                }
             }
             if Date() >= deadline { throw TimedOut(name: missing[0].lastPathComponent) }
             Thread.sleep(forTimeInterval: poll)

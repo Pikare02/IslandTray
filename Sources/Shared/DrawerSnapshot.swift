@@ -53,6 +53,20 @@ enum DrawerSnapshot {
             WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
             return .removed
         }
+        // A tray state carries the drawer only as far as its own tiles leave
+        // room: icons only with the Lock Screen drawer on, and slots shed to
+        // nothing when the state runs out of bytes. What a drawer state
+        // recorded stays unless the drawer's make-up changed, or the tray
+        // state has more icons than what is on disk. It also keeps the
+        // tray's own thumbnails from rewriting this file on every change.
+        if state.view != .drawer {
+            if payload.slots.isEmpty { return .unchanged }
+            if let existing = load(from: url),
+               existing.slots.map(Self.identity) == payload.slots.map(Self.identity),
+               existing.slots.filter(\.hasIcon).count >= payload.slots.filter(\.hasIcon).count {
+                return .unchanged
+            }
+        }
         if (try? Data(contentsOf: url)) == data { return .unchanged }
         try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         do {
@@ -64,6 +78,11 @@ enum DrawerSnapshot {
         }
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)
         return .written
+    }
+
+    /// What makes a slot the same slot, icon or not.
+    private static func identity(_ slot: TrayContentState.DrawerSlot) -> String {
+        "\(slot.symbol)|\(slot.name)|\(slot.launch)"
     }
 
     static func load(from url: URL = url) -> Payload? {

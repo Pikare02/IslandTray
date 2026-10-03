@@ -22,6 +22,7 @@ final class UbiquitousDownloadTests: XCTestCase {
         XCTAssertEqual(UbiquitousDownload.placeholderTarget(".a.txt.icloud"), "a.txt")
         XCTAssertNil(UbiquitousDownload.placeholderTarget("a.txt"))
         XCTAssertNil(UbiquitousDownload.placeholderTarget(".hidden"))
+        XCTAssertNil(UbiquitousDownload.placeholderTarget(".icloud"))
     }
 
     func testLocalFilesHaveNothingPendingAndAreNotWaitedOn() throws {
@@ -44,14 +45,25 @@ final class UbiquitousDownloadTests: XCTestCase {
         try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
         try Data().write(to: sub.appendingPathComponent(".x.pdf.icloud"))
 
-        XCTAssertEqual(UbiquitousDownload.pending(in: scratch).map(\.lastPathComponent), ["x.pdf"])
+        XCTAssertEqual(
+            UbiquitousDownload.pending(in: scratch, assumingUbiquitous: true).map(\.lastPathComponent), ["x.pdf"])
+    }
+
+    func testAStubInsideALocalFolderIsNotWaitedOn() throws {
+        try Data().write(to: scratch.appendingPathComponent(".x.pdf.icloud"))
+
+        XCTAssertEqual(UbiquitousDownload.pending(in: scratch), [])
+        let started = Date()
+        XCTAssertNoThrow(try UbiquitousDownload.ensureDownloaded(scratch, timeout: 5))
+        XCTAssertLessThan(Date().timeIntervalSince(started), 1)
     }
 
     func testAPlaceholderThatNeverArrivesTimesOutNamingIt() throws {
         try Data().write(to: scratch.appendingPathComponent(".x.pdf.icloud"))
 
         XCTAssertThrowsError(
-            try UbiquitousDownload.ensureDownloaded(scratch, timeout: 0.3, poll: 0.1)
+            try UbiquitousDownload.waitUntilDownloaded(
+                scratch, deadline: Date().addingTimeInterval(0.3), poll: 0.1)
         ) { error in
             XCTAssertEqual((error as? UbiquitousDownload.TimedOut)?.name, "x.pdf")
         }

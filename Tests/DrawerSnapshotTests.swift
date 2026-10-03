@@ -50,6 +50,32 @@ final class DrawerSnapshotTests: XCTestCase {
         XCTAssertEqual(DrawerSnapshot.load(from: url)?.atlasOffset, 3)
     }
 
+    private func trayState(carrying slots: [TrayContentState.DrawerSlot]) -> TrayContentState {
+        TrayContentState.make(from: [item(0)], atlas: nil).withDrawer(slots, combined: nil, lockDrawer: false)
+    }
+
+    func testATrayStateDoesNotReplaceADrawerStateWithTheSameSlots() {
+        XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: [slot(0), slot(1)]), at: url), .unchanged)
+        XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.map(\.hasIcon), [true, true])
+    }
+
+    func testATrayStateWithDifferentSlotsIsRecorded() {
+        XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: [slot(0), slot(1), slot(2)]), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.count, 3)
+    }
+
+    func testATrayStateWithNoSlotsIsIgnored() {
+        XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: []), at: url), .unchanged)
+        XCTAssertEqual(DrawerSnapshot.load(from: url)?.slots.count, 2)
+    }
+
+    func testATrayStateIsRecordedWhenNothingIsOnDisk() {
+        XCTAssertEqual(DrawerSnapshot.record(trayState(carrying: [slot(0)]), at: url), .written)
+    }
+
     func testTurningTheDrawerOffRemovesTheSnapshot() {
         XCTAssertEqual(DrawerSnapshot.record(drawerState(), at: url), .written)
         let off = TrayContentState.make(from: [], atlas: nil)
