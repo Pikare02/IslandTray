@@ -101,7 +101,6 @@ final class TrayStore: Sendable {
     ) throws -> TrayItem {
         try prepare()
         let name = suggestedName ?? source.lastPathComponent
-        let size = Self.byteCount(of: source)
         // A folder handed over with no type, or a vague one (Shortcuts can
         // say nothing), is still a folder. A package keeps its own type.
         var uti = uti
@@ -109,7 +108,7 @@ final class TrayStore: Sendable {
            UTType(uti ?? "")?.conforms(to: .directory) != true {
             uti = UTType.folder.identifier
         }
-        var item = makeItem(suggestedName: name, uti: uti, size: size)
+        var item = makeItem(suggestedName: name, uti: uti, size: 0)
         item.origin = origin
         item.board = board
         let destination = item.fileURL(in: itemsDirectory)
@@ -117,6 +116,9 @@ final class TrayStore: Sendable {
             try FileManager.default.removeItem(at: destination)
         }
         try Self.coordinatedCopy(from: source, to: destination)
+        // Counted on the copy, not the source: a source still partly in
+        // iCloud reports its placeholders' sizes, the copy is the real bytes.
+        item.size = Self.byteCount(of: destination)
         try commit(item, payload: destination)
         return item
     }
@@ -593,7 +595,13 @@ final class TrayStore: Sendable {
     /// materialises the contents (a folder's files, a download not yet on the
     /// device) for a reader that coordinates. An uncoordinated copy of a
     /// folder can fail, or copy an empty shell.
+    ///
+    /// Coordination alone does not fetch a folder's children from iCloud,
+    /// so anything still in the cloud is downloaded first. Every way into the
+    /// tray -- drop, share, shortcut, the Files inbox -- comes through here,
+    /// which is what makes this the one place for it.
     static func coordinatedCopy(from source: URL, to destination: URL) throws {
+        try UbiquitousDownload.ensureDownloaded(source)
         var coordinationError: NSError?
         var copyError: Error?
         NSFileCoordinator().coordinate(readingItemAt: source, options: .withoutChanges, error: &coordinationError) { url in
