@@ -183,6 +183,10 @@ struct TrayLiveActivity: Widget {
     }
 
     @ViewBuilder private func lockScreen(_ state: TrayContentState) -> some View {
+        // The Lock Screen presentation is evaluated on every update, in this
+        // extension's process: the one place the Home/Lock Screen drawer
+        // widgets can learn what the drawer holds (see DrawerSnapshot).
+        let _ = DrawerSnapshot.record(state)
         if state.hideLockScreen {
             // Setting: no Lock Screen presentation. ActivityKit still keeps an
             // active activity's banner container, so collapse it to nothing

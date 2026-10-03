@@ -23,9 +23,9 @@ struct DrawerStrip: View {
         HStack(spacing: 6) {
             ForEach(Array(slots.enumerated()), id: \.offset) { index, slot in
                 if let url = URL(string: slot.launch) {
-                    Link(destination: url) { tile(slot.name) { iconImage(index, tiles) } }
+                    Link(destination: url) { tile(slot.name) { DrawerIcon(slot: slot, index: index, tiles: tiles, atlasOffset: atlasOffset) } }
                 } else {
-                    tile(slot.name) { iconImage(index, tiles) }
+                    tile(slot.name) { DrawerIcon(slot: slot, index: index, tiles: tiles, atlasOffset: atlasOffset) }
                 }
             }
         }
@@ -43,18 +43,5 @@ struct DrawerStrip: View {
             }
         }
         .frame(maxWidth: maxSide)
-    }
-
-    @ViewBuilder private func iconImage(_ index: Int, _ tiles: [UIImage]) -> some View {
-        // Full-resolution file first (shared container builds), then the
-        // atlas tile, then the kind's symbol.
-        if let file = DrawerIconFiles.image(slot: index) {
-            Image(uiImage: file).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
-        } else if slots[index].hasIcon, tiles.indices.contains(atlasOffset + index) {
-            let ui = tiles[atlasOffset + index]
-            Image(uiImage: ui).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
-        } else {
-            Image(systemName: slots[index].symbol).font(.title3).foregroundStyle(.white)
-        }
     }
 }
