@@ -8,6 +8,24 @@ the app is used. The version is set once, in `project.yml`
 (`MARKETING_VERSION`), and each release is tagged `vX.Y.Z` with its `.ipa`
 files attached on GitHub.
 
+## [1.10.0] — 2026-10-03
+
+### Added
+- **App Drawer widgets.** The island's app drawer is now available as a Home
+  Screen widget (small: four icons, tap for the drawer; medium: six tiles,
+  each launching directly) and as a Lock Screen widget (rectangular and
+  circular, tap for the drawer). Works on the AltStore / SideStore build too:
+  the widget shows whatever the island last drew, so it fills in the first
+  time the island is refreshed after the drawer is turned on.
+
+### Fixed
+- A file or folder that was still in iCloud Drive, not yet on the device, is
+  now downloaded before it is taken into the tray — from a drop, the share
+  sheet, a shortcut or the Files inbox. It used to arrive as an empty
+  placeholder, and because of that the "same file is already in the tray"
+  check never recognised it either.
+- While a drop is still being taken in, the tray says so.
+
 ## [1.9.6] — 2026-09-30
 
 ### Fixed
